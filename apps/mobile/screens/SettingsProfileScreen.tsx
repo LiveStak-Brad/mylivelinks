@@ -458,6 +458,21 @@ export default function SettingsProfileScreen() {
   const [pinnedPostUploading, setPinnedPostUploading] = useState(false);
   const [pinnedPostDeleting, setPinnedPostDeleting] = useState(false);
   
+  // Profile customization (parity with web)
+  const [profileBgUrl, setProfileBgUrl] = useState<string | null>(null);
+  const [profileBgOverlay, setProfileBgOverlay] = useState('dark-medium');
+  const [cardColor, setCardColor] = useState('#FFFFFF');
+  const [cardOpacity, setCardOpacity] = useState(0.95);
+  const [cardBorderRadius, setCardBorderRadius] = useState('medium');
+  const [fontPreset, setFontPreset] = useState('modern');
+  const [accentColor, setAccentColor] = useState('#3B82F6');
+  const [linksSectionTitle, setLinksSectionTitle] = useState('My Links');
+  const [buttonColor, setButtonColor] = useState<string | null>(null);
+  const [contentTextColor, setContentTextColor] = useState<string | null>(null);
+  const [uiTextColor, setUiTextColor] = useState<string | null>(null);
+  const [linkColor, setLinkColor] = useState<string | null>(null);
+  const [bgUploading, setBgUploading] = useState(false);
+  
   // Referral
   const [referralId, setReferralId] = useState<string | null>(null);
   const [invitedByUsername, setInvitedByUsername] = useState('');
@@ -571,6 +586,20 @@ export default function SettingsProfileScreen() {
     // Display preferences
     setHideStreamingStats(p.hide_streaming_stats || false);
     setDefaultPostVisibility(p.default_post_visibility || 'public');
+    
+    // Profile customization (parity with web)
+    setProfileBgUrl(p.profile_bg_url || null);
+    setProfileBgOverlay(p.profile_bg_overlay || 'dark-medium');
+    setCardColor(p.card_color || '#FFFFFF');
+    setCardOpacity(p.card_opacity ?? 0.95);
+    setCardBorderRadius(p.card_border_radius || 'medium');
+    setFontPreset(p.font_preset || 'modern');
+    setAccentColor(p.accent_color || '#3B82F6');
+    setLinksSectionTitle(p.links_section_title || 'My Links');
+    setButtonColor(p.button_color || null);
+    setContentTextColor(p.content_text_color || null);
+    setUiTextColor(p.ui_text_color || null);
+    setLinkColor(p.link_color || null);
     
     setProfileLoaded(true);
   }, [profile, profileBio, profileDisplayName, saving]);
@@ -894,6 +923,20 @@ export default function SettingsProfileScreen() {
         hide_streaming_stats: hideStreamingStats,
         default_post_visibility: defaultPostVisibility,
         
+        // Profile customization (parity with web)
+        profile_bg_url: profileBgUrl || null,
+        profile_bg_overlay: profileBgOverlay,
+        card_color: cardColor,
+        card_opacity: cardOpacity,
+        card_border_radius: cardBorderRadius,
+        font_preset: fontPreset,
+        accent_color: accentColor,
+        links_section_title: linksSectionTitle,
+        button_color: buttonColor || null,
+        content_text_color: contentTextColor || null,
+        ui_text_color: uiTextColor || null,
+        link_color: linkColor || null,
+        
         updated_at: new Date().toISOString(),
       };
 
@@ -969,7 +1012,10 @@ export default function SettingsProfileScreen() {
     socialTwitch, socialDiscord, socialSnapchat, socialLinkedin, socialGithub,
     socialSpotify, socialOnlyfans, profileType, enabledModules, enabledTabs,
     showTopFriends, topFriendsTitle, topFriendsAvatarStyle, topFriendsMaxCount,
-    hideStreamingStats, defaultPostVisibility, links
+    hideStreamingStats, defaultPostVisibility, links,
+    profileBgUrl, profileBgOverlay, cardColor, cardOpacity, cardBorderRadius,
+    fontPreset, accentColor, linksSectionTitle, buttonColor, contentTextColor,
+    uiTextColor, linkColor
   ]);
 
   // Link CRUD functions (matching web exactly)
@@ -1149,6 +1195,69 @@ export default function SettingsProfileScreen() {
       ]
     );
   }, [userId, currentUser]);
+
+  // Background image upload (parity with web profile-media bucket)
+  const handleUploadBackground = useCallback(async () => {
+    if (!userId) return;
+
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission needed', 'Please allow access to your photo library to upload a background.');
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsEditing: true,
+      aspect: [16, 9],
+      quality: 0.8,
+    });
+
+    if (result.canceled || !result.assets[0]?.uri) return;
+
+    setBgUploading(true);
+    try {
+      const asset = result.assets[0];
+      const fileExt = asset.uri.split('.').pop()?.toLowerCase() || 'jpg';
+      const fileName = `background.${fileExt}`;
+      const filePath = `${userId}/${fileName}`;
+
+      const response = await fetch(asset.uri);
+      const blob = await response.blob();
+
+      const { error: uploadError } = await supabase.storage
+        .from('profile-media')
+        .upload(filePath, blob, {
+          cacheControl: '3600',
+          upsert: true,
+          contentType: 'image/jpeg',
+        });
+
+      if (uploadError) {
+        throw new Error(`Upload failed: ${uploadError.message}`);
+      }
+
+      const { data: urlData } = supabase.storage
+        .from('profile-media')
+        .getPublicUrl(filePath);
+
+      if (!urlData?.publicUrl) {
+        throw new Error('Failed to get background URL');
+      }
+
+      setProfileBgUrl(urlData.publicUrl);
+      Alert.alert('Success', 'Background uploaded! Save to apply.');
+    } catch (err: any) {
+      console.error('[SettingsProfileScreen] background upload error:', err);
+      Alert.alert('Upload Failed', err?.message || 'Failed to upload background');
+    } finally {
+      setBgUploading(false);
+    }
+  }, [userId]);
+
+  const handleRemoveBackground = useCallback(() => {
+    setProfileBgUrl(null);
+  }, []);
 
   const handleChangeAvatar = useCallback(async () => {
     if (!userId) return;
@@ -1830,141 +1939,266 @@ export default function SettingsProfileScreen() {
         >
           <Text style={[styles.fieldLabel, { color: themed.text }]}>Background Image</Text>
           <View style={[styles.bgPreview, { backgroundColor: themed.card2, borderColor: themed.border }]}>
-            <Text style={[styles.bgPreviewText, { color: themed.muted }]}>Background preview</Text>
+            {profileBgUrl ? (
+              <Image source={{ uri: profileBgUrl }} style={{ width: '100%', height: '100%', borderRadius: 12 }} resizeMode="cover" />
+            ) : (
+              <Text style={[styles.bgPreviewText, { color: themed.muted }]}>No background set</Text>
+            )}
+            {bgUploading && (
+              <View style={[styles.avatarLoadingOverlay, { borderRadius: 12 }]}>
+                <ActivityIndicator size="large" color={themed.white} />
+              </View>
+            )}
           </View>
-          <Button label="Upload Background" iconName="cloud-upload-outline" tone="primary" disabled />
+          <View style={{ flexDirection: 'row', gap: 10 }}>
+            <Pressable
+              onPress={handleUploadBackground}
+              disabled={saving || bgUploading}
+              style={({ pressed }) => [
+                styles.btn,
+                styles.btnPrimary,
+                (saving || bgUploading) && styles.btnDisabled,
+                pressed && styles.btnPressed,
+                { flex: 1 },
+              ]}
+            >
+              {bgUploading ? (
+                <ActivityIndicator size="small" color={themed.white} />
+              ) : (
+                <>
+                  <Ionicons name="cloud-upload-outline" size={18} color={themed.white} style={{ marginRight: 6 }} />
+                  <Text style={[styles.btnText, styles.btnPrimaryText]}>{profileBgUrl ? 'Replace' : 'Upload'}</Text>
+                </>
+              )}
+            </Pressable>
+            {profileBgUrl && (
+              <Pressable
+                onPress={handleRemoveBackground}
+                disabled={saving || bgUploading}
+                style={({ pressed }) => [
+                  styles.btn,
+                  styles.btnDanger,
+                  (saving || bgUploading) && styles.btnDisabled,
+                  pressed && styles.btnPressed,
+                ]}
+              >
+                <Ionicons name="trash-outline" size={18} color="#DC2626" style={{ marginRight: 6 }} />
+                <Text style={[styles.btnText, styles.btnDangerText]}>Remove</Text>
+              </Pressable>
+            )}
+          </View>
           <Text style={[styles.fieldHelper, { color: themed.muted }]}>
-            Recommended: 1920x1080px or larger. Max 5MB. JPG, PNG, or WebP. Leave empty for default gradient background.
+            Recommended: 1920x1080px or larger. Max 5MB. JPG, PNG, or WebP.
           </Text>
 
-          <Row
-            label="Background Overlay"
-            value="Dark (Medium)"
-            hint="Helps text remain readable over background images"
-          />
+          <View style={{ marginTop: 12 }}>
+            <Text style={[styles.fieldLabel, { color: themed.text }]}>Background Overlay</Text>
+            <View style={[styles.chipsWrap, { marginTop: 6 }]}>
+              {['none', 'dark-light', 'dark-medium', 'dark-heavy'].map((overlay) => (
+                <Pressable
+                  key={overlay}
+                  onPress={() => setProfileBgOverlay(overlay)}
+                  disabled={saving}
+                  style={[
+                    styles.chip,
+                    profileBgOverlay === overlay ? styles.chipSelected : { backgroundColor: themed.card2, borderColor: themed.border },
+                    saving && styles.chipDisabled,
+                  ]}
+                >
+                  <Text style={[styles.chipText, profileBgOverlay === overlay ? styles.chipTextSelected : styles.chipTextUnselected]}>
+                    {overlay === 'none' ? 'None' : overlay === 'dark-light' ? 'Light' : overlay === 'dark-medium' ? 'Medium' : 'Heavy'}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          </View>
         </Card>
 
         <Card title="Card Style" icon={<Ionicons name="layers-outline" size={18} color={themed.blue600} />}>
           <Text style={[styles.fieldLabel, { color: themed.text }]}>Card Color</Text>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 12 }}>
-            <View style={[styles.colorSwatch, { backgroundColor: '#FFFFFF' }]} />
+            <View style={[styles.colorSwatch, { backgroundColor: cardColor }]} />
             <View style={[styles.inputWrap, { flex: 1, backgroundColor: themed.inputBg, borderColor: themed.inputBorder }]}>
               <TextInput
                 placeholder="#FFFFFF"
                 placeholderTextColor={themed.muted}
+                value={cardColor}
+                onChangeText={setCardColor}
+                editable={!saving}
+                autoCapitalize="characters"
                 style={[styles.input, { color: themed.text }]}
               />
             </View>
           </View>
 
-          <Row
-            label="Card Opacity"
-            value="95%"
-            hint="Lower opacity lets your background show through the cards (slider on web)"
-          />
+          <View style={{ marginBottom: 12 }}>
+            <Text style={[styles.fieldLabel, { color: themed.text }]}>Card Opacity: {Math.round(cardOpacity * 100)}%</Text>
+            <View style={[styles.chipsWrap, { marginTop: 6 }]}>
+              {[0.5, 0.7, 0.85, 0.95, 1].map((opacity) => (
+                <Pressable
+                  key={opacity}
+                  onPress={() => setCardOpacity(opacity)}
+                  disabled={saving}
+                  style={[
+                    styles.chip,
+                    cardOpacity === opacity ? styles.chipSelected : { backgroundColor: themed.card2, borderColor: themed.border },
+                    saving && styles.chipDisabled,
+                  ]}
+                >
+                  <Text style={[styles.chipText, cardOpacity === opacity ? styles.chipTextSelected : styles.chipTextUnselected]}>
+                    {Math.round(opacity * 100)}%
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          </View>
 
-          <Row label="Border Radius" value="Medium (Balanced)" />
+          <View>
+            <Text style={[styles.fieldLabel, { color: themed.text }]}>Border Radius</Text>
+            <View style={[styles.chipsWrap, { marginTop: 6 }]}>
+              {['none', 'small', 'medium', 'large', 'xl'].map((radius) => (
+                <Pressable
+                  key={radius}
+                  onPress={() => setCardBorderRadius(radius)}
+                  disabled={saving}
+                  style={[
+                    styles.chip,
+                    cardBorderRadius === radius ? styles.chipSelected : { backgroundColor: themed.card2, borderColor: themed.border },
+                    saving && styles.chipDisabled,
+                  ]}
+                >
+                  <Text style={[styles.chipText, cardBorderRadius === radius ? styles.chipTextSelected : styles.chipTextUnselected]}>
+                    {radius.charAt(0).toUpperCase() + radius.slice(1)}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          </View>
         </Card>
 
         <Card title="Colors & Typography" icon={<Ionicons name="text-outline" size={18} color={themed.blue600} />}>
-          <Row label="Font Style" value="Modern (Sans-serif)" />
+          <View style={{ marginBottom: 12 }}>
+            <Text style={[styles.fieldLabel, { color: themed.text }]}>Font Style</Text>
+            <View style={[styles.chipsWrap, { marginTop: 6 }]}>
+              {['modern', 'classic', 'playful', 'elegant'].map((font) => (
+                <Pressable
+                  key={font}
+                  onPress={() => setFontPreset(font)}
+                  disabled={saving}
+                  style={[
+                    styles.chip,
+                    fontPreset === font ? styles.chipSelected : { backgroundColor: themed.card2, borderColor: themed.border },
+                    saving && styles.chipDisabled,
+                  ]}
+                >
+                  <Text style={[styles.chipText, fontPreset === font ? styles.chipTextSelected : styles.chipTextUnselected]}>
+                    {font.charAt(0).toUpperCase() + font.slice(1)}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          </View>
 
           <View style={{ marginTop: 12 }}>
-            <Text style={[styles.fieldLabel, { color: themed.text }]}>🎯 Button Color</Text>
+            <Text style={[styles.fieldLabel, { color: themed.text }]}>Button Color</Text>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 8 }}>
-              <View style={[styles.colorSwatch, { backgroundColor: themed.blue600 }]} />
+              <View style={[styles.colorSwatch, { backgroundColor: buttonColor || '#3B82F6' }]} />
               <View style={[styles.inputWrap, { flex: 1, backgroundColor: themed.inputBg, borderColor: themed.inputBorder }]}>
                 <TextInput
                   placeholder="#3B82F6"
                   placeholderTextColor={themed.muted}
+                  value={buttonColor || ''}
+                  onChangeText={(t) => setButtonColor(t || null)}
+                  editable={!saving}
+                  autoCapitalize="characters"
                   style={[styles.input, { color: themed.text }]}
                 />
               </View>
             </View>
-            <Text style={[styles.fieldHelper, { color: themed.muted }]}>Color for buttons, CTAs, and primary actions</Text>
           </View>
 
           <View style={{ marginTop: 12 }}>
-            <Text style={[styles.fieldLabel, { color: themed.text }]}>✍️ Content Text Color</Text>
+            <Text style={[styles.fieldLabel, { color: themed.text }]}>Content Text Color</Text>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 8 }}>
-              <View style={[styles.colorSwatch, { backgroundColor: '#1F2937' }]} />
+              <View style={[styles.colorSwatch, { backgroundColor: contentTextColor || '#1F2937' }]} />
               <View style={[styles.inputWrap, { flex: 1, backgroundColor: themed.inputBg, borderColor: themed.inputBorder }]}>
                 <TextInput
                   placeholder="#1F2937"
                   placeholderTextColor={themed.muted}
+                  value={contentTextColor || ''}
+                  onChangeText={(t) => setContentTextColor(t || null)}
+                  editable={!saving}
+                  autoCapitalize="characters"
                   style={[styles.input, { color: themed.text }]}
                 />
               </View>
             </View>
-            <Text style={[styles.fieldHelper, { color: themed.muted }]}>
-              Color for your bio, post captions, and user-written content
-            </Text>
           </View>
 
           <View style={{ marginTop: 12 }}>
-            <Text style={[styles.fieldLabel, { color: themed.text }]}>🏷️ UI Text Color</Text>
+            <Text style={[styles.fieldLabel, { color: themed.text }]}>UI Text Color</Text>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 8 }}>
-              <View style={[styles.colorSwatch, { backgroundColor: '#374151' }]} />
+              <View style={[styles.colorSwatch, { backgroundColor: uiTextColor || '#374151' }]} />
               <View style={[styles.inputWrap, { flex: 1, backgroundColor: themed.inputBg, borderColor: themed.inputBorder }]}>
                 <TextInput
                   placeholder="#374151"
                   placeholderTextColor={themed.muted}
+                  value={uiTextColor || ''}
+                  onChangeText={(t) => setUiTextColor(t || null)}
+                  editable={!saving}
+                  autoCapitalize="characters"
                   style={[styles.input, { color: themed.text }]}
                 />
               </View>
             </View>
-            <Text style={[styles.fieldHelper, { color: themed.muted }]}>
-              Color for labels, headings, stats, and UI elements
-            </Text>
           </View>
 
           <View style={{ marginTop: 12 }}>
-            <Text style={[styles.fieldLabel, { color: themed.text }]}>🔗 Link Color</Text>
+            <Text style={[styles.fieldLabel, { color: themed.text }]}>Link Color</Text>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 8 }}>
-              <View style={[styles.colorSwatch, { backgroundColor: themed.blue600 }]} />
+              <View style={[styles.colorSwatch, { backgroundColor: linkColor || '#3B82F6' }]} />
               <View style={[styles.inputWrap, { flex: 1, backgroundColor: themed.inputBg, borderColor: themed.inputBorder }]}>
                 <TextInput
                   placeholder="#3B82F6"
                   placeholderTextColor={themed.muted}
+                  value={linkColor || ''}
+                  onChangeText={(t) => setLinkColor(t || null)}
+                  editable={!saving}
+                  autoCapitalize="characters"
                   style={[styles.input, { color: themed.text }]}
                 />
               </View>
             </View>
-            <Text style={[styles.fieldHelper, { color: themed.muted }]}>Color for clickable links in your profile</Text>
           </View>
 
           <View style={{ marginTop: 12 }}>
-            <Text style={[styles.fieldLabel, { color: themed.text }]}>✨ Accent Color (Highlights)</Text>
+            <Text style={[styles.fieldLabel, { color: themed.text }]}>Accent Color</Text>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 8 }}>
-              <View style={[styles.colorSwatch, { backgroundColor: themed.blue600 }]} />
+              <View style={[styles.colorSwatch, { backgroundColor: accentColor }]} />
               <View style={[styles.inputWrap, { flex: 1, backgroundColor: themed.inputBg, borderColor: themed.inputBorder }]}>
                 <TextInput
                   placeholder="#3B82F6"
                   placeholderTextColor={themed.muted}
+                  value={accentColor}
+                  onChangeText={setAccentColor}
+                  editable={!saving}
+                  autoCapitalize="characters"
                   style={[styles.input, { color: themed.text }]}
                 />
               </View>
-            </View>
-            <Text style={[styles.fieldHelper, { color: themed.muted }]}>
-              Used for highlights, badges, and special elements
-            </Text>
-          </View>
-
-          <View style={[styles.noticeBox, { marginTop: 14 }]}>
-            <Text style={[styles.noticeTitle, { color: themed.text }]}>🎨 Quick Color Presets</Text>
-            <View style={styles.presetGrid}>
-              <Button label="💙 Classic Blue" disabled />
-              <Button label="💜 Purple Dream" disabled />
-              <Button label="💗 Hot Pink" disabled />
-              <Button label="💚 Fresh Green" disabled />
-              <Button label="🧡 Warm Amber" disabled />
-              <Button label="🖤 Dark Mode" disabled />
             </View>
           </View>
         </Card>
 
         <Card title="Links Section" icon={<Ionicons name="link-outline" size={18} color={themed.blue600} />}>
-          <Field label="Section Title" placeholder="My Links" helper='Examples: "My Links", "Follow Me", "My Platforms", "Sponsors"' />
+          <Field
+            label="Section Title"
+            placeholder="My Links"
+            value={linksSectionTitle}
+            onChangeText={setLinksSectionTitle}
+            disabled={saving}
+            helper='Examples: "My Links", "Follow Me", "My Platforms"'
+          />
         </Card>
 
         <Card
@@ -1991,10 +2225,6 @@ export default function SettingsProfileScreen() {
           <Text style={[styles.previewNoteText, { color: themed.text }]}>
             💡 <Text style={{ fontWeight: '800' }}>Preview your changes:</Text> Visit your profile page after saving to see how it looks!
           </Text>
-        </View>
-
-        <View style={{ flexDirection: 'row', justifyContent: 'flex-end' }}>
-          <Button label="Save Customization" tone="primary" disabled />
         </View>
 
         {/* Social Media */}
