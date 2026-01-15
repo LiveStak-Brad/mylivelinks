@@ -287,7 +287,11 @@ export default function MessageThread({ conversation, onBack, showBackButton = f
       {/* Messages - scrollable with iOS momentum scroll */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar pwa-messages-scroll">
         {groupedMessages.length === 0 ? (
-          <EmptyThreadState username={conversation.recipientUsername} />
+          <EmptyThreadState 
+            username={conversation.recipientUsername} 
+            avatarUrl={conversation.recipientAvatar}
+            displayName={conversation.recipientDisplayName}
+          />
         ) : (
           groupedMessages.map((group, groupIdx) => (
             <div key={groupIdx}>
@@ -755,13 +759,21 @@ function MessageBubble({
 }
 
 // Empty state for new conversations
-function EmptyThreadState({ username }: { username: string }) {
+function EmptyThreadState({ username, avatarUrl, displayName }: { username: string; avatarUrl?: string | null; displayName?: string | null }) {
   return (
     <div className="flex flex-col items-center justify-center h-full py-8 text-center">
-      <div className="w-20 h-20 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white text-3xl font-bold mb-4">
-        {username.charAt(0).toUpperCase()}
-      </div>
-      <p className="font-semibold text-foreground mb-1">{username}</p>
+      {avatarUrl ? (
+        <img 
+          src={avatarUrl} 
+          alt={displayName || username} 
+          className="w-20 h-20 rounded-full object-cover mb-4"
+        />
+      ) : (
+        <div className="w-20 h-20 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white text-3xl font-bold mb-4">
+          {username.charAt(0).toUpperCase()}
+        </div>
+      )}
+      <p className="font-semibold text-foreground mb-1">{displayName || username}</p>
       <p className="text-sm text-muted-foreground">Start a conversation!</p>
       <p className="text-xs text-muted-foreground mt-1">Send a message or gift 🎁</p>
     </div>
