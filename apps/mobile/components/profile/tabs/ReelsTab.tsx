@@ -2,9 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, FlatList, Image, Pressable, ActivityIndicator } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { supabase } from '../../../lib/supabase';
+import ModuleEmptyState from '../ModuleEmptyState';
 
 interface ReelsTabProps {
   profileId: string;
+  isOwnProfile?: boolean;
+  onAddReel?: () => void;
   colors: any;
 }
 
@@ -18,7 +21,7 @@ interface Reel {
   created_at: string;
 }
 
-export default function ReelsTab({ profileId, colors }: ReelsTabProps) {
+export default function ReelsTab({ profileId, isOwnProfile = false, onAddReel, colors }: ReelsTabProps) {
   const [reels, setReels] = useState<Reel[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -97,13 +100,26 @@ export default function ReelsTab({ profileId, colors }: ReelsTabProps) {
   }
 
   if (reels.length === 0) {
+    if (!isOwnProfile) {
+      return (
+        <View style={[styles.emptyContainer, { backgroundColor: colors.surface }]}>
+          <Feather name="film" size={48} color={colors.mutedText} />
+          <Text style={[styles.emptyText, { color: colors.mutedText }]}>
+            No reels yet
+          </Text>
+        </View>
+      );
+    }
+    
     return (
-      <View style={[styles.emptyContainer, { backgroundColor: colors.surface }]}>
-        <Feather name="film" size={48} color={colors.mutedText} />
-        <Text style={[styles.emptyText, { color: colors.mutedText }]}>
-          No reels yet
-        </Text>
-      </View>
+      <ModuleEmptyState
+        icon="film"
+        title="No Reels Yet"
+        description="Share short-form video content with your audience."
+        ctaLabel="Add Reel"
+        onCtaPress={onAddReel}
+        colors={colors}
+      />
     );
   }
 

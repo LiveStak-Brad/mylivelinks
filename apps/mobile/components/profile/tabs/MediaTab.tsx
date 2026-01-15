@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, Image, Pressable, ActivityIndicator, Dimensions
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '../../../lib/supabase';
+import ModuleEmptyState from '../ModuleEmptyState';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const GRID_SPACING = 2;
@@ -11,6 +12,8 @@ const ITEM_SIZE = (SCREEN_WIDTH - (NUM_COLUMNS + 1) * GRID_SPACING) / NUM_COLUMN
 
 interface MediaTabProps {
   profileId: string;
+  isOwnProfile?: boolean;
+  onAddMedia?: () => void;
   colors: any;
 }
 
@@ -23,7 +26,7 @@ interface MediaItem {
   created_at: string;
 }
 
-export default function MediaTab({ profileId, colors }: MediaTabProps) {
+export default function MediaTab({ profileId, isOwnProfile = false, onAddMedia, colors }: MediaTabProps) {
   const insets = useSafeAreaInsets();
   const [media, setMedia] = useState<MediaItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -135,13 +138,26 @@ export default function MediaTab({ profileId, colors }: MediaTabProps) {
   }
 
   if (media.length === 0) {
+    if (!isOwnProfile) {
+      return (
+        <View style={[styles.emptyContainer, { backgroundColor: colors.surface }]}>
+          <Feather name="image" size={48} color={colors.mutedText} />
+          <Text style={[styles.emptyText, { color: colors.mutedText }]}>
+            No media yet
+          </Text>
+        </View>
+      );
+    }
+    
     return (
-      <View style={[styles.emptyContainer, { backgroundColor: colors.surface }]}>
-        <Feather name="image" size={48} color={colors.mutedText} />
-        <Text style={[styles.emptyText, { color: colors.mutedText }]}>
-          No media yet
-        </Text>
-      </View>
+      <ModuleEmptyState
+        icon="image"
+        title="No Media Yet"
+        description="Share photos and videos from your posts here."
+        ctaLabel="Add Media"
+        onCtaPress={onAddMedia}
+        colors={colors}
+      />
     );
   }
 

@@ -104,6 +104,11 @@ DECLARE
   v_diamonds bigint;
   v_gift_recipient_id uuid;
 BEGIN
+  -- Skip if no gift_id
+  IF NEW.gift_id IS NULL THEN
+    RETURN NEW;
+  END IF;
+
   -- Get gift details
   SELECT g.recipient_id, g.sender_id, COALESCE(g.diamonds_awarded, g.coin_amount, 0)
   INTO v_gift_recipient_id, NEW.sender_id, v_diamonds
@@ -142,7 +147,6 @@ DROP TRIGGER IF EXISTS trg_update_gift_notification_with_post ON public.post_gif
 CREATE TRIGGER trg_update_gift_notification_with_post
   AFTER INSERT ON public.post_gifts
   FOR EACH ROW
-  WHEN (NEW.gift_id IS NOT NULL)
   EXECUTE FUNCTION public.update_gift_notification_with_post();
 
 COMMIT;

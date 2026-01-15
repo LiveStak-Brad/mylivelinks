@@ -1,63 +1,75 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, Pressable, ActivityIndicator, Linking } from 'react-native';
+import { View, Text, StyleSheet, Pressable, ActivityIndicator, Linking, Image } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { supabase } from '../../../lib/supabase';
+import ModuleEmptyState from '../ModuleEmptyState';
 
 interface ProductsTabProps {
   profileId: string;
+  isOwnProfile?: boolean;
+  onAddItem?: () => void;
   colors: any;
 }
 
-interface BusinessInfo {
-  profile_id: string;
-  business_description?: string;
-  website_url?: string;
-  contact_email?: string;
-  contact_phone?: string;
-  location_or_service_area?: string;
-  hours?: any;
+interface PortfolioItem {
+  id: string;
+  title?: string | null;
+  subtitle?: string | null;
+  description?: string | null;
+  media_type: 'image' | 'video' | 'link';
+  media_url: string;
+  thumbnail_url?: string | null;
+  sort_order?: number | null;
 }
 
-export default function ProductsTab({ profileId, colors }: ProductsTabProps) {
-  const [businessInfo, setBusinessInfo] = useState<BusinessInfo | null>(null);
+export default function ProductsTab({ profileId, isOwnProfile = false, onAddItem, colors }: ProductsTabProps) {
+  const [items, setItems] = useState<PortfolioItem[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    loadBusinessInfo();
+    loadPortfolioItems();
   }, [profileId]);
 
-  const loadBusinessInfo = async () => {
+  const loadPortfolioItems = async () => {
     try {
-      const { data, error } = await supabase
-        .from('profile_business')
-        .select('*')
-        .eq('profile_id', profileId)
-        .single();
+      const { data, error } = await supabase.rpc('get_profile_portfolio', {
+        p_profile_id: profileId,
+      });
 
-      if (error && error.code !== 'PGRST116') throw error;
-      setBusinessInfo(data);
+      if (error) throw error;
+      
+      const portfolioItems: PortfolioItem[] = (data || []).map((item: any) => ({
+        id: item.id,
+        title: item.title,
+        subtitle: item.subtitle,
+        description: item.description,
+        media_type: item.media_type,
+        media_url: item.media_url,
+        thumbnail_url: item.thumbnail_url,
+        sort_order: item.sort_order,
+      }));
+      
+      setItems(portfolioItems);
     } catch (error) {
-      console.error('Error loading business info:', error);
+      console.error('Error loading portfolio items:', error);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleOpenWebsite = () => {
-    if (businessInfo?.website_url) {
-      Linking.openURL(businessInfo.website_url);
+  const handleItemPress = (item: PortfolioItem) => {
+    if (item.media_type === 'link' && item.media_url) {
+      Linking.openURL(item.media_url).catch(err => 
+        console.error('Failed to open link:', err)
+      );
     }
   };
 
-  const handleEmail = () => {
-    if (businessInfo?.contact_email) {
-      Linking.openURL(`mailto:${businessInfo.contact_email}`);
-    }
-  };
-
-  const handlePhone = () => {
-    if (businessInfo?.contact_phone) {
-      Linking.openURL(`tel:${businessInfo.contact_phone}`);
+  const getMediaIcon = (mediaType: string): keyof typeof Feather.glyphMap => {
+    switch (mediaType) {
+      case 'video': return 'video';
+      case 'link': return 'link';
+      default: return 'image';
     }
   };
 
@@ -69,80 +81,75 @@ export default function ProductsTab({ profileId, colors }: ProductsTabProps) {
     );
   }
 
-  if (!businessInfo) {
+  if (items.length === 0) {
+    if (!isOwnProfile) {
+      return (
+        <View style={[styles.emptyContainer, { backgroundColor: colors.surface }]}>
+          <Feather name="briefcase" size={48} color={colors.mutedText} />
+          <Text style={[styles.emptyText, { color: colors.mutedText }]}>
+            No products or portfolio items yet
+          </Text>
+        </View>
+      );
+    }
+    
     return (
-      <View style={[styles.emptyContainer, { backgroundColor: colors.surface }]}>
-        <Feather name="briefcase" size={48} color={colors.mutedText} />
-        <Text style={[styles.emptyText, { color: colors.mutedText }]}>
-          No business information available
-        </Text>
-      </View>
+      <ModuleEmptyState
+        icon="briefcase"
+        title="No Portfolio Items Yet"
+        description="Showcase your products, work samples, or portfolio pieces here."
+        ctaLabel="Add Portfolio Item"
+        onCtaPress={onAddItem}
+        colors={colors}
+      />
     );
   }
 
   return (
     <View style={styles.container}>
-      {businessInfo.business_description && (
-        <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>About</Text>
-          <Text style={[styles.description, { color: colors.text }]}>
-            {businessInfo.business_description}
-          </Text>
-        </View>
-      )}
-
-      {businessInfo.location_or_service_area && (
-        <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>Service Area</Text>
-          <View style={styles.infoRow}>
-            <Feather name="map-pin" size={18} color={colors.primary} />
-            <Text style={[styles.infoText, { color: colors.text }]}>
-              {businessInfo.location_or_service_area}
-            </Text>
+      {items.map((item) => (
+        <Pressable
+          key={item.id}
+          style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}
+          onPress={() => handleItemPress(item)}
+        >
+          {(item.media_type === 'image' || item.thumbnail_url) && (
+            <Image
+              source={{ uri: item.thumbnail_url || item.media_url }}
+              style={styles.itemImage}
+              resizeMode="cover"
+            />
+          )}
+          <View style={styles.itemContent}>
+            <View style={styles.itemHeader}>
+              <View style={[styles.mediaTypeBadge, { backgroundColor: `${colors.primary}15` }]}>
+                <Feather name={getMediaIcon(item.media_type)} size={14} color={colors.primary} />
+              </View>
+              {item.title && (
+                <Text style={[styles.itemTitle, { color: colors.text }]} numberOfLines={2}>
+                  {item.title}
+                </Text>
+              )}
+            </View>
+            {item.subtitle && (
+              <Text style={[styles.itemSubtitle, { color: colors.mutedText }]} numberOfLines={1}>
+                {item.subtitle}
+              </Text>
+            )}
+            {item.description && (
+              <Text style={[styles.itemDescription, { color: colors.text }]} numberOfLines={3}>
+                {item.description}
+              </Text>
+            )}
+            {item.media_type === 'link' && (
+              <View style={styles.linkIndicator}>
+                <Feather name="external-link" size={14} color={colors.primary} />
+                <Text style={[styles.linkText, { color: colors.primary }]}>Open Link</Text>
+              </View>
+            )}
           </View>
-        </View>
-      )}
-
-      <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-        <Text style={[styles.sectionTitle, { color: colors.text }]}>Contact</Text>
-        
-        {businessInfo.website_url && (
-          <Pressable onPress={handleOpenWebsite} style={styles.contactRow}>
-            <Feather name="globe" size={18} color={colors.primary} />
-            <Text style={[styles.contactText, { color: colors.primary }]}>
-              Visit Website
-            </Text>
-            <Feather name="external-link" size={16} color={colors.mutedText} style={styles.contactIcon} />
-          </Pressable>
-        )}
-
-        {businessInfo.contact_email && (
-          <Pressable onPress={handleEmail} style={styles.contactRow}>
-            <Feather name="mail" size={18} color={colors.primary} />
-            <Text style={[styles.contactText, { color: colors.primary }]}>
-              {businessInfo.contact_email}
-            </Text>
-          </Pressable>
-        )}
-
-        {businessInfo.contact_phone && (
-          <Pressable onPress={handlePhone} style={styles.contactRow}>
-            <Feather name="phone" size={18} color={colors.primary} />
-            <Text style={[styles.contactText, { color: colors.primary }]}>
-              {businessInfo.contact_phone}
-            </Text>
-          </Pressable>
-        )}
-      </View>
-
-      {businessInfo.hours && (
-        <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>Hours</Text>
-          <Text style={[styles.hoursText, { color: colors.text }]}>
-            {JSON.stringify(businessInfo.hours, null, 2)}
-          </Text>
-        </View>
-      )}
+        </Pressable>
+      ))}
     </View>
   );
 }
@@ -169,44 +176,53 @@ const styles = StyleSheet.create({
   card: {
     borderRadius: 12,
     borderWidth: 1,
+    overflow: 'hidden',
+    marginBottom: 12,
+  },
+  itemImage: {
+    width: '100%',
+    height: 180,
+  },
+  itemContent: {
     padding: 16,
-    marginBottom: 12,
   },
-  sectionTitle: {
-    fontSize: 18,
+  itemHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 4,
+  },
+  mediaTypeBadge: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  itemTitle: {
+    fontSize: 16,
     fontWeight: '600',
-    marginBottom: 12,
-  },
-  description: {
-    fontSize: 15,
-    lineHeight: 22,
-  },
-  infoRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  infoText: {
-    fontSize: 15,
     flex: 1,
   },
-  contactRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.1)',
-  },
-  contactText: {
-    fontSize: 15,
-    flex: 1,
-  },
-  contactIcon: {
-    marginLeft: 'auto',
-  },
-  hoursText: {
+  itemSubtitle: {
     fontSize: 14,
-    fontFamily: 'monospace',
+    marginBottom: 8,
+    marginLeft: 38,
+  },
+  itemDescription: {
+    fontSize: 14,
+    lineHeight: 20,
+    marginLeft: 38,
+  },
+  linkIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 12,
+    marginLeft: 38,
+  },
+  linkText: {
+    fontSize: 14,
+    fontWeight: '500',
   },
 });

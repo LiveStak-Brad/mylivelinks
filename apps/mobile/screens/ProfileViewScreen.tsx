@@ -25,6 +25,7 @@ import SeriesTab from '../components/profile/tabs/SeriesTab';
 import EducationTab from '../components/profile/tabs/EducationTab';
 import TopFriendsSection from '../components/profile/TopFriendsSection';
 import TopFriendsManager from '../components/profile/TopFriendsManager';
+import PortfolioManager from '../components/profile/PortfolioManager';
 import ReferralNetworkSection from '../components/profile/ReferralNetworkSection';
 import SocialMediaBar from '../components/profile/SocialMediaBar';
 import MusicShowcaseSection from '../components/profile/MusicShowcaseSection';
@@ -71,6 +72,8 @@ export default function ProfileViewScreen({ routeParams }: ProfileViewScreenProp
   const [showReportModal, setShowReportModal] = useState(false);
   const [showTopFriendsManager, setShowTopFriendsManager] = useState(false);
   const [topFriendsReloadKey, setTopFriendsReloadKey] = useState(0);
+  const [showPortfolioManager, setShowPortfolioManager] = useState(false);
+  const [portfolioReloadKey, setPortfolioReloadKey] = useState(0);
 
   const loadingRef = useRef(false);
   const mountedRef = useRef(true);
@@ -88,6 +91,44 @@ export default function ProfileViewScreen({ routeParams }: ProfileViewScreenProp
   );
 
   const styles = useMemo(() => createStyles(stylesVars), [stylesVars]);
+
+  // Profile-driven customization (parity with web)
+  // Uses rgba alpha instead of opacity to preserve text readability
+  const effectiveCustomization = useMemo(() => {
+    const profile = profileData?.profile;
+    
+    // Helper: convert hex + opacity to rgba
+    const hexToRgba = (hex: string, alpha: number): string => {
+      const cleanHex = hex.replace('#', '');
+      const r = parseInt(cleanHex.substring(0, 2), 16) || 255;
+      const g = parseInt(cleanHex.substring(2, 4), 16) || 255;
+      const b = parseInt(cleanHex.substring(4, 6), 16) || 255;
+      return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+    };
+    
+    // Border radius mapping (matches web)
+    const radiusMap: Record<string, number> = {
+      'none': 0,
+      'small': 8,
+      'medium': 16,
+      'large': 24,
+      'xl': 32,
+    };
+    
+    const cardColor = profile?.card_color || '#FFFFFF';
+    const cardOpacity = Math.max(0.1, Math.min(1, profile?.card_opacity ?? 0.95));
+    const cardBorderRadius = profile?.card_border_radius || 'medium';
+    const accentColor = profile?.accent_color || stylesVars.primary;
+    
+    return {
+      cardBg: hexToRgba(cardColor, cardOpacity),
+      cardRadius: radiusMap[cardBorderRadius] ?? 16,
+      accent: accentColor,
+      // Additional fields for future use (low-risk, already in payload)
+      buttonColor: profile?.button_color || null,
+      linkColor: profile?.link_color || accentColor,
+    };
+  }, [profileData?.profile, stylesVars.primary]);
 
   const isOwnProfile = useMemo(() => {
     if (!currentUser.userId || !profileData?.profile?.id) return false;
@@ -475,13 +516,13 @@ export default function ProfileViewScreen({ routeParams }: ProfileViewScreenProp
             />
           )}
 
-          <View style={[styles.card, { backgroundColor: stylesVars.card, borderColor: stylesVars.border }]}>
+          <View style={[styles.card, { backgroundColor: effectiveCustomization.cardBg, borderColor: stylesVars.border, borderRadius: effectiveCustomization.cardRadius }]}>
             <View style={styles.heroTopRow}>
-              <View style={[styles.heroAvatarSmall, { backgroundColor: `${stylesVars.primary}20`, borderColor: `${stylesVars.primary}40` }]}>
+              <View style={[styles.heroAvatarSmall, { backgroundColor: `${effectiveCustomization.accent}20`, borderColor: `${effectiveCustomization.accent}40` }]}>
                 {avatarUrl ? (
                   <Image source={{ uri: avatarUrl }} style={styles.heroAvatarImage} />
                 ) : (
-                  <Text style={[styles.heroAvatarTextSmall, { color: stylesVars.primary }]}>{avatarFallback}</Text>
+                  <Text style={[styles.heroAvatarTextSmall, { color: effectiveCustomization.accent }]}>{avatarFallback}</Text>
                 )}
               </View>
 
@@ -500,9 +541,9 @@ export default function ProfileViewScreen({ routeParams }: ProfileViewScreenProp
                     </Text>
                   ) : null}
                   {profile.profile_type && (
-                    <View style={[styles.pillSmall, { backgroundColor: `${stylesVars.primary}15`, borderColor: `${stylesVars.primary}30` }]}>
-                      <Feather name="star" size={10} color={stylesVars.primary} />
-                      <Text style={[styles.pillTextSmall, { color: stylesVars.primary }]}>
+                    <View style={[styles.pillSmall, { backgroundColor: `${effectiveCustomization.accent}15`, borderColor: `${effectiveCustomization.accent}30` }]}>
+                      <Feather name="star" size={10} color={effectiveCustomization.accent} />
+                      <Text style={[styles.pillTextSmall, { color: effectiveCustomization.accent }]}>
                         {profile.profile_type}
                       </Text>
                     </View>
@@ -586,21 +627,21 @@ export default function ProfileViewScreen({ routeParams }: ProfileViewScreenProp
 
             <View style={styles.countsRow}>
               <Pressable style={styles.countChip} onPress={() => showComingSoon('Followers list')}>
-                <Text style={[styles.countValue, { color: stylesVars.primary }]}>
+                <Text style={[styles.countValue, { color: effectiveCustomization.accent }]}>
                   {profileData.follower_count.toLocaleString()}
                 </Text>
                 <Text style={[styles.countLabel, { color: stylesVars.mutedText }]}>Followers</Text>
               </Pressable>
 
               <Pressable style={styles.countChip} onPress={() => showComingSoon('Following list')}>
-                <Text style={[styles.countValue, { color: stylesVars.primary }]}>
+                <Text style={[styles.countValue, { color: effectiveCustomization.accent }]}>
                   {profileData.following_count.toLocaleString()}
                 </Text>
                 <Text style={[styles.countLabel, { color: stylesVars.mutedText }]}>Following</Text>
               </Pressable>
 
               <Pressable style={styles.countChip} onPress={() => showComingSoon('Friends list')}>
-                <Text style={[styles.countValue, { color: stylesVars.primary }]}>
+                <Text style={[styles.countValue, { color: effectiveCustomization.accent }]}>
                   {profileData.friends_count.toLocaleString()}
                 </Text>
                 <Text style={[styles.countLabel, { color: stylesVars.mutedText }]}>Friends</Text>
@@ -627,18 +668,18 @@ export default function ProfileViewScreen({ routeParams }: ProfileViewScreenProp
           )}
 
           {shouldShowSection('links') && profileData.links && profileData.links.length > 0 && (
-            <View style={[styles.card, { backgroundColor: stylesVars.card, borderColor: stylesVars.border }]}>
+            <View style={[styles.card, { backgroundColor: effectiveCustomization.cardBg, borderColor: stylesVars.border, borderRadius: effectiveCustomization.cardRadius }]}>
               <Text style={[styles.sectionTitle, { color: stylesVars.text }]}>
                 {profile.links_section_title || 'Links'}
               </Text>
               {profileData.links.map((link) => (
                 <Pressable
                   key={link.id}
-                  style={[styles.linkRow, { backgroundColor: `${stylesVars.primary}10`, borderColor: stylesVars.border }]}
+                  style={[styles.linkRow, { backgroundColor: `${effectiveCustomization.linkColor}10`, borderColor: stylesVars.border }]}
                   onPress={() => link.url && Linking.openURL(link.url).catch(err => console.error('Failed to open link:', err))}
                 >
                   <View style={styles.linkRowLeft}>
-                    <Feather name="link" size={16} color={stylesVars.primary} />
+                    <Feather name="link" size={16} color={effectiveCustomization.linkColor} />
                     <Text style={[styles.linkTitle, { color: stylesVars.text }]} numberOfLines={1}>
                       {link.title}
                     </Text>
@@ -720,29 +761,29 @@ export default function ProfileViewScreen({ routeParams }: ProfileViewScreenProp
               )}
 
               {shouldShowSection('streaming_stats') && !profile.hide_streaming_stats && profileData.stream_stats && profileData.stream_stats.total_streams > 0 && (
-                <View style={[styles.card, { backgroundColor: stylesVars.card, borderColor: stylesVars.border }]}>
+                <View style={[styles.card, { backgroundColor: effectiveCustomization.cardBg, borderColor: stylesVars.border, borderRadius: effectiveCustomization.cardRadius }]}>
                   <Text style={[styles.sectionTitle, { color: stylesVars.text }]}>Streaming Stats</Text>
                   <View style={styles.statsGrid}>
                     <View style={styles.statItem}>
-                      <Text style={[styles.statValue, { color: stylesVars.primary }]}>
+                      <Text style={[styles.statValue, { color: effectiveCustomization.accent }]}>
                         {profileData.stream_stats.total_streams}
                       </Text>
                       <Text style={[styles.statLabel, { color: stylesVars.mutedText }]}>Total Streams</Text>
                     </View>
                     <View style={styles.statItem}>
-                      <Text style={[styles.statValue, { color: stylesVars.primary }]}>
+                      <Text style={[styles.statValue, { color: effectiveCustomization.accent }]}>
                         {profileData.stream_stats.total_viewers.toLocaleString()}
                       </Text>
                       <Text style={[styles.statLabel, { color: stylesVars.mutedText }]}>Total Viewers</Text>
                     </View>
                     <View style={styles.statItem}>
-                      <Text style={[styles.statValue, { color: stylesVars.primary }]}>
+                      <Text style={[styles.statValue, { color: effectiveCustomization.accent }]}>
                         {profileData.stream_stats.peak_viewers}
                       </Text>
                       <Text style={[styles.statLabel, { color: stylesVars.mutedText }]}>Peak Viewers</Text>
                     </View>
                     <View style={styles.statItem}>
-                      <Text style={[styles.statValue, { color: stylesVars.primary }]}>
+                      <Text style={[styles.statValue, { color: effectiveCustomization.accent }]}>
                         {profileData.stream_stats.diamonds_earned_lifetime}
                       </Text>
                       <Text style={[styles.statLabel, { color: stylesVars.mutedText }]}>Diamonds</Text>
@@ -752,19 +793,40 @@ export default function ProfileViewScreen({ routeParams }: ProfileViewScreenProp
               )}
             </InfoTab>
       ) : activeTab === 'feed' ? (
-        <FeedTab profileId={profile.id} colors={stylesVars} />
+        <FeedTab 
+          profileId={profile.id} 
+          isOwnProfile={isOwnProfile}
+          colors={stylesVars} 
+        />
       ) : activeTab === 'media' ? (
-        <MediaTab profileId={profile.id} colors={stylesVars} />
+        <MediaTab 
+          profileId={profile.id} 
+          isOwnProfile={isOwnProfile}
+          colors={stylesVars} 
+        />
       ) : activeTab === 'music_videos' ? (
         <MusicVideosTab profileId={profile.id} colors={stylesVars} />
       ) : activeTab === 'music' ? (
         <MusicTab profileId={profile.id} colors={stylesVars} />
       ) : activeTab === 'events' ? (
-        <EventsTab profileId={profile.id} colors={stylesVars} />
+        <EventsTab 
+          profileId={profile.id} 
+          isOwnProfile={isOwnProfile}
+          colors={stylesVars} 
+        />
       ) : activeTab === 'products' ? (
-        <ProductsTab profileId={profile.id} colors={stylesVars} />
+        <ProductsTab 
+          profileId={profile.id} 
+          isOwnProfile={isOwnProfile}
+          onAddItem={() => setShowPortfolioManager(true)}
+          colors={stylesVars} 
+        />
       ) : activeTab === 'reels' ? (
-        <ReelsTab profileId={profile.id} colors={stylesVars} />
+        <ReelsTab 
+          profileId={profile.id} 
+          isOwnProfile={isOwnProfile}
+          colors={stylesVars} 
+        />
       ) : activeTab === 'podcasts' ? (
         <PodcastsTab profileId={profile.id} colors={stylesVars} />
       ) : activeTab === 'movies' ? (
@@ -870,6 +932,24 @@ export default function ProfileViewScreen({ routeParams }: ProfileViewScreenProp
           isOpen={showTopFriendsManager}
           onClose={() => setShowTopFriendsManager(false)}
           onSave={() => setTopFriendsReloadKey(k => k + 1)}
+          colors={{
+            bg: stylesVars.bg,
+            card: stylesVars.card,
+            text: stylesVars.text,
+            textSecondary: stylesVars.mutedText,
+            border: stylesVars.border,
+            primary: stylesVars.primary,
+          }}
+        />
+      )}
+
+      {/* Portfolio Manager Modal */}
+      {isOwnProfile && (
+        <PortfolioManager
+          profileId={profile.id}
+          isOpen={showPortfolioManager}
+          onClose={() => setShowPortfolioManager(false)}
+          onSave={() => setPortfolioReloadKey(k => k + 1)}
           colors={{
             bg: stylesVars.bg,
             card: stylesVars.card,

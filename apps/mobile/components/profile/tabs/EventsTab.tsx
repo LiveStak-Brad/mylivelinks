@@ -2,9 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, FlatList, Pressable, ActivityIndicator } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { supabase } from '../../../lib/supabase';
+import ModuleEmptyState from '../ModuleEmptyState';
 
 interface EventsTabProps {
   profileId: string;
+  isOwnProfile?: boolean;
+  onAddEvent?: () => void;
   colors: any;
 }
 
@@ -19,7 +22,7 @@ interface Event {
   created_at: string;
 }
 
-export default function EventsTab({ profileId, colors }: EventsTabProps) {
+export default function EventsTab({ profileId, isOwnProfile = false, onAddEvent, colors }: EventsTabProps) {
   const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -97,13 +100,26 @@ export default function EventsTab({ profileId, colors }: EventsTabProps) {
   }
 
   if (events.length === 0) {
+    if (!isOwnProfile) {
+      return (
+        <View style={[styles.emptyContainer, { backgroundColor: colors.surface }]}>
+          <Feather name="calendar" size={48} color={colors.mutedText} />
+          <Text style={[styles.emptyText, { color: colors.mutedText }]}>
+            No upcoming events
+          </Text>
+        </View>
+      );
+    }
+    
     return (
-      <View style={[styles.emptyContainer, { backgroundColor: colors.surface }]}>
-        <Feather name="calendar" size={48} color={colors.mutedText} />
-        <Text style={[styles.emptyText, { color: colors.mutedText }]}>
-          No upcoming events
-        </Text>
-      </View>
+      <ModuleEmptyState
+        icon="calendar"
+        title="No Events Yet"
+        description="Add your upcoming shows, appearances, or events."
+        ctaLabel="Add Event"
+        onCtaPress={onAddEvent}
+        colors={colors}
+      />
     );
   }
 

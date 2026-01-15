@@ -2,9 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, FlatList, Image, Pressable, ActivityIndicator } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { supabase } from '../../../lib/supabase';
+import ModuleEmptyState from '../ModuleEmptyState';
 
 interface FeedTabProps {
   profileId: string;
+  isOwnProfile?: boolean;
+  onAddPost?: () => void;
   colors: any;
 }
 
@@ -24,7 +27,7 @@ interface Post {
   };
 }
 
-export default function FeedTab({ profileId, colors }: FeedTabProps) {
+export default function FeedTab({ profileId, isOwnProfile = false, onAddPost, colors }: FeedTabProps) {
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -120,13 +123,26 @@ export default function FeedTab({ profileId, colors }: FeedTabProps) {
   }
 
   if (posts.length === 0) {
+    if (!isOwnProfile) {
+      return (
+        <View style={[styles.emptyContainer, { backgroundColor: colors.surface }]}>
+          <Feather name="file-text" size={48} color={colors.mutedText} />
+          <Text style={[styles.emptyText, { color: colors.mutedText }]}>
+            No posts yet
+          </Text>
+        </View>
+      );
+    }
+    
     return (
-      <View style={[styles.emptyContainer, { backgroundColor: colors.surface }]}>
-        <Feather name="file-text" size={48} color={colors.mutedText} />
-        <Text style={[styles.emptyText, { color: colors.mutedText }]}>
-          No posts yet
-        </Text>
-      </View>
+      <ModuleEmptyState
+        icon="file-text"
+        title="No Posts Yet"
+        description="Share updates, photos, and thoughts with your followers."
+        ctaLabel="Create Post"
+        onCtaPress={onAddPost}
+        colors={colors}
+      />
     );
   }
 
