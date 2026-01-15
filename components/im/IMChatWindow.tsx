@@ -55,6 +55,7 @@ export interface IMChatWindowProps {
   onMinimize: () => void;
   onSendMessage: (content: string) => void;
   onSendGift: (giftId: number, giftName: string, giftCoins: number, giftIcon?: string) => void;
+  onSendImage?: (file: File) => Promise<void>;
   onFocus: () => void;
   zIndex: number;
 }
@@ -83,6 +84,7 @@ export default function IMChatWindow({
   onMinimize,
   onSendMessage,
   onSendGift,
+  onSendImage,
   onFocus,
   zIndex,
 }: IMChatWindowProps) {
@@ -172,6 +174,27 @@ export default function IMChatWindow({
     onSendGift(gift.id, gift.name, gift.coin_cost, gift.icon_url);
     setShowGiftPicker(false);
     inputRef.current?.focus();
+  };
+
+  // Handle paste event to support pasting images
+  const handlePaste = async (e: React.ClipboardEvent<HTMLInputElement>) => {
+    if (!onSendImage) return;
+    
+    const items = e.clipboardData?.items;
+    if (!items) return;
+
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      if (item.type.startsWith('image/')) {
+        e.preventDefault();
+        const file = item.getAsFile();
+        if (file) {
+          await onSendImage(file);
+          inputRef.current?.focus();
+        }
+        return;
+      }
+    }
   };
 
   const formatTime = (date: Date) => {
@@ -533,6 +556,7 @@ export default function IMChatWindow({
             value={messageInput}
             onChange={(e) => setMessageInput(e.target.value)}
             onKeyDown={handleKeyDown}
+            onPaste={handlePaste}
             placeholder="Type a message..."
             className="flex-1 bg-muted/50 border-none rounded-full px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/50"
             maxLength={500}

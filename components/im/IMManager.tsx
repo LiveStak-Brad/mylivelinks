@@ -435,6 +435,112 @@ export default function IMManager({ currentUserId }: IMManagerProps) {
     [currentUserId, supabase]
   );
 
+  // Send an image
+  const sendImage = useCallback(
+    async (chatId: string, recipientId: string, file: File) => {
+      if (!currentUserId) return;
+
+      const tempId = `temp-image-${Date.now()}`;
+      const localUrl = URL.createObjectURL(file);
+
+      const newMessage: IMMessage = {
+        id: tempId,
+        senderId: currentUserId,
+        content: '',
+        timestamp: new Date(),
+        status: 'sending',
+        type: 'image',
+        imageUrl: localUrl,
+      };
+
+      setChatWindows((prev) =>
+        prev.map((c) => (c.chatId === chatId ? { ...c, messages: [...c.messages, newMessage] } : c))
+      );
+
+      try {
+        // Get upload URL
+        const uploadRes = await fetch('/api/messages/upload-url', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ mimeType: file.type, otherProfileId: recipientId }),
+        });
+
+        const uploadData = await uploadRes.json();
+        if (!uploadRes.ok) {
+          throw new Error(uploadData?.error || 'Failed to prepare upload');
+        }
+
+        const bucket = String(uploadData?.bucket || '');
+        const path = String(uploadData?.path || '');
+        const token = String(uploadData?.token || '');
+        const publicUrl = String(uploadData?.publicUrl || '');
+        if (!bucket || !path || !token || !publicUrl) {
+          throw new Error('Upload response missing required fields');
+        }
+
+        // Upload file
+        const { error: uploadErr } = await supabase.storage.from(bucket).uploadToSignedUrl(path, token, file, {
+          contentType: file.type,
+        });
+        if (uploadErr) throw uploadErr;
+
+        // Encode image content
+        const imageContent = `__img__:${JSON.stringify({ url: publicUrl, mime: file.type })}`;
+
+        // Insert message
+        const { data: row, error } = await supabase
+          .from('instant_messages')
+          .insert({
+            sender_id: currentUserId,
+            recipient_id: recipientId,
+            content: imageContent,
+          })
+          .select()
+          .single();
+
+        if (error) throw error;
+
+        // Update message with real data
+        setChatWindows((prev) =>
+          prev.map((c) =>
+            c.chatId === chatId
+              ? {
+                  ...c,
+                  messages: c.messages.map((m) =>
+                    m.id === tempId
+                      ? {
+                          ...m,
+                          id: row.id.toString(),
+                          imageUrl: publicUrl,
+                          timestamp: row.created_at ? new Date(row.created_at) : m.timestamp,
+                          status: 'sent',
+                        }
+                      : m
+                  ),
+                }
+              : c
+          )
+        );
+
+        URL.revokeObjectURL(localUrl);
+      } catch (error) {
+        console.error('[IM] Error sending image:', error);
+        setChatWindows((prev) =>
+          prev.map((c) =>
+            c.chatId === chatId
+              ? {
+                  ...c,
+                  messages: c.messages.filter((m) => m.id !== tempId),
+                }
+              : c
+          )
+        );
+        URL.revokeObjectURL(localUrl);
+      }
+    },
+    [currentUserId, supabase]
+  );
+
   // Close a chat
   const closeChat = useCallback((chatId: string) => {
     setChatWindows(prev => prev.filter(c => c.chatId !== chatId));
@@ -572,6 +678,7 @@ export default function IMManager({ currentUserId }: IMManagerProps) {
           onSendGift={(giftId, giftName, giftCoins, giftIcon) =>
             sendGift(chat.chatId, chat.recipientId, giftId, giftName, giftCoins, giftIcon)
           }
+          onSendImage={(file) => sendImage(chat.chatId, chat.recipientId, file)}
           onFocus={() => focusChat(chat.chatId)}
           zIndex={focusedChatId === chat.chatId ? 9999 : 9990 + index}
         />
