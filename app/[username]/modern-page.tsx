@@ -1271,40 +1271,42 @@ export default function ModernProfilePage() {
               </div>
             </div>
             
-            {/* Social Counts - Integrated into Hero */}
-            <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
-              <div className="grid grid-cols-3 gap-4 text-center">
-                <button
-                  onClick={() => setShowFollowersModal(true)}
-                  className="hover:bg-gray-50 dark:hover:bg-gray-800/50 rounded-lg p-3 transition-colors"
-                >
-                  <div className="text-2xl font-bold" style={{ color: accentColor }}>
-                    {profileData.follower_count.toLocaleString()}
-                  </div>
-                  <div className="text-sm text-gray-600 dark:text-gray-400" style={{ color: uiTextColor }}>Followers</div>
-                </button>
-                
-                <button
-                  onClick={() => setShowFollowingModal(true)}
-                  className="hover:bg-gray-50 dark:hover:bg-gray-800/50 rounded-lg p-3 transition-colors"
-                >
-                  <div className="text-2xl font-bold" style={{ color: accentColor }}>
-                    {profileData.following_count.toLocaleString()}
-                  </div>
-                  <div className="text-sm text-gray-600 dark:text-gray-400" style={{ color: uiTextColor }}>Following</div>
-                </button>
-                
-                <button
-                  onClick={() => setShowFriendsModal(true)}
-                  className="hover:bg-gray-50 dark:hover:bg-gray-800/50 rounded-lg p-3 transition-colors"
-                >
-                  <div className="text-2xl font-bold" style={{ color: accentColor }}>
-                    {profileData.friends_count.toLocaleString()}
-                  </div>
-                  <div className="text-sm text-gray-600 dark:text-gray-400" style={{ color: uiTextColor }}>Friends</div>
-                </button>
+            {/* Social Counts - Integrated into Hero - Check if social_counts is enabled */}
+            {isSectionEnabled('social_counts', profile.profile_type as ConfigProfileType, profile.enabled_modules as any) && (
+              <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
+                <div className="grid grid-cols-3 gap-4 text-center">
+                  <button
+                    onClick={() => setShowFollowersModal(true)}
+                    className="hover:bg-gray-50 dark:hover:bg-gray-800/50 rounded-lg p-3 transition-colors"
+                  >
+                    <div className="text-2xl font-bold" style={{ color: accentColor }}>
+                      {profileData.follower_count.toLocaleString()}
+                    </div>
+                    <div className="text-sm text-gray-600 dark:text-gray-400" style={{ color: uiTextColor }}>Followers</div>
+                  </button>
+                  
+                  <button
+                    onClick={() => setShowFollowingModal(true)}
+                    className="hover:bg-gray-50 dark:hover:bg-gray-800/50 rounded-lg p-3 transition-colors"
+                  >
+                    <div className="text-2xl font-bold" style={{ color: accentColor }}>
+                      {profileData.following_count.toLocaleString()}
+                    </div>
+                    <div className="text-sm text-gray-600 dark:text-gray-400" style={{ color: uiTextColor }}>Following</div>
+                  </button>
+                  
+                  <button
+                    onClick={() => setShowFriendsModal(true)}
+                    className="hover:bg-gray-50 dark:hover:bg-gray-800/50 rounded-lg p-3 transition-colors"
+                  >
+                    <div className="text-2xl font-bold" style={{ color: accentColor }}>
+                      {profileData.friends_count.toLocaleString()}
+                    </div>
+                    <div className="text-sm text-gray-600 dark:text-gray-400" style={{ color: uiTextColor }}>Friends</div>
+                  </button>
+                </div>
               </div>
-            </div>
+            )}
           </div>
         </div>
 
@@ -1331,20 +1333,22 @@ export default function ModernProfilePage() {
           </div>
         )}
 
-        {/* Top Friends Section - MySpace Style */}
-        <TopFriendsDisplay
-          key={topFriendsReloadKey}
-          profileId={profile.id}
-          isOwner={isOwnProfile}
-          onManage={() => setTopFriendsManagerOpen(true)}
-          cardStyle={cardStyle}
-          borderRadiusClass={borderRadiusClass}
-          accentColor={accentColor}
-          showTopFriends={profile.show_top_friends !== false}
-          topFriendsTitle={profile.top_friends_title || 'Top Friends'}
-          topFriendsAvatarStyle={profile.top_friends_avatar_style || 'square'}
-          topFriendsMaxCount={profile.top_friends_max_count || 8}
-        />
+        {/* Top Friends Section - MySpace Style - Check if top_friends is enabled */}
+        {isSectionEnabled('top_friends', profile.profile_type as ConfigProfileType, profile.enabled_modules as any) && (
+          <TopFriendsDisplay
+            key={topFriendsReloadKey}
+            profileId={profile.id}
+            isOwner={isOwnProfile}
+            onManage={() => setTopFriendsManagerOpen(true)}
+            cardStyle={cardStyle}
+            borderRadiusClass={borderRadiusClass}
+            accentColor={accentColor}
+            showTopFriends={profile.show_top_friends !== false}
+            topFriendsTitle={profile.top_friends_title || 'Top Friends'}
+            topFriendsAvatarStyle={profile.top_friends_avatar_style || 'square'}
+            topFriendsMaxCount={profile.top_friends_max_count || 8}
+          />
+        )}
         
         {/* Profile Tabs (config-driven, parity with mobile) */}
         <div className={`${borderRadiusClass} overflow-hidden shadow-lg mb-4 sm:mb-6`} style={cardStyle}>
@@ -1485,8 +1489,9 @@ export default function ModernProfilePage() {
               </div>
             )}
             
-            {/* Social Media Bar */}
-            {(profile.social_instagram || profile.social_twitter || profile.social_youtube || 
+            {/* Social Media Bar - Check if social_media is enabled */}
+            {isSectionEnabled('social_media', profile.profile_type as ConfigProfileType, profile.enabled_modules as any) && 
+              (profile.social_instagram || profile.social_twitter || profile.social_youtube || 
               profile.social_tiktok || profile.social_facebook || profile.social_twitch ||
               profile.social_discord || profile.social_snapchat || profile.social_linkedin ||
               profile.social_github || profile.social_spotify || profile.social_onlyfans) && (
@@ -1511,8 +1516,9 @@ export default function ModernProfilePage() {
               </div>
             )}
             
-            {/* Links Section */}
-            {profileData.links.length > 0 && (
+            {/* Links Section - Check if links is enabled */}
+            {isSectionEnabled('links', profile.profile_type as ConfigProfileType, profile.enabled_modules as any) && 
+              profileData.links.length > 0 && (
               <ModernLinksSection
                 links={profileData.links}
                 sectionTitle={profile.links_section_title || 'My Links'}
