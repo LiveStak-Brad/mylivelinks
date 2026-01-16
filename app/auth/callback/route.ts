@@ -91,7 +91,7 @@ export async function GET(request: NextRequest) {
       } else {
         // Profile incomplete - store next in onboarding redirect if valid
         if (isValidNextUrl(next)) {
-          return NextResponse.redirect(`${requestUrl.origin}/onboarding?next=${encodeURIComponent(next)}`);
+          return NextResponse.redirect(`${requestUrl.origin}/onboarding?next=${encodeURIComponent(next!)}`);
         }
         return NextResponse.redirect(`${requestUrl.origin}/onboarding`);
       }
