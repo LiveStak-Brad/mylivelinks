@@ -340,7 +340,7 @@ export default function LiveUserScreen() {
           message_type,
           content,
           created_at,
-          profiles!inner(username, display_name, avatar_url, lifetime_coins_gifted)
+          profiles!inner(username, display_name, avatar_url, total_spent)
         `)
         .eq('live_stream_id', streamerData.live_stream_id)
         .is('room_id', null)
@@ -349,7 +349,7 @@ export default function LiveUserScreen() {
 
       if (!error && data && mountedRef.current) {
         const messages: ChatMessage[] = data.reverse().map((msg: any) => {
-          const tierInfo = getGifterTierFromCoins(msg.profiles?.lifetime_coins_gifted || 0);
+          const tierInfo = getGifterTierFromCoins(msg.profiles?.total_spent || 0);
           return {
             id: String(msg.id),
             type: msg.message_type === 'gift' ? 'gift' : msg.message_type === 'follow' ? 'follow' : msg.message_type === 'system' ? 'system' : 'chat',
@@ -358,7 +358,7 @@ export default function LiveUserScreen() {
             avatarUrl: msg.profiles?.avatar_url,
             gifterTierKey: tierInfo.tierKey,
             gifterLevelInTier: tierInfo.levelInTier,
-            lifetimeCoins: msg.profiles?.lifetime_coins_gifted || 0,
+            lifetimeCoins: msg.profiles?.total_spent || 0,
           };
         });
         setChatMessages(messages);
@@ -384,12 +384,12 @@ export default function LiveUserScreen() {
           // Fetch profile for the new message
           const { data: profile } = await supabase
             .from('profiles')
-            .select('username, display_name, avatar_url, lifetime_coins_gifted')
+            .select('username, display_name, avatar_url, total_spent')
             .eq('id', payload.new.profile_id)
             .single();
 
           if (mountedRef.current && profile) {
-            const tierInfo = getGifterTierFromCoins(profile.lifetime_coins_gifted || 0);
+            const tierInfo = getGifterTierFromCoins(profile.total_spent || 0);
             const newMsg: ChatMessage = {
               id: String(payload.new.id),
               type: payload.new.message_type === 'gift' ? 'gift' : payload.new.message_type === 'follow' ? 'follow' : payload.new.message_type === 'system' ? 'system' : 'chat',
@@ -398,7 +398,7 @@ export default function LiveUserScreen() {
               avatarUrl: profile.avatar_url,
               gifterTierKey: tierInfo.tierKey,
               gifterLevelInTier: tierInfo.levelInTier,
-              lifetimeCoins: profile.lifetime_coins_gifted || 0,
+              lifetimeCoins: profile.total_spent || 0,
             };
             setChatMessages((prev) => [...prev.slice(-49), newMsg]);
           }

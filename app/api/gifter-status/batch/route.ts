@@ -42,7 +42,7 @@ export async function POST(request: NextRequest) {
     const adminSupabase = getSupabaseAdmin();
     const { data, error } = await adminSupabase
       .from('profiles')
-      .select('id, lifetime_coins_gifted')
+      .select('id, total_spent')
       .in('id', profileIds);
 
     if (error) {
@@ -52,7 +52,7 @@ export async function POST(request: NextRequest) {
 
     const statuses: Record<string, any> = {};
     for (const row of data || []) {
-      const lifetimeCoins = Number((row as any).lifetime_coins_gifted ?? 0);
+      const lifetimeCoins = Number((row as any).total_spent ?? 0);
       statuses[(row as any).id] = getGifterStatus(lifetimeCoins, { is_admin: viewerIsAdmin });
     }
 

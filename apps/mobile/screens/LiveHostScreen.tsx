@@ -259,7 +259,7 @@ export default function LiveHostScreen() {
               username,
               display_name,
               avatar_url,
-              lifetime_coins_gifted
+              total_spent
             )
           `)
           .eq('live_stream_id', liveStreamId)
@@ -286,7 +286,7 @@ export default function LiveHostScreen() {
 
         // Data is newest-first from DB, pass directly to inverted FlatList
         const messages: ChatMessage[] = (data ?? []).map((msg: any) => {
-          const lifetimeCoins = msg.profile?.lifetime_coins_gifted || 0;
+          const lifetimeCoins = msg.profile?.total_spent || 0;
           const gifterInfo = getGifterTierFromCoins(lifetimeCoins);
 
           return {
@@ -331,7 +331,7 @@ export default function LiveHostScreen() {
           const [profileResult, chatSettingsResult] = await Promise.all([
             supabase
               .from('profiles')
-              .select('username, display_name, avatar_url, lifetime_coins_gifted')
+              .select('username, display_name, avatar_url, total_spent')
               .eq('id', msg.profile_id)
               .single(),
             supabase
@@ -345,7 +345,7 @@ export default function LiveHostScreen() {
 
           const profile = profileResult.data;
           const chatSettings = chatSettingsResult.data;
-          const lifetimeCoins = (profile as any)?.lifetime_coins_gifted || 0;
+          const lifetimeCoins = (profile as any)?.total_spent || 0;
           const gifterInfo = getGifterTierFromCoins(lifetimeCoins);
 
           const newMessage: ChatMessage = {

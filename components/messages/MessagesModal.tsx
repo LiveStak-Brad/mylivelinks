@@ -75,6 +75,15 @@ export default function MessagesModal({ isOpen, onClose, anchorRef }: MessagesMo
   const callStatus = mapCallStatus(callSession.status);
   const callType: CallType = callSession.activeCall?.callType || callSession.incomingCall?.callType || 'voice';
   const isIncomingCall = !!callSession.incomingCall && !callSession.activeCall;
+  
+  // Debug logging
+  console.log('[MessagesModal] Call state:', {
+    status: callSession.status,
+    isCallActive,
+    isIncomingCall,
+    hasActiveCall: !!callSession.activeCall,
+    hasIncomingCall: !!callSession.incomingCall,
+  });
   const callParticipant: CallParticipant | null = callSession.activeCall ? {
     id: callSession.activeCall.otherParticipant.id,
     username: callSession.activeCall.otherParticipant.username,
