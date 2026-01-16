@@ -236,7 +236,7 @@ export default function CallModal({
         </div>
 
         {/* Controls */}
-        <div className="flex-shrink-0 px-4 pb-8 pt-4 pwa-safe-bottom">
+        <div className="flex-shrink-0 px-4 pb-12 pt-4 pwa-safe-bottom">
           {/* Incoming call: show Accept/Decline buttons */}
           {isIncoming && status === 'ringing' ? (
             <div className="flex items-center justify-center gap-8">

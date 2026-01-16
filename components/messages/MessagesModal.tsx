@@ -46,6 +46,38 @@ export default function MessagesModal({ isOpen, onClose, anchorRef }: MessagesMo
   const [isCallMinimized, setIsCallMinimized] = useState(false);
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
+  const [localPreviewStream, setLocalPreviewStream] = useState<MediaStream | null>(null);
+  
+  // Start camera preview for incoming video calls
+  useEffect(() => {
+    const incomingVideoCall = callSession.incomingCall && callSession.incomingCall.callType === 'video';
+    
+    if (incomingVideoCall && !localPreviewStream) {
+      // Request camera access for preview
+      navigator.mediaDevices.getUserMedia({ video: true, audio: false })
+        .then(stream => {
+          setLocalPreviewStream(stream);
+          if (localVideoRef.current) {
+            localVideoRef.current.srcObject = stream;
+          }
+        })
+        .catch(err => {
+          console.error('[MessagesModal] Camera preview error:', err);
+        });
+    }
+    
+    // Cleanup preview when call ends or is no longer incoming
+    if (!incomingVideoCall && localPreviewStream) {
+      localPreviewStream.getTracks().forEach(track => track.stop());
+      setLocalPreviewStream(null);
+    }
+    
+    return () => {
+      if (localPreviewStream) {
+        localPreviewStream.getTracks().forEach(track => track.stop());
+      }
+    };
+  }, [callSession.incomingCall, localPreviewStream]);
 
   // Map call session status to CallStatus type
   const mapCallStatus = (status: string): CallStatus => {

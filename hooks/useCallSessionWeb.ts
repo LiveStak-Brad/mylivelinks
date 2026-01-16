@@ -423,6 +423,23 @@ export function useCallSessionWeb(options: UseCallSessionWebOptions = {}) {
           .from('call_sessions')
           .update({ status: 'missed', ended_at: new Date().toISOString(), end_reason: 'timeout' })
           .eq('id', callId);
+        
+        // Send missed call message to the callee
+        try {
+          await fetch('/api/messages/send', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              otherProfileId: calleeId,
+              type: 'text',
+              text: `📞 You missed a ${callType} call`,
+            }),
+          });
+          console.log('[CALL] Sent missed call message');
+        } catch (msgErr) {
+          console.error('[CALL] Error sending missed call message:', msgErr);
+        }
+        
         setActiveCall(null);
         onCallEnded?.('timeout');
         // Reset to idle after a brief delay so UI can show "missed" state
@@ -722,6 +739,23 @@ export function useCallSessionWeb(options: UseCallSessionWebOptions = {}) {
           } else if (call?.status === 'declined' && activeCallRef.current?.callId === call.id) {
             console.log('[CALL] Call declined by callee');
             clearRingTimeout();
+            
+            // Send "unavailable" message to caller
+            try {
+              await fetch('/api/messages/send', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  otherProfileId: call.callee_id,
+                  type: 'text',
+                  text: `📞 User is unavailable right now`,
+                }),
+              });
+              console.log('[CALL] Sent unavailable message');
+            } catch (msgErr) {
+              console.error('[CALL] Error sending unavailable message:', msgErr);
+            }
+            
             setStatus('declined');
             setActiveCall(null);
             onCallEndedRef.current?.('declined');
