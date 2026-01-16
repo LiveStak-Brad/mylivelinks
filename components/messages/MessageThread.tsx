@@ -293,7 +293,11 @@ export default function MessageThread({ conversation, onBack, showBackButton = f
         <div className="flex items-center gap-1">
           {onStartVoiceCall && (
             <button
-              onClick={onStartVoiceCall}
+              onClick={() => {
+                console.log('[MessageThread] Voice call button clicked');
+                alert('Voice call button clicked - check console');
+                onStartVoiceCall();
+              }}
               className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-full transition"
               title="Voice call"
             >
@@ -302,7 +306,11 @@ export default function MessageThread({ conversation, onBack, showBackButton = f
           )}
           {onStartVideoCall && (
             <button
-              onClick={onStartVideoCall}
+              onClick={() => {
+                console.log('[MessageThread] Video call button clicked');
+                alert('Video call button clicked - check console');
+                onStartVideoCall();
+              }}
               className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-full transition"
               title="Video call"
             >

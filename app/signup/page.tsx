@@ -51,9 +51,16 @@ function SignUpPageInner() {
         }
         
         if (profile?.username && profile?.date_of_birth) {
-          router.push('/');
+          const next = new URLSearchParams(window.location.search).get('next');
+          const safeNext = next && next.startsWith('/') && !next.startsWith('//') && !/^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(next) && next !== '/login' && next !== '/signup' ? next : '/watch';
+          router.push(safeNext);
         } else {
-          router.push('/onboarding');
+          const next = new URLSearchParams(window.location.search).get('next');
+          if (next && next.startsWith('/') && !next.startsWith('//')) {
+            router.push(`/onboarding?next=${encodeURIComponent(next)}`);
+          } else {
+            router.push('/onboarding');
+          }
         }
       }
     };
@@ -126,7 +133,12 @@ function SignUpPageInner() {
 
         setMessage('Account created! Redirecting to setup...');
         setTimeout(() => {
-          router.push('/onboarding');
+          const next = new URLSearchParams(window.location.search).get('next');
+          if (next && next.startsWith('/') && !next.startsWith('//')) {
+            router.push(`/onboarding?next=${encodeURIComponent(next)}`);
+          } else {
+            router.push('/onboarding');
+          }
         }, 1000);
       }
     } catch (err) {

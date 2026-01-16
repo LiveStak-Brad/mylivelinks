@@ -1,12 +1,20 @@
-import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import React, { createContext, useContext, useEffect, useMemo, useState, useCallback } from 'react';
 import type { Session, User } from '@supabase/supabase-js';
 
 import { supabase } from '../lib/supabase';
+
+export type PendingDestination = {
+  screen: string;
+  params?: Record<string, any>;
+};
 
 type AuthContextValue = {
   session: Session | null;
   user: User | null;
   loading: boolean;
+  pendingDestination: PendingDestination | null;
+  setPendingDestination: (dest: PendingDestination | null) => void;
+  clearPendingDestination: () => PendingDestination | null;
   signInWithPassword: (email: string, password: string) => Promise<{ error: string | null }>;
   signUp: (email: string, password: string) => Promise<{ error: string | null }>;
   signOut: () => Promise<{ error: string | null }>;
@@ -19,6 +27,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [pendingDestination, setPendingDestination] = useState<PendingDestination | null>(null);
+
+  const clearPendingDestination = useCallback(() => {
+    const dest = pendingDestination;
+    setPendingDestination(null);
+    return dest;
+  }, [pendingDestination]);
 
   useEffect(() => {
     let mounted = true;
@@ -57,6 +72,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       session,
       user,
       loading,
+      pendingDestination,
+      setPendingDestination,
+      clearPendingDestination,
       signInWithPassword: async (email, password) => {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         return { error: error?.message ?? null };
@@ -74,7 +92,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return { error: error?.message ?? null };
       },
     }),
-    [loading, session, user]
+    [loading, session, user, pendingDestination, clearPendingDestination]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

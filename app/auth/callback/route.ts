@@ -3,14 +3,23 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { cookies } from 'next/headers';
 
+function isValidNextUrl(next: string | null): boolean {
+  if (!next || typeof next !== 'string') return false;
+  if (!next.startsWith('/')) return false;
+  if (next.startsWith('//')) return false;
+  if (/^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(next)) return false;
+  if (next === '/login' || next === '/signup' || next.startsWith('/login?') || next.startsWith('/signup?')) return false;
+  return true;
+}
+
 export async function GET(request: NextRequest) {
   const requestUrl = new URL(request.url);
   const code = requestUrl.searchParams.get('code');
-  const returnTo = requestUrl.searchParams.get('returnTo');
+  const next = requestUrl.searchParams.get('next');
 
   console.log('Auth callback received:', { 
     hasCode: !!code, 
-    returnTo,
+    next,
     url: requestUrl.toString() 
   });
 
@@ -73,14 +82,17 @@ export async function GET(request: NextRequest) {
         }
       }
 
-      if (returnTo) {
-        return NextResponse.redirect(`${requestUrl.origin}${returnTo}`);
-      }
-
       if (profile?.username && profile?.date_of_birth) {
-        // Profile complete, redirect to Watch (default landing)
+        // Profile complete, redirect to next URL or Watch (default landing)
+        if (isValidNextUrl(next)) {
+          return NextResponse.redirect(`${requestUrl.origin}${next}`);
+        }
         return NextResponse.redirect(`${requestUrl.origin}/watch`);
       } else {
+        // Profile incomplete - store next in onboarding redirect if valid
+        if (isValidNextUrl(next)) {
+          return NextResponse.redirect(`${requestUrl.origin}/onboarding?next=${encodeURIComponent(next)}`);
+        }
         return NextResponse.redirect(`${requestUrl.origin}/onboarding`);
       }
     }

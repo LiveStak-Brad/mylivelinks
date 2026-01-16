@@ -103,6 +103,7 @@ import { Text, View } from 'react-native';
 import { useAuth } from '../state/AuthContext';
 import { useTheme } from '../theme/useTheme';
 import { brand } from '../theme/colors';
+import { navigationRef } from './navigationRef';
 
 const Tabs = createBottomTabNavigator();
 const RootStack = createNativeStackNavigator();
@@ -181,8 +182,25 @@ function TabsNavigator() {
 }
 
 export default function RootNavigator({ header }: { header: () => React.ReactNode }) {
-  const { loading, session } = useAuth();
+  const { loading, session, clearPendingDestination } = useAuth();
   const { colors } = useTheme();
+
+  // Navigate to pending destination after successful login
+  React.useEffect(() => {
+    if (session && !loading) {
+      const dest = clearPendingDestination();
+      if (dest && navigationRef.isReady()) {
+        // Small delay to ensure navigation is ready after auth state change
+        setTimeout(() => {
+          try {
+            (navigationRef as any).navigate(dest.screen, dest.params);
+          } catch (e) {
+            console.warn('[nav] Failed to navigate to pending destination:', e);
+          }
+        }, 100);
+      }
+    }
+  }, [session, loading, clearPendingDestination]);
 
   if (loading) {
     return (

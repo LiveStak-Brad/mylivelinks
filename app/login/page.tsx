@@ -67,11 +67,12 @@ function LoginPageInner() {
         }
         
         if (profile?.username && profile?.date_of_birth) {
-          // Profile complete, redirect to return URL or Watch (default landing)
+          // Profile complete, redirect to next URL or Watch (default landing)
           // Set flag so home page knows initial redirect is done
           try { sessionStorage.setItem('mll:home_redirected', 'true'); } catch {}
-          const returnUrl = new URLSearchParams(window.location.search).get('returnUrl') || '/watch';
-          router.push(returnUrl);
+          const next = new URLSearchParams(window.location.search).get('next');
+          const safeNext = next && next.startsWith('/') && !next.startsWith('//') && !/^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(next) && next !== '/login' && next !== '/signup' ? next : '/watch';
+          router.push(safeNext);
         } else {
           // Profile incomplete, redirect to onboarding
           router.push('/onboarding');
@@ -238,11 +239,12 @@ function LoginPageInner() {
           }
           
           if (profile?.username && profile?.date_of_birth) {
-            // Profile complete, redirect to return URL or Watch (default landing)
+            // Profile complete, redirect to next URL or Watch (default landing)
             // Set flag so home page knows initial redirect is done
             try { sessionStorage.setItem('mll:home_redirected', 'true'); } catch {}
-            const returnUrl = new URLSearchParams(window.location.search).get('returnUrl') || '/watch';
-            router.push(returnUrl);
+            const next = new URLSearchParams(window.location.search).get('next');
+            const safeNext = next && next.startsWith('/') && !next.startsWith('//') && !/^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(next) && next !== '/login' && next !== '/signup' ? next : '/watch';
+            router.push(safeNext);
           } else {
             // Profile incomplete, redirect to onboarding
             router.push('/onboarding');
@@ -396,10 +398,15 @@ function LoginPageInner() {
                   setLoading(true);
                   setError(null);
                   try {
+                    const nextParam = new URLSearchParams(window.location.search).get('next');
+                    const callbackUrl = new URL('/auth/callback', window.location.origin);
+                    if (nextParam && nextParam.startsWith('/') && !nextParam.startsWith('//')) {
+                      callbackUrl.searchParams.set('next', nextParam);
+                    }
                     const { error } = await supabase.auth.signInWithOAuth({
                       provider: 'google',
                       options: {
-                        redirectTo: `${window.location.origin}/auth/callback`,
+                        redirectTo: callbackUrl.toString(),
                       },
                     });
                     if (error) throw error;
@@ -428,10 +435,15 @@ function LoginPageInner() {
                   setLoading(true);
                   setError(null);
                   try {
+                    const nextParam = new URLSearchParams(window.location.search).get('next');
+                    const callbackUrl = new URL('/auth/callback', window.location.origin);
+                    if (nextParam && nextParam.startsWith('/') && !nextParam.startsWith('//')) {
+                      callbackUrl.searchParams.set('next', nextParam);
+                    }
                     const { error } = await supabase.auth.signInWithOAuth({
                       provider: 'apple',
                       options: {
-                        redirectTo: `${window.location.origin}/auth/callback`,
+                        redirectTo: callbackUrl.toString(),
                       },
                     });
                     if (error) throw error;
@@ -457,10 +469,15 @@ function LoginPageInner() {
                   setLoading(true);
                   setError(null);
                   try {
+                    const nextParam = new URLSearchParams(window.location.search).get('next');
+                    const callbackUrl = new URL('/auth/callback', window.location.origin);
+                    if (nextParam && nextParam.startsWith('/') && !nextParam.startsWith('//')) {
+                      callbackUrl.searchParams.set('next', nextParam);
+                    }
                     const { error } = await supabase.auth.signInWithOAuth({
                       provider: 'facebook',
                       options: {
-                        redirectTo: `${window.location.origin}/auth/callback`,
+                        redirectTo: callbackUrl.toString(),
                       },
                     });
                     if (error) throw error;
@@ -486,10 +503,15 @@ function LoginPageInner() {
                   setLoading(true);
                   setError(null);
                   try {
+                    const nextParam = new URLSearchParams(window.location.search).get('next');
+                    const callbackUrl = new URL('/auth/callback', window.location.origin);
+                    if (nextParam && nextParam.startsWith('/') && !nextParam.startsWith('//')) {
+                      callbackUrl.searchParams.set('next', nextParam);
+                    }
                     const { error } = await supabase.auth.signInWithOAuth({
                       provider: 'twitch',
                       options: {
-                        redirectTo: `${window.location.origin}/auth/callback`,
+                        redirectTo: callbackUrl.toString(),
                       },
                     });
                     if (error) throw error;

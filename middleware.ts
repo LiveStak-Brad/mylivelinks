@@ -1,6 +1,33 @@
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 
+// Public routes that don't require authentication
+const PUBLIC_ROUTES = [
+  '/login',
+  '/signup',
+  '/auth',
+  '/onboarding',
+  '/reset-password',
+  '/policies',
+  '/api',
+];
+
+function isPublicRoute(pathname: string): boolean {
+  return PUBLIC_ROUTES.some(route => pathname === route || pathname.startsWith(route + '/'));
+}
+
+function isValidNextUrl(next: string): boolean {
+  // Must start with / and not start with // (protocol-relative)
+  // Must not contain protocol (http:, https:, javascript:, etc.)
+  if (!next || typeof next !== 'string') return false;
+  if (!next.startsWith('/')) return false;
+  if (next.startsWith('//')) return false;
+  if (/^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(next)) return false;
+  // Don't redirect back to auth pages
+  if (next === '/login' || next === '/signup' || next.startsWith('/login?') || next.startsWith('/signup?')) return false;
+  return true;
+}
+
 export async function middleware(request: NextRequest) {
   // Handle Supabase auth session refresh
   let response = NextResponse.next({
@@ -55,6 +82,8 @@ export async function middleware(request: NextRequest) {
     }
   );
 
+  const pathname = request.nextUrl.pathname;
+
   // Refresh session if expired
   try {
     // IMPORTANT:
@@ -64,9 +93,19 @@ export async function middleware(request: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser();
     
     // Redirect logged-in users from / to /watch (Watch is the centerpoint like TikTok)
-    const pathname = request.nextUrl.pathname;
     if (user && pathname === '/') {
       return NextResponse.redirect(new URL('/watch', request.url));
+    }
+
+    // Auth gate: redirect unauthenticated users to login with next= param
+    if (!user && !isPublicRoute(pathname)) {
+      // Build the full path including query string
+      const fullPath = request.nextUrl.pathname + request.nextUrl.search;
+      const loginUrl = new URL('/login', request.url);
+      if (isValidNextUrl(fullPath)) {
+        loginUrl.searchParams.set('next', fullPath);
+      }
+      return NextResponse.redirect(loginUrl);
     }
   } catch {
     // Never block requests due to transient auth/network issues

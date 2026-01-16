@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase';
 import { Button, Input, Textarea, Card, CardContent } from '@/components/ui';
 import { AlertCircle, CheckCircle2, Info } from 'lucide-react';
@@ -75,8 +75,11 @@ export default function OnboardingPage() {
     }
     
     if (profile?.username && profile?.date_of_birth) {
-      // Profile complete, redirect to Watch (default landing)
-      router.push('/watch');
+      // Profile complete, redirect to next URL or Watch (default landing)
+      const params = new URLSearchParams(window.location.search);
+      const next = params.get('next');
+      const safeNext = next && next.startsWith('/') && !next.startsWith('//') && !/^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(next) && next !== '/login' && next !== '/signup' ? next : '/watch';
+      router.push(safeNext);
       return;
     }
     
@@ -255,8 +258,11 @@ export default function OnboardingPage() {
         }
       }
       
-      // Redirect to Watch (default landing)
-      router.push('/watch');
+      // Redirect to next URL or Watch (default landing)
+      const params = new URLSearchParams(window.location.search);
+      const next = params.get('next');
+      const safeNext = next && next.startsWith('/') && !next.startsWith('//') && !/^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(next) && next !== '/login' && next !== '/signup' ? next : '/watch';
+      router.push(safeNext);
     } catch (err: any) {
       console.error('Onboarding error:', err);
       setError(err.message || 'Failed to complete profile setup');
