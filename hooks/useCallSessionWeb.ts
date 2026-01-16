@@ -267,7 +267,9 @@ export function useCallSessionWeb(options: UseCallSessionWebOptions = {}) {
       return false;
     }
     
-    if (status !== 'idle') {
+    // Allow new calls from idle or terminal states (missed, ended, failed, declined)
+    const terminalStates = ['idle', 'missed', 'ended', 'failed', 'declined'];
+    if (!terminalStates.includes(status)) {
       console.error('[CALL] Already in a call - status:', status);
       const err = new Error('Already in a call');
       setError(err);
@@ -613,11 +615,25 @@ export function useCallSessionWeb(options: UseCallSessionWebOptions = {}) {
   }, [currentUserId, enabled, supabase, activeCall, connectToRoom, disconnectRoom, clearRingTimeout, onIncomingCall, onCallEnded, onError]);
 
   // Check for existing active call on mount (query call_sessions directly)
+  // Only restore calls that are recent (within last 2 minutes) to avoid stale state
   useEffect(() => {
     if (!currentUserId || !enabled) return;
     
     const checkActiveCall = async () => {
+      const twoMinutesAgo = new Date(Date.now() - 2 * 60 * 1000).toISOString();
+      
+      // First, clean up any stale pending calls older than 2 minutes
+      await supabase
+        .from('call_sessions')
+        .update({ status: 'missed', ended_at: new Date().toISOString(), end_reason: 'stale' })
+        .or(`caller_id.eq.${currentUserId},callee_id.eq.${currentUserId}`)
+        .eq('status', 'pending')
+        .lt('created_at', twoMinutesAgo);
+      
+      console.log('[CALL] Cleaned up stale pending calls');
+      
       // Query call_sessions directly instead of using RPC from calls table
+      // Only get calls created within the last 2 minutes to avoid stale calls
       const { data, error } = await supabase
         .from('call_sessions')
         .select(`
@@ -632,11 +648,15 @@ export function useCallSessionWeb(options: UseCallSessionWebOptions = {}) {
         `)
         .or(`caller_id.eq.${currentUserId},callee_id.eq.${currentUserId}`)
         .in('status', ['pending', 'accepted', 'active'])
+        .gte('created_at', twoMinutesAgo)
         .order('created_at', { ascending: false })
         .limit(1)
         .maybeSingle();
       
-      if (error || !data) return;
+      if (error || !data) {
+        console.log('[CALL] No recent active calls found');
+        return;
+      }
       
       console.log('[CALL] Found existing active call:', data);
       
@@ -664,7 +684,7 @@ export function useCallSessionWeb(options: UseCallSessionWebOptions = {}) {
         answeredAt: data.answered_at ? new Date(data.answered_at) : undefined,
       });
       
-      if (data.status === 'accepted') {
+      if (data.status === 'accepted' || data.status === 'active') {
         setStatus('connecting');
         try {
           await connectToRoom(data.room_name, data.call_type as CallType);
@@ -675,7 +695,13 @@ export function useCallSessionWeb(options: UseCallSessionWebOptions = {}) {
           setStatus('failed');
         }
       } else if (data.status === 'pending') {
-        setStatus('ringing');
+        // Only show ringing if we're the callee (incoming call)
+        if (!isCaller) {
+          setStatus('ringing');
+        } else {
+          // We're the caller - this is an outgoing call that's still ringing
+          setStatus('ringing');
+        }
       }
     };
     
