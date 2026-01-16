@@ -3,6 +3,8 @@ import { View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet, Activi
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import MllProBadge from '../components/shared/MllProBadge';
+import TopLeaderBadge from '../components/shared/TopLeaderBadge';
+import { useTopLeaders, getLeaderType } from '../hooks/useTopLeaders';
 import { useNavigation } from '@react-navigation/native';
 import { useTheme } from '../theme/useTheme';
 import { supabase } from '../lib/supabase';
@@ -495,6 +497,7 @@ export default function SearchScreen() {
                           {person.display_name || person.username}
                         </Text>
                         {person.is_mll_pro && <MllProBadge size="sm" />}
+                        <SearchLeaderBadge profileId={person.id} />
                         {person.is_live && (
                           <View style={styles.livePill}>
                             <View style={styles.liveDot} />
@@ -1025,3 +1028,10 @@ const styles = StyleSheet.create({
     color: '#6B7280',
   },
 });
+
+function SearchLeaderBadge({ profileId }: { profileId?: string }) {
+  const leaders = useTopLeaders();
+  const leaderType = getLeaderType(profileId, leaders);
+  if (!leaderType) return null;
+  return <TopLeaderBadge type={leaderType} size="sm" />;
+}

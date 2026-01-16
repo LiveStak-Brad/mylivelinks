@@ -9,6 +9,8 @@ import { useAuth } from '../state/AuthContext';
 import { useTheme } from '../theme/useTheme';
 import { brand, darkPalette, lightPalette } from '../theme/colors';
 import MllProBadge from '../components/shared/MllProBadge';
+import TopLeaderBadge from '../components/shared/TopLeaderBadge';
+import { useTopLeaders, getLeaderType } from '../hooks/useTopLeaders';
 
 const TAB_BAR_SAFE_PADDING = 96;
 const NO_PROFILE_PIC = require('../assets/no-profile-pic.png');
@@ -231,6 +233,7 @@ function ConversationRow({
               {conversation.displayName || conversation.username}
             </Text>
             {conversation.isMllPro && <MllProBadge size="sm" />}
+            <MessageLeaderBadge profileId={conversation.id} />
           </View>
           <Text style={[styles.conversationTime, showUnread && styles.conversationTimeUnread]}>{conversation.timeLabel}</Text>
         </View>
@@ -791,3 +794,9 @@ function createStyles(stylesVars: StylesVars) {
   });
 }
 
+function MessageLeaderBadge({ profileId }: { profileId?: string }) {
+  const leaders = useTopLeaders();
+  const leaderType = getLeaderType(profileId, leaders);
+  if (!leaderType) return null;
+  return <TopLeaderBadge type={leaderType} size="sm" />;
+}

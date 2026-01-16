@@ -13,6 +13,8 @@ import { Feather } from '@expo/vector-icons';
 import { supabase } from '../../lib/supabase';
 import { getAvatarSource } from '../../lib/defaultAvatar';
 import MllProBadge from '../shared/MllProBadge';
+import TopLeaderBadge from '../shared/TopLeaderBadge';
+import { useTopLeaders, getLeaderType } from '../../hooks/useTopLeaders';
 
 interface User {
   id: string;
@@ -191,6 +193,7 @@ export default function ConnectionsModal({
             {user.display_name || user.username}
           </Text>
           {user.is_mll_pro && <MllProBadge size="sm" />}
+          <ConnectionLeaderBadge profileId={user.id} />
         </View>
         <Text style={[styles.userHandle, { color: colors.mutedText }]} numberOfLines={1}>
           @{user.username}
@@ -299,6 +302,13 @@ export default function ConnectionsModal({
       </View>
     </Modal>
   );
+}
+
+function ConnectionLeaderBadge({ profileId }: { profileId?: string }) {
+  const leaders = useTopLeaders();
+  const leaderType = getLeaderType(profileId, leaders);
+  if (!leaderType) return null;
+  return <TopLeaderBadge type={leaderType} size="sm" />;
 }
 
 const styles = StyleSheet.create({

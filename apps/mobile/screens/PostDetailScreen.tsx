@@ -24,6 +24,8 @@ import WatchGiftModal from '../components/watch/WatchGiftModal';
 import ShareModal from '../components/ShareModal';
 import ReportModal from '../components/ReportModal';
 import MllProBadge from '../components/shared/MllProBadge';
+import TopLeaderBadge from '../components/shared/TopLeaderBadge';
+import { useTopLeaders, getLeaderType } from '../hooks/useTopLeaders';
 
 const API_BASE_URL = 'https://www.mylivelinks.com';
 
@@ -362,6 +364,7 @@ export default function PostDetailScreen() {
               <View style={styles.authorNameRow}>
                 <Text style={styles.authorName}>{post.author.display_name || post.author.username}</Text>
                 {post.author.is_mll_pro && <MllProBadge size="sm" />}
+                <PostLeaderBadge profileId={post.author.id} />
                 {post.feeling_emoji && post.feeling_label && (
                   <Text style={styles.feelingText}>
                     {' '}is feeling {post.feeling_emoji} {post.feeling_label}
@@ -716,4 +719,11 @@ function createStyles(vars: any) {
       fontWeight: '600',
     },
   });
+}
+
+function PostLeaderBadge({ profileId }: { profileId?: string }) {
+  const leaders = useTopLeaders();
+  const leaderType = getLeaderType(profileId, leaders);
+  if (!leaderType) return null;
+  return <TopLeaderBadge type={leaderType} size="sm" />;
 }

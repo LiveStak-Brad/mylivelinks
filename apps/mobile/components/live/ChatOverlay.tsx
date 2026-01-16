@@ -2,6 +2,8 @@ import React, { useRef, useEffect } from 'react';
 import { FlatList, Image, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import MllProBadge from '../shared/MllProBadge';
+import TopLeaderBadge from '../shared/TopLeaderBadge';
+import { useTopLeaders, getLeaderType } from '../../hooks/useTopLeaders';
 
 export interface ChatMessage {
   id: string;

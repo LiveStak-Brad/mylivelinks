@@ -17,6 +17,8 @@ import { Feather, Ionicons } from '@expo/vector-icons';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../state/AuthContext';
 import MllProBadge from '../shared/MllProBadge';
+import TopLeaderBadge from '../shared/TopLeaderBadge';
+import { useTopLeaders, getLeaderType } from '../../hooks/useTopLeaders';
 
 type CommentAuthor = {
   id: string;
@@ -296,6 +298,7 @@ export default function FeedCommentsModal({
               <View style={styles.commentAuthorRow}>
                 <Text style={styles.commentAuthor}>{item.author.username}</Text>
                 {item.author.is_mll_pro && <MllProBadge size="sm" />}
+                <CommentLeaderBadge profileId={item.author.id} />
               </View>
               <Text style={styles.commentText}>{item.text_content}</Text>
             </View>
@@ -439,6 +442,13 @@ export default function FeedCommentsModal({
       </KeyboardAvoidingView>
     </Modal>
   );
+}
+
+function CommentLeaderBadge({ profileId }: { profileId?: string }) {
+  const leaders = useTopLeaders();
+  const leaderType = getLeaderType(profileId, leaders);
+  if (!leaderType) return null;
+  return <TopLeaderBadge type={leaderType} size="sm" />;
 }
 
 const styles = StyleSheet.create({

@@ -25,6 +25,8 @@ import WatchGiftModal from '../components/watch/WatchGiftModal';
 import ReportModal from '../components/ReportModal';
 import ShareModal from '../components/ShareModal';
 import MllProBadge from '../components/shared/MllProBadge';
+import TopLeaderBadge from '../components/shared/TopLeaderBadge';
+import { useTopLeaders, getLeaderType } from '../hooks/useTopLeaders';
 
 type FeedRow = {
   post_id: string;
@@ -295,6 +297,7 @@ function FeedPostCard({
           <View style={styles.authorNameRow}>
             <Text style={styles.postAuthorName}>{post.author_display_name}</Text>
             {post.author_is_mll_pro && <MllProBadge size="sm" />}
+            <LeaderBadgeInline profileId={post.author_profile_id} />
             {post.feeling_emoji && post.feeling_label && (
               <Text style={styles.feelingText}>
                 {' '}is feeling {post.feeling_emoji} {post.feeling_label}
@@ -2137,3 +2140,9 @@ function createStyles(stylesVars: StylesVars) {
   });
 }
 
+function LeaderBadgeInline({ profileId }: { profileId?: string }) {
+  const leaders = useTopLeaders();
+  const leaderType = getLeaderType(profileId, leaders);
+  if (!leaderType) return null;
+  return <TopLeaderBadge type={leaderType} size="sm" />;
+}

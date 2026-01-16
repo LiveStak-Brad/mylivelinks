@@ -43,6 +43,8 @@ import MerchandiseSection from '../components/profile/MerchandiseSection';
 import BusinessInfoSection from '../components/profile/BusinessInfoSection';
 import LiveIndicatorBanner from '../components/profile/LiveIndicatorBanner';
 import MllProBadge from '../components/shared/MllProBadge';
+import TopLeaderBadge from '../components/shared/TopLeaderBadge';
+import { useTopLeaders, getLeaderType } from '../hooks/useTopLeaders';
 import ShareModal from '../components/ShareModal';
 import ReportModal from '../components/ReportModal';
 import ConnectionsModal from '../components/profile/ConnectionsModal';
@@ -568,6 +570,7 @@ export default function ProfileViewScreen({ routeParams }: ProfileViewScreenProp
                     {displayName}
                   </Text>
                   {profile.is_mll_pro && <MllProBadge size="md" />}
+                  <ProfileLeaderBadge profileId={profile.id} />
                 </View>
 
                 <View style={styles.heroMetaRow}>
@@ -1631,4 +1634,11 @@ function createStyles(stylesVars: {
       marginBottom: 12,
     },
   });
+}
+
+function ProfileLeaderBadge({ profileId }: { profileId?: string }) {
+  const leaders = useTopLeaders();
+  const leaderType = getLeaderType(profileId, leaders);
+  if (!leaderType) return null;
+  return <TopLeaderBadge type={leaderType} size="md" />;
 }
