@@ -335,17 +335,19 @@ export function useCallSessionWeb(options: UseCallSessionWebOptions = {}) {
           .from('call_sessions')
           .update({ status: 'missed', ended_at: new Date().toISOString(), end_reason: 'timeout' })
           .eq('id', callId);
-        setStatus('missed');
         setActiveCall(null);
         onCallEnded?.('timeout');
+        // Reset to idle after a brief delay so UI can show "missed" state
+        setTimeout(() => setStatus('idle'), 2000);
       }, RING_TIMEOUT_MS);
       
       return true;
     } catch (err: any) {
       console.error('[CALL] Error initiating call:', err);
       setError(err);
-      setStatus('failed');
       onError?.(err);
+      // Reset to idle after a brief delay so UI can show error
+      setTimeout(() => setStatus('idle'), 2000);
       return false;
     }
   }, [currentUserId, status, supabase, onError, onCallEnded]);
@@ -459,15 +461,12 @@ export function useCallSessionWeb(options: UseCallSessionWebOptions = {}) {
       
       setActiveCall(null);
       setIncomingCall(null);
-      setStatus('ended');
       setRemoteParticipant(null);
       
       onCallEnded?.(reason);
       
-      // Reset to idle after a moment
-      setTimeout(() => {
-        setStatus('idle');
-      }, 1000);
+      // Reset to idle after brief delay
+      setTimeout(() => setStatus('idle'), 1000);
       
       return true;
     } catch (err: any) {
