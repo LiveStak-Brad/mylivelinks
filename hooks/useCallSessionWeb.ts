@@ -366,6 +366,31 @@ export function useCallSessionWeb(options: UseCallSessionWebOptions = {}) {
       setStatus('initiating');
       setError(null);
       
+      // Request camera/mic permissions BEFORE creating the call session
+      // This ensures the caller has granted permissions before the callee sees the incoming call
+      if (callType === 'video') {
+        console.log('[CALL] Requesting camera permission before initiating video call');
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+          // Stop the stream - we'll create proper tracks when connecting to room
+          stream.getTracks().forEach(track => track.stop());
+          console.log('[CALL] Camera permission granted');
+        } catch (permErr: any) {
+          console.error('[CALL] Camera permission denied:', permErr);
+          throw new Error('Camera permission required for video calls');
+        }
+      } else {
+        console.log('[CALL] Requesting microphone permission before initiating voice call');
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          stream.getTracks().forEach(track => track.stop());
+          console.log('[CALL] Microphone permission granted');
+        } catch (permErr: any) {
+          console.error('[CALL] Microphone permission denied:', permErr);
+          throw new Error('Microphone permission required for calls');
+        }
+      }
+      
       // Pre-generate UUID so we can set room_name in single insert
       const callId = generateUUID();
       const roomName = `call_${callId}`;
