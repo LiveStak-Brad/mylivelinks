@@ -8,6 +8,12 @@ import { useTheme } from '../theme/useTheme';
 import { useAuth } from '../state/AuthContext';
 import { supabase } from '../lib/supabase';
 
+// Owner profile IDs to exclude from leaderboards
+const OWNER_PROFILE_IDS = [
+  '2b4a1178-3c39-4179-94ea-314dd824a818',
+  '0b47a2d7-43fb-4d38-b321-2d5d0619aabf',
+];
+
 const SCREEN_WIDTH = Dimensions.get('window').width;
 
 // Theme context for helper components
@@ -137,12 +143,20 @@ export default function LeaderboardsScreen() {
     setError(null);
     
     // Query referral_rollups and manually join with profiles
-    const { data: rollups, error: rollupsError } = await supabase
+    // Exclude owner profile IDs from leaderboard
+    let query = supabase
       .from('referral_rollups')
       .select('referrer_profile_id, referral_count, activation_count, last_activity_at')
       .order('activation_count', { ascending: false })
       .order('referral_count', { ascending: false })
       .limit(100);
+    
+    // Exclude owner IDs
+    for (const ownerId of OWNER_PROFILE_IDS) {
+      query = query.neq('referrer_profile_id', ownerId);
+    }
+    
+    const { data: rollups, error: rollupsError } = await query;
     
     if (rollupsError) {
       console.error('[Leaderboards] Error loading referrals:', rollupsError);

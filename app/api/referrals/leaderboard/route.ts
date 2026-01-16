@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
+import { getOwnerProfileIds } from '@/lib/owner-ids';
 
 export async function GET(request: NextRequest) {
   try {
@@ -10,14 +11,25 @@ export async function GET(request: NextRequest) {
     const limit = Math.min(Math.max(limitRaw || 50, 1), 100);
 
     const admin = getSupabaseAdmin();
+    const ownerIds = getOwnerProfileIds();
 
     // Query referral_rollups directly like the admin panel does
-    const { data, error } = await admin
+    // Exclude owner profile IDs from leaderboard
+    let query = admin
       .from('referral_rollups')
       .select('referrer_profile_id, referral_count, activation_count, profiles!referral_rollups_referrer_profile_id_fkey(username, avatar_url, display_name)')
       .order('activation_count', { ascending: false })
       .order('referral_count', { ascending: false })
       .limit(limit);
+
+    // Exclude owner IDs
+    if (ownerIds.length > 0) {
+      for (const ownerId of ownerIds) {
+        query = query.neq('referrer_profile_id', ownerId);
+      }
+    }
+
+    const { data, error } = await query;
 
     if (error) {
       console.error('GET /api/referrals/leaderboard DB error:', error);
