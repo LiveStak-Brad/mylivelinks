@@ -1,7 +1,10 @@
 'use client';
 
 /**
- * PlaylistsTab - Full playlist management tab for profile
+ * PlaylistsTab - Horizontal scroll playlists for profile TV tab
+ * 
+ * DO NOT TOUCH - Video links use youtube_video_id for the replay player URL.
+ * The replay player searches by both youtube_video_id AND playlist item UUID.
  * 
  * Shows playlists with horizontal scroll of videos (like SeriesTab).
  * Each playlist: Title + "+ Video" button → horizontal scroll of video cards
@@ -125,7 +128,7 @@ function VideoCard({
     <div className="group flex-shrink-0 w-[200px] relative">
       {/* Thumbnail - links to replay player */}
       <a
-        href={`/replay/${username}/${item.id}?playlist=${playlistId}`}
+        href={`/replay/${username}/${item.youtube_video_id}?playlist=${playlistId}`}
         className="block relative aspect-video rounded-lg overflow-hidden bg-gray-200 dark:bg-gray-700"
       >
         <img 

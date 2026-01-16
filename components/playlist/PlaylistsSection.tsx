@@ -1,5 +1,10 @@
 'use client';
 
+/**
+ * DO NOT TOUCH - Links go to /${username}/tv?tab=playlists
+ * Individual playlist cards link to /replay/${username}/playlist/${playlist.id}
+ */
+
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { ListVideo, Plus, Play, ExternalLink } from 'lucide-react';
@@ -113,7 +118,7 @@ export default function PlaylistsSection({
             Curate YouTube videos into playlists for your audience
           </p>
           <Link
-            href={`/${username}/playlists/new`}
+            href={`/${username}/tv?tab=playlists`}
             className="inline-flex items-center gap-2 px-4 py-2 rounded-full text-white font-semibold text-sm transition-opacity hover:opacity-90"
             style={{ backgroundColor: buttonColor }}
           >
@@ -141,7 +146,7 @@ export default function PlaylistsSection({
         <div className="flex items-center gap-2">
           {isOwner && (
             <Link
-              href={`/${username}/playlists/new`}
+              href={`/${username}/tv?tab=playlists`}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-white font-semibold text-xs transition-opacity hover:opacity-90"
               style={{ backgroundColor: buttonColor }}
             >
@@ -151,7 +156,7 @@ export default function PlaylistsSection({
           )}
           {hasMore && (
             <Link
-              href={`/${username}/playlists`}
+              href={`/${username}/tv?tab=playlists`}
               className="text-sm font-semibold text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 flex items-center gap-1"
             >
               View All

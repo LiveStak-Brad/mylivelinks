@@ -5,6 +5,17 @@
  * 
  * Route: /replay/[username]/[id]
  * 
+ * DO NOT TOUCH - This file handles video lookup by multiple ID types:
+ * 1. youtube_id (11-char YouTube video ID)
+ * 2. UUID (playlist item id or music video id)
+ * 
+ * The lookup order is critical:
+ * 1. profile_music_videos by youtube_id
+ * 2. profile_music_videos by UUID id
+ * 3. replay_playlist_items by youtube_video_id
+ * 4. replay_playlist_items by UUID id (playlist item's own id)
+ * 5. creator_studio_items by UUID id
+ * 
  * YouTube-style video player page with:
  * - Video player with custom controls
  * - Video metadata (title, description, views, likes)
@@ -14,7 +25,7 @@
  * Supports all long-form content types:
  * - vlog, music_video, podcast, movie, series_episode, education, comedy_special, other
  * 
- * REAL DATA: Fetches from profile_music_videos and creator_studio_items tables
+ * REAL DATA: Fetches from profile_music_videos, replay_playlist_items, and creator_studio_items tables
  */
 
 import { useState, useEffect } from 'react';
@@ -130,12 +141,31 @@ export default function ReplayPlayerPage() {
         
         // If still not found, check replay_playlist_items (for curated playlist videos)
         if (!musicVideo) {
-          const { data: playlistItem } = await supabase
+          
+          // First try by youtube_video_id
+          let playlistItem = null;
+          const { data: itemByYoutubeId } = await supabase
             .from('replay_playlist_items')
             .select('*, replay_playlists!inner(profile_id)')
             .eq('replay_playlists.profile_id', profile.id)
             .eq('youtube_video_id', currentVideoId)
             .maybeSingle();
+          
+          playlistItem = itemByYoutubeId;
+          
+          // If not found, try by playlist item UUID
+          if (!playlistItem) {
+            const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+            if (uuidRegex.test(currentVideoId)) {
+              const { data: itemById } = await supabase
+                .from('replay_playlist_items')
+                .select('*, replay_playlists!inner(profile_id)')
+                .eq('replay_playlists.profile_id', profile.id)
+                .eq('id', currentVideoId)
+                .maybeSingle();
+              playlistItem = itemById;
+            }
+          }
           
           if (playlistItem) {
             // Build video data from playlist item
@@ -204,7 +234,7 @@ export default function ReplayPlayerPage() {
             .select('*')
             .eq('id', currentVideoId)
             .eq('owner_profile_id', profile.id)
-            .single();
+            .maybeSingle();
           
           if (studioItem) {
             const youtubeId = extractYoutubeId(studioItem.media_url || '');
