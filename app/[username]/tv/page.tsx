@@ -374,33 +374,33 @@ export default function TVPage() {
         )}
 
         {/* Creator Context Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6 p-3 sm:p-4 bg-gray-50 dark:bg-gray-800/50 rounded-xl">
-          <div className="flex items-center gap-3 sm:gap-4">
+        <div className="flex items-center justify-between mb-6 p-4 bg-gray-50 dark:bg-gray-800/50 rounded-xl">
+          <div className="flex items-center gap-4">
             {/* Creator Avatar */}
             <Link href={`/${username}`}>
-              <div className="w-10 h-10 sm:w-14 sm:h-14 rounded-full overflow-hidden bg-gray-200 dark:bg-gray-700 ring-2 ring-purple-500 flex-shrink-0">
+              <div className="w-14 h-14 rounded-full overflow-hidden bg-gray-200 dark:bg-gray-700 ring-2 ring-purple-500">
                 {profile?.avatar_url && (
                   <Image
                     src={profile.avatar_url}
                     alt={profile.display_name || username}
                     width={56}
                     height={56}
-                    className="object-cover w-full h-full"
+                    className="object-cover"
                   />
                 )}
               </div>
             </Link>
-            <div className="min-w-0">
-              <div className="flex items-center gap-1.5 sm:gap-2">
-                <Tv className="w-4 h-4 sm:w-5 sm:h-5 text-purple-600 dark:text-purple-400 flex-shrink-0" />
-                <h1 className="text-base sm:text-xl font-bold text-gray-900 dark:text-white truncate">
+            <div>
+              <div className="flex items-center gap-2">
+                <Tv className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+                <h1 className="text-xl font-bold text-gray-900 dark:text-white">
                   {username}TV
                 </h1>
               </div>
-              <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">
+              <p className="text-sm text-gray-500 dark:text-gray-400">
                 {videos.length} videos
               </p>
-              <p className="text-xs text-gray-400 dark:text-gray-500 hidden sm:block">
+              <p className="text-sm text-gray-500 dark:text-gray-400">
                 {profile?.follower_count?.toLocaleString() || 0} followers
               </p>
             </div>
@@ -409,24 +409,24 @@ export default function TVPage() {
           <div className="flex items-center gap-2">
             <button
               onClick={() => setIsFollowing(!isFollowing)}
-              className={`flex items-center justify-center gap-1.5 px-3 sm:px-4 py-1.5 sm:py-2 rounded-full font-medium text-xs sm:text-sm transition-colors flex-1 sm:flex-none ${
+              className={`flex items-center gap-2 px-4 py-2 rounded-full font-medium text-sm transition-colors ${
                 isFollowing
                   ? 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300'
                   : 'bg-purple-600 hover:bg-purple-700 text-white'
               }`}
             >
               {isFollowing ? (
-                <><UserCheck className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> <span className="hidden xs:inline">Following</span></>
+                <><UserCheck className="w-4 h-4" /> Following</>
               ) : (
-                <><UserPlus className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> <span className="hidden xs:inline">Follow</span></>
+                <><UserPlus className="w-4 h-4" /> Follow</>
               )}
             </button>
             <Link
               href={`/${username}`}
-              className="p-1.5 sm:p-2 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+              className="p-2 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
               title="About this channel"
             >
-              <Info className="w-4 h-4 sm:w-5 sm:h-5" />
+              <Info className="w-5 h-5" />
             </Link>
           </div>
         </div>
@@ -446,17 +446,17 @@ export default function TVPage() {
           </div>
         )}
 
-        {/* Search + Sort Controls */}
-        <div className="flex items-center gap-2 mb-4">
-          {/* Search Input - icon only on mobile, expands on focus */}
-          <div className="relative flex-1 sm:max-w-md">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 sm:w-5 sm:h-5 text-gray-400" />
+        {/* Filter Bar - Same layout as /replay */}
+        <div className="space-y-3 mb-6">
+          {/* Search Bar */}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
             <input
               type="text"
+              placeholder={`Search @${username}TV...`}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search..."
-              className="w-full pl-9 sm:pl-10 pr-8 py-2 bg-gray-100 dark:bg-gray-800 border border-transparent focus:border-purple-500 rounded-full text-sm sm:text-base text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none transition-colors"
+              className="w-full pl-10 pr-4 py-2.5 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 border border-transparent focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 outline-none transition-all"
             />
             {searchQuery && (
               <button
@@ -467,56 +467,61 @@ export default function TVPage() {
               </button>
             )}
           </div>
-          
-          {/* Sort Dropdown */}
-          <div className="relative flex-shrink-0">
-            <button
-              onClick={() => setShowSortDropdown(!showSortDropdown)}
-              className="flex items-center gap-1 sm:gap-2 px-2.5 sm:px-4 py-2 bg-gray-100 dark:bg-gray-800 rounded-full text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors whitespace-nowrap"
-            >
-              <span className="hidden sm:inline">{SORT_OPTIONS.find(s => s.id === sortBy)?.label}</span>
-              <span className="sm:hidden">{SORT_OPTIONS.find(s => s.id === sortBy)?.label.slice(0, 6)}</span>
-              <ChevronDown className={`w-3.5 h-3.5 sm:w-4 sm:h-4 transition-transform ${showSortDropdown ? 'rotate-180' : ''}`} />
-            </button>
-            {showSortDropdown && (
-              <div className="absolute right-0 mt-2 w-36 sm:w-40 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 py-1 z-20">
-                {SORT_OPTIONS.map(option => (
-                  <button
-                    key={option.id}
-                    onClick={() => {
-                      setSortBy(option.id);
-                      setShowSortDropdown(false);
-                    }}
-                    className={`w-full px-3 sm:px-4 py-2 text-left text-xs sm:text-sm transition-colors ${
-                      sortBy === option.id
-                        ? 'bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400'
-                        : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
-                    }`}
-                  >
-                    {option.label}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
 
-        {/* Filter Pills - Horizontal scroll on mobile */}
-        <div className="overflow-x-auto scrollbar-none -mx-4 px-4 mb-6 pb-4 border-b border-gray-200 dark:border-gray-700">
-          <div className="flex gap-2 min-w-max">
+          {/* Row 1: Sort Toggle - stretch on mobile */}
+          <div className="flex items-center gap-2">
+            {SORT_OPTIONS.slice(0, 2).map((option) => (
+              <button
+                key={option.id}
+                onClick={() => setSortBy(option.id)}
+                className={`flex-1 md:flex-none px-4 py-1.5 rounded-full text-sm font-semibold transition-all text-center ${
+                  sortBy === option.id
+                    ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-md'
+                    : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
+                }`}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Row 2: Category Chips - horizontal scroll */}
+          <div className="flex items-center gap-2 overflow-x-auto scrollbar-none pb-1">
             {CONTENT_FILTERS.map((filter) => (
               <button
                 key={filter.id}
                 onClick={() => setActiveFilter(filter.id as ContentFilter)}
-                className={`px-3 sm:px-4 py-1.5 rounded-full text-xs sm:text-sm font-medium transition-colors whitespace-nowrap ${
+                className={`flex-shrink-0 px-4 py-1.5 rounded-full text-sm font-medium transition-all ${
                   activeFilter === filter.id
-                    ? 'bg-purple-600 text-white'
-                    : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
+                    ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-md'
+                    : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
                 }`}
               >
                 {filter.label}
               </button>
             ))}
+          </div>
+
+          {/* Row 3: Creator Studio + UsernameTV / Playlists - stretch on mobile */}
+          <div className="flex items-center gap-2">
+            <Link
+              href="/creator-studio"
+              className="flex-1 md:flex-none flex items-center justify-center px-4 py-1.5 rounded-full text-sm font-semibold border-2 border-pink-500 text-pink-600 dark:text-pink-400 hover:bg-pink-50 dark:hover:bg-pink-900/20 transition-all"
+            >
+              +Creator Studio
+            </Link>
+            <button
+              className="flex-1 md:flex-none px-5 py-1.5 rounded-full text-sm font-semibold bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-md text-center"
+            >
+              {username}TV
+            </button>
+            <Link
+              href="/replay/playlists"
+              className="flex-1 md:flex-none flex items-center justify-center gap-2 px-4 py-1.5 rounded-full text-sm font-medium bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition-all"
+            >
+              <ListVideo className="w-4 h-4" />
+              Playlists
+            </Link>
           </div>
         </div>
 

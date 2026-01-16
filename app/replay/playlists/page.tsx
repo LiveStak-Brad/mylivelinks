@@ -317,27 +317,25 @@ export default function PRPPage() {
               ))}
             </div>
 
-            {/* Row 3: +Create Playlist / REPLAY / Playlists */}
-            <div className="flex items-center gap-1.5 sm:gap-2">
+            {/* Row 3: +Create Playlist / REPLAY / Playlists - stretch on mobile */}
+            <div className="flex items-center gap-2">
               <Link
                 href="/playlists/new"
-                className="flex items-center justify-center px-2 sm:px-3 py-1.5 rounded-full text-xs sm:text-sm font-semibold border-2 border-pink-500 text-pink-600 dark:text-pink-400 hover:bg-pink-50 dark:hover:bg-pink-900/20 transition-all whitespace-nowrap"
+                className="flex-1 md:flex-none flex items-center justify-center px-4 py-1.5 rounded-full text-sm font-semibold border-2 border-pink-500 text-pink-600 dark:text-pink-400 hover:bg-pink-50 dark:hover:bg-pink-900/20 transition-all"
               >
-                <span className="hidden sm:inline">+Create Playlist</span>
-                <span className="sm:hidden">+Create</span>
+                +Create Playlist
               </Link>
               <Link
                 href="/replay"
-                className="px-3 sm:px-5 py-1.5 rounded-full text-xs sm:text-sm font-medium bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition-all text-center whitespace-nowrap"
+                className="flex-1 md:flex-none px-5 py-1.5 rounded-full text-sm font-medium bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition-all text-center"
               >
                 REPLAY
               </Link>
               <button
-                className="flex items-center justify-center gap-1 sm:gap-2 px-2 sm:px-4 py-1.5 rounded-full text-xs sm:text-sm font-semibold bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-md whitespace-nowrap"
+                className="flex-1 md:flex-none flex items-center justify-center gap-2 px-5 py-1.5 rounded-full text-sm font-semibold bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-md"
               >
-                <ListVideo className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                <span className="hidden sm:inline">Playlists</span>
-                <span className="sm:hidden">Lists</span>
+                <ListVideo className="w-4 h-4" />
+                Playlists
               </button>
             </div>
           </div>
