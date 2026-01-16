@@ -9,6 +9,7 @@ import MessageThread from './MessageThread';
 import FriendsList from './FriendsList';
 import { CallModal, CallMinimizedBubble } from '@/components/call';
 import type { CallType, CallStatus, CallParticipant } from '@/components/call';
+import { useCallSessionWeb } from '@/hooks/useCallSessionWeb';
 
 interface MessagesModalProps {
   isOpen: boolean;
@@ -30,19 +31,58 @@ export default function MessagesModal({ isOpen, onClose, anchorRef }: MessagesMo
   const [showThread, setShowThread] = useState(false);
   const [modalPosition, setModalPosition] = useState<ModalPosition>({ top: 0, left: 0 });
 
-  // Call state
-  const [isCallActive, setIsCallActive] = useState(false);
+  // Real call session hook
+  const callSession = useCallSessionWeb({
+    enabled: true,
+    onIncomingCall: (call) => {
+      console.log('[MessagesModal] Incoming call:', call);
+    },
+    onCallEnded: (reason) => {
+      console.log('[MessagesModal] Call ended:', reason);
+    },
+    onError: (err) => {
+      console.error('[MessagesModal] Call error:', err);
+    },
+  });
+
+  // Call UI state (for minimized bubble)
   const [isCallMinimized, setIsCallMinimized] = useState(false);
-  const [callType, setCallType] = useState<CallType>('voice');
-  const [callStatus, setCallStatus] = useState<CallStatus>('connecting');
-  const [callDuration, setCallDuration] = useState(0);
-  const [isMuted, setIsMuted] = useState(false);
-  const [isVideoOff, setIsVideoOff] = useState(false);
-  const [isSpeakerOn, setIsSpeakerOn] = useState(true);
-  const [callParticipant, setCallParticipant] = useState<CallParticipant | null>(null);
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
-  const durationIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Map call session status to CallStatus type
+  const mapCallStatus = (status: string): CallStatus => {
+    switch (status) {
+      case 'initiating':
+      case 'connecting':
+        return 'connecting';
+      case 'ringing':
+        return 'ringing';
+      case 'connected':
+        return 'active';
+      case 'ended':
+      case 'declined':
+      case 'missed':
+      case 'failed':
+        return 'ended';
+      default:
+        return 'connecting';
+    }
+  };
+
+  // Derive call state from hook
+  const isCallActive = callSession.status !== 'idle' && callSession.status !== 'ended';
+  const callStatus = mapCallStatus(callSession.status);
+  const callType: CallType = callSession.activeCall?.callType || 'voice';
+  const callParticipant: CallParticipant | null = callSession.activeCall ? {
+    id: callSession.activeCall.otherParticipant.id,
+    username: callSession.activeCall.otherParticipant.username,
+    avatarUrl: callSession.activeCall.otherParticipant.avatarUrl,
+  } : callSession.incomingCall ? {
+    id: callSession.incomingCall.caller.id,
+    username: callSession.incomingCall.caller.username,
+    avatarUrl: callSession.incomingCall.caller.avatarUrl,
+  } : null;
 
   // Get active conversation object
   const activeConversation = conversations.find(c => c.id === activeConversationId);
@@ -173,67 +213,33 @@ export default function MessagesModal({ isOpen, onClose, anchorRef }: MessagesMo
     setActiveConversationId(null);
   };
 
-  // Call duration timer
-  useEffect(() => {
-    if (callStatus === 'active') {
-      durationIntervalRef.current = setInterval(() => {
-        setCallDuration((prev) => prev + 1);
-      }, 1000);
-    } else {
-      if (durationIntervalRef.current) {
-        clearInterval(durationIntervalRef.current);
-        durationIntervalRef.current = null;
-      }
+  // Start a call with the active conversation recipient (using real hook)
+  const handleStartVoiceCall = useCallback(async () => {
+    console.log('[MessagesModal] handleStartVoiceCall called, activeConversation:', activeConversation?.recipientId);
+    if (!activeConversation) {
+      console.error('[MessagesModal] No active conversation');
+      return;
     }
+    console.log('[MessagesModal] Starting voice call to:', activeConversation.recipientId);
+    const result = await callSession.initiateCall(activeConversation.recipientId, 'voice');
+    console.log('[MessagesModal] Voice call initiate result:', result);
+  }, [activeConversation, callSession]);
 
-    return () => {
-      if (durationIntervalRef.current) {
-        clearInterval(durationIntervalRef.current);
-      }
-    };
-  }, [callStatus]);
+  const handleStartVideoCall = useCallback(async () => {
+    console.log('[MessagesModal] handleStartVideoCall called, activeConversation:', activeConversation?.recipientId);
+    if (!activeConversation) {
+      console.error('[MessagesModal] No active conversation');
+      return;
+    }
+    console.log('[MessagesModal] Starting video call to:', activeConversation.recipientId);
+    const result = await callSession.initiateCall(activeConversation.recipientId, 'video');
+    console.log('[MessagesModal] Video call initiate result:', result);
+  }, [activeConversation, callSession]);
 
-  // Start a call with the active conversation recipient
-  const startCall = useCallback((type: CallType) => {
-    if (!activeConversation) return;
-
-    setCallParticipant({
-      id: activeConversation.recipientId,
-      username: activeConversation.recipientUsername,
-      displayName: activeConversation.recipientDisplayName,
-      avatarUrl: activeConversation.recipientAvatar,
-    });
-    setCallType(type);
-    setCallStatus('connecting');
-    setCallDuration(0);
-    setIsMuted(false);
-    setIsVideoOff(false);
-    setIsSpeakerOn(true);
-    setIsCallMinimized(false);
-    setIsCallActive(true);
-
-    // Simulate call connection
-    setTimeout(() => setCallStatus('ringing'), 1000);
-    setTimeout(() => setCallStatus('active'), 3000);
-  }, [activeConversation]);
-
-  const handleStartVoiceCall = useCallback(() => {
-    startCall('voice');
-  }, [startCall]);
-
-  const handleStartVideoCall = useCallback(() => {
-    startCall('video');
-  }, [startCall]);
-
-  const handleEndCall = useCallback(() => {
-    setCallStatus('ended');
-    setTimeout(() => {
-      setIsCallActive(false);
-      setIsCallMinimized(false);
-      setCallParticipant(null);
-      setCallDuration(0);
-    }, 500);
-  }, []);
+  const handleEndCall = useCallback(async () => {
+    console.log('[MessagesModal] Ending call');
+    await callSession.endCall();
+  }, [callSession]);
 
   const handleMinimizeCall = useCallback(() => {
     setIsCallMinimized(true);
@@ -244,15 +250,15 @@ export default function MessagesModal({ isOpen, onClose, anchorRef }: MessagesMo
   }, []);
 
   const handleToggleMute = useCallback(() => {
-    setIsMuted((prev) => !prev);
-  }, []);
+    callSession.toggleAudio();
+  }, [callSession]);
 
   const handleToggleVideo = useCallback(() => {
-    setIsVideoOff((prev) => !prev);
-  }, []);
+    callSession.toggleVideo();
+  }, [callSession]);
 
   const handleToggleSpeaker = useCallback(() => {
-    setIsSpeakerOn((prev) => !prev);
+    // Speaker toggle not implemented in web hook yet
   }, []);
 
   // Get current user info for local participant
@@ -261,6 +267,12 @@ export default function MessagesModal({ isOpen, onClose, anchorRef }: MessagesMo
     username: 'You',
     displayName: 'You',
   };
+
+  // Derive mute/video state from hook
+  const isMuted = !callSession.isAudioEnabled;
+  const isVideoOff = !callSession.isVideoEnabled;
+  const isSpeakerOn = true; // Not implemented yet
+  const callDuration = 0; // TODO: Add duration tracking to hook
 
   if (!isOpen || !mounted) return null;
 

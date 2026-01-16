@@ -30,6 +30,17 @@ export function CallProvider({ children }: CallProviderProps) {
   const showIncomingOverlay = callSession.callState === 'incoming_invite';
   const showActiveOverlay = ['connecting', 'in_call', 'outgoing_invite'].includes(callSession.callState);
 
+  // Debug logging
+  if (callSession.callState !== 'idle') {
+    console.log('[CallProvider] Call state:', {
+      callState: callSession.callState,
+      showIncomingOverlay,
+      showActiveOverlay,
+      currentCall: callSession.currentCall?.id,
+      remoteParticipant: callSession.remoteParticipant?.username,
+    });
+  }
+
   return (
     <CallContext.Provider value={callSession}>
       {children}

@@ -273,31 +273,53 @@ export async function POST(request: NextRequest) {
       
       // 1:1 CALL ROOM: Check if user is a participant in the call
       // Extract call_id from room name (call_<uuid>)
+      // NOTE: Mobile uses call_sessions table, web uses calls table - check both for compatibility
       let isCallParticipant = false;
       if (isCallRoom) {
         const callId = roomName.replace(/^call_/i, '');
         try {
           const adminClient = getSupabaseAdmin();
-          const { data: call } = await adminClient
-            .from('calls')
+          
+          // First check call_sessions (mobile canonical table)
+          const { data: callSession } = await adminClient
+            .from('call_sessions')
             .select('caller_id, callee_id, status')
             .eq('id', callId)
-            .in('status', ['ringing', 'accepted'])
+            .in('status', ['pending', 'accepted', 'active'])
             .maybeSingle();
           
-          if (call && (call.caller_id === user.id || call.callee_id === user.id)) {
+          if (callSession && (callSession.caller_id === user.id || callSession.callee_id === user.id)) {
             isCallParticipant = true;
-            console.log('[LIVEKIT_TOKEN] User is call participant, allowing publish', { 
+            console.log('[LIVEKIT_TOKEN] User is call_sessions participant, allowing publish', { 
               userId: user.id, 
               callId,
-              roomName 
+              roomName,
+              status: callSession.status
             });
           } else {
-            console.log('[LIVEKIT_TOKEN] User is NOT call participant', { 
-              userId: user.id, 
-              callId,
-              call: call ? { caller_id: call.caller_id, callee_id: call.callee_id, status: call.status } : null 
-            });
+            // Fallback: check calls table (web schema) for backward compatibility
+            const { data: call } = await adminClient
+              .from('calls')
+              .select('caller_id, callee_id, status')
+              .eq('id', callId)
+              .in('status', ['ringing', 'accepted'])
+              .maybeSingle();
+            
+            if (call && (call.caller_id === user.id || call.callee_id === user.id)) {
+              isCallParticipant = true;
+              console.log('[LIVEKIT_TOKEN] User is calls participant, allowing publish', { 
+                userId: user.id, 
+                callId,
+                roomName 
+              });
+            } else {
+              console.log('[LIVEKIT_TOKEN] User is NOT call participant in either table', { 
+                userId: user.id, 
+                callId,
+                callSession: callSession ? { caller_id: callSession.caller_id, callee_id: callSession.callee_id, status: callSession.status } : null,
+                call: call ? { caller_id: call.caller_id, callee_id: call.callee_id, status: call.status } : null 
+              });
+            }
           }
         } catch (err) {
           console.log('[LIVEKIT_TOKEN] Error checking call participant:', err);

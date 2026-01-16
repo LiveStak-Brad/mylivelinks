@@ -104,7 +104,7 @@ SECURITY DEFINER
 SET search_path = public
 AS $$
 DECLARE
-  v_updated BOOLEAN := FALSE;
+  v_count INT;
 BEGIN
   UPDATE call_sessions
   SET status = 'accepted', answered_at = NOW()
@@ -112,8 +112,8 @@ BEGIN
     AND callee_id = p_user_id
     AND status = 'pending';
   
-  GET DIAGNOSTICS v_updated = ROW_COUNT > 0;
-  RETURN v_updated;
+  GET DIAGNOSTICS v_count = ROW_COUNT;
+  RETURN v_count > 0;
 END;
 $$;
 
@@ -125,7 +125,7 @@ SECURITY DEFINER
 SET search_path = public
 AS $$
 DECLARE
-  v_updated BOOLEAN := FALSE;
+  v_count INT;
 BEGIN
   UPDATE call_sessions
   SET status = 'declined', ended_at = NOW(), end_reason = 'declined'
@@ -133,8 +133,8 @@ BEGIN
     AND callee_id = p_user_id
     AND status = 'pending';
   
-  GET DIAGNOSTICS v_updated = ROW_COUNT > 0;
-  RETURN v_updated;
+  GET DIAGNOSTICS v_count = ROW_COUNT;
+  RETURN v_count > 0;
 END;
 $$;
 
@@ -146,7 +146,7 @@ SECURITY DEFINER
 SET search_path = public
 AS $$
 DECLARE
-  v_updated BOOLEAN := FALSE;
+  v_count INT;
 BEGIN
   UPDATE call_sessions
   SET status = 'ended', ended_at = NOW(), end_reason = p_reason
@@ -154,8 +154,8 @@ BEGIN
     AND (caller_id = p_user_id OR callee_id = p_user_id)
     AND status IN ('pending', 'accepted', 'active');
   
-  GET DIAGNOSTICS v_updated = ROW_COUNT > 0;
-  RETURN v_updated;
+  GET DIAGNOSTICS v_count = ROW_COUNT;
+  RETURN v_count > 0;
 END;
 $$;
 
@@ -167,7 +167,7 @@ SECURITY DEFINER
 SET search_path = public
 AS $$
 DECLARE
-  v_updated BOOLEAN := FALSE;
+  v_count INT;
 BEGIN
   UPDATE call_sessions
   SET status = 'active'
@@ -175,8 +175,8 @@ BEGIN
     AND (caller_id = p_user_id OR callee_id = p_user_id)
     AND status = 'accepted';
   
-  GET DIAGNOSTICS v_updated = ROW_COUNT > 0;
-  RETURN v_updated;
+  GET DIAGNOSTICS v_count = ROW_COUNT;
+  RETURN v_count > 0;
 END;
 $$;
 

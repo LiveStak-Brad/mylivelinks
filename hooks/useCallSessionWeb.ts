@@ -246,9 +246,21 @@ export function useCallSessionWeb(options: UseCallSessionWebOptions = {}) {
     }
   }, [currentUserId, getCallToken, supabase]);
 
+  // Generate a UUID for the call session
+  const generateUUID = (): string => {
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+      const r = Math.random() * 16 | 0;
+      const v = c === 'x' ? r : (r & 0x3 | 0x8);
+      return v.toString(16);
+    });
+  };
+
   // Initiate a call
   const initiateCall = useCallback(async (calleeId: string, callType: CallType = 'video'): Promise<boolean> => {
+    console.log('[CALL] initiateCall called:', { calleeId, callType, currentUserId, status });
+    
     if (!currentUserId) {
+      console.error('[CALL] Not authenticated - currentUserId is null');
       const err = new Error('Not authenticated');
       setError(err);
       onError?.(err);
@@ -256,6 +268,7 @@ export function useCallSessionWeb(options: UseCallSessionWebOptions = {}) {
     }
     
     if (status !== 'idle') {
+      console.error('[CALL] Already in a call - status:', status);
       const err = new Error('Already in a call');
       setError(err);
       onError?.(err);
@@ -266,26 +279,28 @@ export function useCallSessionWeb(options: UseCallSessionWebOptions = {}) {
       setStatus('initiating');
       setError(null);
       
-      // Call the RPC to initiate
-      const { data, error: rpcError } = await supabase.rpc('initiate_call', {
-        p_callee_id: calleeId,
-        p_call_type: callType,
-      });
+      // Pre-generate UUID so we can set room_name in single insert
+      const callId = generateUUID();
+      const roomName = `call_${callId}`;
       
-      if (rpcError) {
-        throw new Error(rpcError.message);
-      }
+      console.log('[CALL] Creating call session:', { callId, roomName, calleeId });
       
-      const result = data?.[0];
-      if (result?.error) {
-        throw new Error(result.error);
-      }
+      // Insert directly into call_sessions table (same as mobile)
+      const { data: insertData, error: insertError } = await supabase
+        .from('call_sessions')
+        .insert({
+          id: callId,
+          caller_id: currentUserId,
+          callee_id: calleeId,
+          call_type: callType,
+          room_name: roomName,
+        })
+        .select()
+        .single();
       
-      const callId = result?.call_id;
-      const roomName = result?.room_name;
-      
-      if (!callId || !roomName) {
-        throw new Error('Failed to create call');
+      if (insertError) {
+        console.error('[CALL] Insert error:', insertError);
+        throw new Error(insertError.message);
       }
       
       console.log('[CALL] Call initiated:', { callId, roomName });
@@ -315,7 +330,11 @@ export function useCallSessionWeb(options: UseCallSessionWebOptions = {}) {
       // Set ring timeout
       ringTimeoutRef.current = setTimeout(async () => {
         console.log('[CALL] Ring timeout - marking as missed');
-        await supabase.rpc('mark_call_missed', { p_call_id: callId });
+        // Update call_sessions directly instead of using RPC
+        await supabase
+          .from('call_sessions')
+          .update({ status: 'missed', ended_at: new Date().toISOString(), end_reason: 'timeout' })
+          .eq('id', callId);
         setStatus('missed');
         setActiveCall(null);
         onCallEnded?.('timeout');
@@ -333,7 +352,7 @@ export function useCallSessionWeb(options: UseCallSessionWebOptions = {}) {
 
   // Accept an incoming call
   const acceptCall = useCallback(async (): Promise<boolean> => {
-    if (!incomingCall) {
+    if (!incomingCall || !currentUserId) {
       const err = new Error('No incoming call to accept');
       setError(err);
       onError?.(err);
@@ -344,18 +363,16 @@ export function useCallSessionWeb(options: UseCallSessionWebOptions = {}) {
       setStatus('connecting');
       clearRingTimeout();
       
-      // Accept via RPC
-      const { data, error: rpcError } = await supabase.rpc('accept_call', {
-        p_call_id: incomingCall.callId,
-      });
+      // Accept by updating call_sessions directly
+      const { error: updateError } = await supabase
+        .from('call_sessions')
+        .update({ status: 'accepted', answered_at: new Date().toISOString() })
+        .eq('id', incomingCall.callId)
+        .eq('callee_id', currentUserId)
+        .eq('status', 'pending');
       
-      if (rpcError) {
-        throw new Error(rpcError.message);
-      }
-      
-      const result = data?.[0];
-      if (result?.error) {
-        throw new Error(result.error);
+      if (updateError) {
+        throw new Error(updateError.message);
       }
       
       console.log('[CALL] Call accepted:', incomingCall.callId);
@@ -389,16 +406,19 @@ export function useCallSessionWeb(options: UseCallSessionWebOptions = {}) {
 
   // Decline an incoming call
   const declineCall = useCallback(async (): Promise<boolean> => {
-    if (!incomingCall) {
+    if (!incomingCall || !currentUserId) {
       return false;
     }
     
     try {
       clearRingTimeout();
       
-      await supabase.rpc('decline_call', {
-        p_call_id: incomingCall.callId,
-      });
+      // Decline by updating call_sessions directly
+      await supabase
+        .from('call_sessions')
+        .update({ status: 'declined', ended_at: new Date().toISOString(), end_reason: 'declined' })
+        .eq('id', incomingCall.callId)
+        .eq('callee_id', currentUserId);
       
       console.log('[CALL] Call declined:', incomingCall.callId);
       
@@ -412,7 +432,7 @@ export function useCallSessionWeb(options: UseCallSessionWebOptions = {}) {
       onError?.(err);
       return false;
     }
-  }, [incomingCall, supabase, clearRingTimeout, onError]);
+  }, [incomingCall, currentUserId, supabase, clearRingTimeout, onError]);
 
   // End the current call
   const endCall = useCallback(async (reason: string = 'hangup'): Promise<boolean> => {
@@ -429,11 +449,11 @@ export function useCallSessionWeb(options: UseCallSessionWebOptions = {}) {
       // Disconnect from RTC first
       await disconnectRoom();
       
-      // End via RPC
-      await supabase.rpc('end_call', {
-        p_call_id: callId,
-        p_reason: reason,
-      });
+      // End by updating call_sessions directly
+      await supabase
+        .from('call_sessions')
+        .update({ status: 'ended', ended_at: new Date().toISOString(), end_reason: reason })
+        .eq('id', callId);
       
       console.log('[CALL] Call ended:', callId, reason);
       
@@ -486,27 +506,28 @@ export function useCallSessionWeb(options: UseCallSessionWebOptions = {}) {
     setIsVideoEnabled(!isVideoEnabled);
   }, [room, isVideoEnabled]);
 
-  // Subscribe to call updates via realtime
+  // Subscribe to call updates via realtime (using call_sessions table)
   useEffect(() => {
     if (!currentUserId || !enabled) return;
     
     console.log('[CALL] Setting up realtime subscription for user:', currentUserId);
     
     const channel = supabase
-      .channel(`calls-${currentUserId}`)
+      .channel(`call-sessions-${currentUserId}`)
       .on(
         'postgres_changes',
         {
           event: '*',
           schema: 'public',
-          table: 'calls',
+          table: 'call_sessions',
           filter: `callee_id=eq.${currentUserId}`,
         },
         async (payload: any) => {
           const call = payload.new;
           console.log('[CALL] Realtime event (callee):', payload.eventType, call?.status);
           
-          if (payload.eventType === 'INSERT' && call?.status === 'ringing') {
+          // call_sessions uses 'pending' status, not 'ringing'
+          if (payload.eventType === 'INSERT' && call?.status === 'pending') {
             // Incoming call
             const { data: callerProfile } = await supabase
               .from('profiles')
@@ -538,7 +559,7 @@ export function useCallSessionWeb(options: UseCallSessionWebOptions = {}) {
         {
           event: 'UPDATE',
           schema: 'public',
-          table: 'calls',
+          table: 'call_sessions',
           filter: `caller_id=eq.${currentUserId}`,
         },
         async (payload: any) => {
@@ -579,7 +600,9 @@ export function useCallSessionWeb(options: UseCallSessionWebOptions = {}) {
           }
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log('[CALL] Subscription status:', status);
+      });
     
     channelRef.current = channel;
     
@@ -590,44 +613,70 @@ export function useCallSessionWeb(options: UseCallSessionWebOptions = {}) {
     };
   }, [currentUserId, enabled, supabase, activeCall, connectToRoom, disconnectRoom, clearRingTimeout, onIncomingCall, onCallEnded, onError]);
 
-  // Check for existing active call on mount
+  // Check for existing active call on mount (query call_sessions directly)
   useEffect(() => {
     if (!currentUserId || !enabled) return;
     
     const checkActiveCall = async () => {
-      const { data } = await supabase.rpc('get_active_call');
+      // Query call_sessions directly instead of using RPC from calls table
+      const { data, error } = await supabase
+        .from('call_sessions')
+        .select(`
+          id,
+          caller_id,
+          callee_id,
+          call_type,
+          status,
+          room_name,
+          created_at,
+          answered_at
+        `)
+        .or(`caller_id.eq.${currentUserId},callee_id.eq.${currentUserId}`)
+        .in('status', ['pending', 'accepted', 'active'])
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
       
-      if (data && data.length > 0) {
-        const call = data[0];
-        console.log('[CALL] Found existing active call:', call);
-        
-        setActiveCall({
-          callId: call.call_id,
-          roomName: call.room_name,
-          callType: call.call_type,
-          otherParticipant: {
-            id: call.other_user_id,
-            username: call.other_username || 'User',
-            avatarUrl: call.other_avatar,
-          },
-          isCaller: call.is_caller,
-          startedAt: new Date(call.created_at),
-          answeredAt: call.answered_at ? new Date(call.answered_at) : undefined,
-        });
-        
-        if (call.status === 'accepted') {
-          setStatus('connecting');
-          try {
-            await connectToRoom(call.room_name, call.call_type);
-            setStatus('connected');
-          } catch (err: any) {
-            console.error('[CALL] Error reconnecting to call:', err);
-            setError(err);
-            setStatus('failed');
-          }
-        } else if (call.status === 'ringing') {
-          setStatus('ringing');
+      if (error || !data) return;
+      
+      console.log('[CALL] Found existing active call:', data);
+      
+      const isCaller = data.caller_id === currentUserId;
+      const otherUserId = isCaller ? data.callee_id : data.caller_id;
+      
+      // Get other user's profile
+      const { data: otherProfile } = await supabase
+        .from('profiles')
+        .select('username, avatar_url')
+        .eq('id', otherUserId)
+        .single();
+      
+      setActiveCall({
+        callId: data.id,
+        roomName: data.room_name,
+        callType: data.call_type as CallType,
+        otherParticipant: {
+          id: otherUserId,
+          username: otherProfile?.username || 'User',
+          avatarUrl: otherProfile?.avatar_url,
+        },
+        isCaller,
+        startedAt: new Date(data.created_at),
+        answeredAt: data.answered_at ? new Date(data.answered_at) : undefined,
+      });
+      
+      if (data.status === 'accepted') {
+        setStatus('connecting');
+        try {
+          await connectToRoom(data.room_name, data.call_type as CallType);
+          setStatus('connected');
+        } catch (err: any) {
+          console.error('[CALL] Error reconnecting to call:', err);
+          setError(err);
+          setStatus('failed');
         }
+      } else if (data.status === 'pending') {
+        setStatus('ringing');
       }
     };
     

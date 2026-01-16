@@ -71,10 +71,19 @@ export interface UseCallSessionReturn {
   toggleSpeaker: () => void;
 }
 
-// Generate unique room name for call
-function generateCallRoomName(callerId: string, calleeId: string): string {
-  const sorted = [callerId, calleeId].sort().join('_');
-  return `call_${sorted}_${Date.now()}`;
+// Generate a UUID for the call session
+function generateUUID(): string {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = Math.random() * 16 | 0;
+    const v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+}
+
+// Generate unique room name for call using the call session ID
+// Format: call_<uuid> so token route can look up the call session
+function generateCallRoomName(callSessionId: string): string {
+  return `call_${callSessionId}`;
 }
 
 // Fetch LiveKit token for call
@@ -154,6 +163,8 @@ export function useCallSession(): UseCallSessionReturn {
   useEffect(() => {
     if (!userId) return;
 
+    console.log('[CallSession] Setting up realtime subscription for callee:', userId);
+
     const channel = supabase
       .channel(`call-invites-${userId}`)
       .on(
@@ -165,23 +176,39 @@ export function useCallSession(): UseCallSessionReturn {
           filter: `callee_id=eq.${userId}`,
         },
         (payload) => {
-          if (!mountedRef.current) return;
+          console.log('[CallSession] Realtime event received (callee):', {
+            eventType: payload.eventType,
+            new: payload.new,
+            old: payload.old,
+          });
+
+          if (!mountedRef.current) {
+            console.log('[CallSession] Component unmounted, ignoring event');
+            return;
+          }
           
           const row = payload.new as any;
-          if (!row) return;
+          if (!row) {
+            console.log('[CallSession] No row data in payload');
+            return;
+          }
 
           // Handle incoming call invite
           if (payload.eventType === 'INSERT' && row.status === 'pending') {
+            console.log('[CallSession] Incoming call detected:', row.id);
             handleIncomingCall(row);
           }
           
           // Handle call status changes
           if (payload.eventType === 'UPDATE') {
+            console.log('[CallSession] Call status update:', row.status);
             handleCallStatusChange(row);
           }
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log('[CallSession] Callee subscription status:', status);
+      });
 
     // Also subscribe as caller to get status updates
     const callerChannel = supabase
@@ -267,8 +294,18 @@ export function useCallSession(): UseCallSessionReturn {
 
   // Handle incoming call
   const handleIncomingCall = async (row: any) => {
+    console.log('[CallSession] handleIncomingCall called:', {
+      callId: row.id,
+      callerId: row.caller_id,
+      calleeId: row.callee_id,
+      status: row.status,
+      roomName: row.room_name,
+      currentCallState: callState,
+    });
+
     // Only handle if we're idle
     if (callState !== 'idle') {
+      console.log('[CallSession] Not idle, auto-declining call');
       // Auto-decline if already in a call
       await supabase.rpc('decline_call', { p_call_id: row.id, p_user_id: userId });
       return;
@@ -283,6 +320,7 @@ export function useCallSession(): UseCallSessionReturn {
       createdAt: row.created_at,
     };
 
+    console.log('[CallSession] Setting incoming call state');
     setCurrentCall(session);
     setCallType(session.callType);
     setCallState('incoming_invite');
@@ -456,11 +494,16 @@ export function useCallSession(): UseCallSessionReturn {
     setCallType('voice');
 
     try {
-      const roomName = generateCallRoomName(userId, targetUserId);
+      // Pre-generate UUID so we can set room_name in single insert
+      const callId = generateUUID();
+      const roomName = generateCallRoomName(callId);
 
-      const { data, error: insertError } = await supabase
+      console.log('[CallSession] Starting voice call:', { callId, roomName, targetUserId });
+
+      const { data: insertData, error: insertError } = await supabase
         .from('call_sessions')
         .insert({
+          id: callId,
           caller_id: userId,
           callee_id: targetUserId,
           call_type: 'voice',
@@ -469,15 +512,20 @@ export function useCallSession(): UseCallSessionReturn {
         .select()
         .single();
 
-      if (insertError) throw insertError;
+      if (insertError) {
+        console.error('[CallSession] Insert error:', insertError);
+        throw insertError;
+      }
+
+      console.log('[CallSession] Call session created:', insertData);
 
       const session: CallSession = {
-        id: data.id,
-        callerId: data.caller_id,
-        calleeId: data.callee_id,
+        id: insertData.id,
+        callerId: insertData.caller_id,
+        calleeId: insertData.callee_id,
         callType: 'voice',
-        roomName: data.room_name,
-        createdAt: data.created_at,
+        roomName: insertData.room_name,
+        createdAt: insertData.created_at,
       };
 
       setCurrentCall(session);
@@ -508,11 +556,16 @@ export function useCallSession(): UseCallSessionReturn {
     setCallType('video');
 
     try {
-      const roomName = generateCallRoomName(userId, targetUserId);
+      // Pre-generate UUID so we can set room_name in single insert
+      const callId = generateUUID();
+      const roomName = generateCallRoomName(callId);
 
-      const { data, error: insertError } = await supabase
+      console.log('[CallSession] Starting video call:', { callId, roomName, targetUserId });
+
+      const { data: insertData, error: insertError } = await supabase
         .from('call_sessions')
         .insert({
+          id: callId,
           caller_id: userId,
           callee_id: targetUserId,
           call_type: 'video',
@@ -521,15 +574,20 @@ export function useCallSession(): UseCallSessionReturn {
         .select()
         .single();
 
-      if (insertError) throw insertError;
+      if (insertError) {
+        console.error('[CallSession] Insert error:', insertError);
+        throw insertError;
+      }
+
+      console.log('[CallSession] Call session created:', insertData);
 
       const session: CallSession = {
-        id: data.id,
-        callerId: data.caller_id,
-        calleeId: data.callee_id,
+        id: insertData.id,
+        callerId: insertData.caller_id,
+        calleeId: insertData.callee_id,
         callType: 'video',
-        roomName: data.room_name,
-        createdAt: data.created_at,
+        roomName: insertData.room_name,
+        createdAt: insertData.created_at,
       };
 
       setCurrentCall(session);
