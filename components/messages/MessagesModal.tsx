@@ -73,7 +73,8 @@ export default function MessagesModal({ isOpen, onClose, anchorRef }: MessagesMo
   // Derive call state from hook
   const isCallActive = callSession.status !== 'idle' && callSession.status !== 'ended';
   const callStatus = mapCallStatus(callSession.status);
-  const callType: CallType = callSession.activeCall?.callType || 'voice';
+  const callType: CallType = callSession.activeCall?.callType || callSession.incomingCall?.callType || 'voice';
+  const isIncomingCall = !!callSession.incomingCall && !callSession.activeCall;
   const callParticipant: CallParticipant | null = callSession.activeCall ? {
     id: callSession.activeCall.otherParticipant.id,
     username: callSession.activeCall.otherParticipant.username,
@@ -241,6 +242,16 @@ export default function MessagesModal({ isOpen, onClose, anchorRef }: MessagesMo
     await callSession.endCall();
   }, [callSession]);
 
+  const handleAcceptCall = useCallback(async () => {
+    console.log('[MessagesModal] Accepting call');
+    await callSession.acceptCall();
+  }, [callSession]);
+
+  const handleDeclineCall = useCallback(async () => {
+    console.log('[MessagesModal] Declining call');
+    await callSession.declineCall();
+  }, [callSession]);
+
   const handleMinimizeCall = useCallback(() => {
     setIsCallMinimized(true);
   }, []);
@@ -398,7 +409,7 @@ export default function MessagesModal({ isOpen, onClose, anchorRef }: MessagesMo
       {isCallActive && !isCallMinimized && callParticipant && (
         <CallModal
           isOpen={true}
-          onClose={handleEndCall}
+          onClose={isIncomingCall ? handleDeclineCall : handleEndCall}
           onMinimize={handleMinimizeCall}
           callType={callType}
           localParticipant={localParticipant}
@@ -409,6 +420,9 @@ export default function MessagesModal({ isOpen, onClose, anchorRef }: MessagesMo
           onToggleVideo={handleToggleVideo}
           onToggleSpeaker={handleToggleSpeaker}
           onEndCall={handleEndCall}
+          onAccept={handleAcceptCall}
+          onDecline={handleDeclineCall}
+          isIncoming={isIncomingCall}
           isMuted={isMuted}
           isVideoOff={isVideoOff}
           isSpeakerOn={isSpeakerOn}

@@ -357,7 +357,7 @@ export default function Leaderboard({ roomSlug, roomName }: LeaderboardProps = {
                   isLive={entry.is_live}
                   size="sm"
                   showLiveBadge={false}
-                  className="border border-gray-200 dark:border-gray-700 scale-[0.85] sm:scale-95 lg:scale-100 origin-left"
+                  className="border border-gray-200 dark:border-gray-700"
                 />
               </div>
 

@@ -155,6 +155,7 @@ export default function LiveAvatar({
           <span className="leading-none">LIVE</span>
         </div>
       )}
+      
     </div>
   );
   

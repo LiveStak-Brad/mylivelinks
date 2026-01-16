@@ -41,6 +41,9 @@ export interface CallModalProps {
   onToggleVideo?: () => void;
   onToggleSpeaker?: () => void;
   onEndCall?: () => void;
+  onAccept?: () => void;
+  onDecline?: () => void;
+  isIncoming?: boolean;
   isMuted?: boolean;
   isVideoOff?: boolean;
   isSpeakerOn?: boolean;
@@ -67,6 +70,9 @@ export default function CallModal({
   onToggleVideo,
   onToggleSpeaker,
   onEndCall,
+  onAccept,
+  onDecline,
+  isIncoming = false,
   isMuted = false,
   isVideoOff = false,
   isSpeakerOn = true,
@@ -231,69 +237,94 @@ export default function CallModal({
 
         {/* Controls */}
         <div className="flex-shrink-0 px-4 pb-8 pt-4 pwa-safe-bottom">
-          {/* Gift button row */}
-          <div className="flex justify-center mb-6">
-            <button
-              onClick={() => setShowGiftModal(true)}
-              className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white font-medium rounded-full shadow-lg transition"
-            >
-              <Gift className="w-5 h-5" />
-              <span>Send Gift</span>
-            </button>
-          </div>
-
-          {/* Main controls */}
-          <div className="flex items-center justify-center gap-4 md:gap-6">
-            {/* Mute */}
-            <button
-              onClick={onToggleMute}
-              className={`p-4 rounded-full transition ${
-                isMuted
-                  ? 'bg-red-500 text-white'
-                  : 'bg-white/10 text-white hover:bg-white/20'
-              }`}
-              title={isMuted ? 'Unmute' : 'Mute'}
-            >
-              {isMuted ? <MicOff className="w-6 h-6" /> : <Mic className="w-6 h-6" />}
-            </button>
-
-            {/* Video toggle (only for video calls) */}
-            {callType === 'video' && (
+          {/* Incoming call: show Accept/Decline buttons */}
+          {isIncoming && status === 'ringing' ? (
+            <div className="flex items-center justify-center gap-8">
+              {/* Decline */}
               <button
-                onClick={onToggleVideo}
-                className={`p-4 rounded-full transition ${
-                  isVideoOff
-                    ? 'bg-red-500 text-white'
-                    : 'bg-white/10 text-white hover:bg-white/20'
-                }`}
-                title={isVideoOff ? 'Turn on camera' : 'Turn off camera'}
+                onClick={onDecline}
+                className="p-5 bg-red-500 hover:bg-red-600 text-white rounded-full transition shadow-lg"
+                title="Decline"
               >
-                {isVideoOff ? <VideoOff className="w-6 h-6" /> : <Video className="w-6 h-6" />}
+                <PhoneOff className="w-8 h-8" />
               </button>
-            )}
 
-            {/* Speaker toggle */}
-            <button
-              onClick={onToggleSpeaker}
-              className={`p-4 rounded-full transition ${
-                !isSpeakerOn
-                  ? 'bg-white/10 text-white/50'
-                  : 'bg-white/10 text-white hover:bg-white/20'
-              }`}
-              title={isSpeakerOn ? 'Speaker off' : 'Speaker on'}
-            >
-              {isSpeakerOn ? <Volume2 className="w-6 h-6" /> : <VolumeX className="w-6 h-6" />}
-            </button>
+              {/* Accept */}
+              <button
+                onClick={onAccept}
+                className="p-5 bg-green-500 hover:bg-green-600 text-white rounded-full transition shadow-lg"
+                title="Accept"
+              >
+                <Phone className="w-8 h-8" />
+              </button>
+            </div>
+          ) : (
+            <>
+              {/* Gift button row */}
+              <div className="flex justify-center mb-6">
+                <button
+                  onClick={() => setShowGiftModal(true)}
+                  className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white font-medium rounded-full shadow-lg transition"
+                >
+                  <Gift className="w-5 h-5" />
+                  <span>Send Gift</span>
+                </button>
+              </div>
 
-            {/* End call */}
-            <button
-              onClick={handleEndCall}
-              className="p-4 bg-red-500 hover:bg-red-600 text-white rounded-full transition shadow-lg"
-              title="End call"
-            >
-              <PhoneOff className="w-6 h-6" />
-            </button>
-          </div>
+              {/* Main controls */}
+              <div className="flex items-center justify-center gap-4 md:gap-6">
+                {/* Mute */}
+                <button
+                  onClick={onToggleMute}
+                  className={`p-4 rounded-full transition ${
+                    isMuted
+                      ? 'bg-red-500 text-white'
+                      : 'bg-white/10 text-white hover:bg-white/20'
+                  }`}
+                  title={isMuted ? 'Unmute' : 'Mute'}
+                >
+                  {isMuted ? <MicOff className="w-6 h-6" /> : <Mic className="w-6 h-6" />}
+                </button>
+
+                {/* Video toggle (only for video calls) */}
+                {callType === 'video' && (
+                  <button
+                    onClick={onToggleVideo}
+                    className={`p-4 rounded-full transition ${
+                      isVideoOff
+                        ? 'bg-red-500 text-white'
+                        : 'bg-white/10 text-white hover:bg-white/20'
+                    }`}
+                    title={isVideoOff ? 'Turn on camera' : 'Turn off camera'}
+                  >
+                    {isVideoOff ? <VideoOff className="w-6 h-6" /> : <Video className="w-6 h-6" />}
+                  </button>
+                )}
+
+                {/* Speaker toggle */}
+                <button
+                  onClick={onToggleSpeaker}
+                  className={`p-4 rounded-full transition ${
+                    !isSpeakerOn
+                      ? 'bg-white/10 text-white/50'
+                      : 'bg-white/10 text-white hover:bg-white/20'
+                  }`}
+                  title={isSpeakerOn ? 'Speaker off' : 'Speaker on'}
+                >
+                  {isSpeakerOn ? <Volume2 className="w-6 h-6" /> : <VolumeX className="w-6 h-6" />}
+                </button>
+
+                {/* End call */}
+                <button
+                  onClick={handleEndCall}
+                  className="p-4 bg-red-500 hover:bg-red-600 text-white rounded-full transition shadow-lg"
+                  title="End call"
+                >
+                  <PhoneOff className="w-6 h-6" />
+                </button>
+              </div>
+            </>
+          )}
         </div>
       </div>
 

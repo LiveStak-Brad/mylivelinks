@@ -670,21 +670,21 @@ export function useCallSessionWeb(options: UseCallSessionWebOptions = {}) {
         .eq('id', otherUserId)
         .single();
       
-      setActiveCall({
-        callId: data.id,
-        roomName: data.room_name,
-        callType: data.call_type as CallType,
-        otherParticipant: {
-          id: otherUserId,
-          username: otherProfile?.username || 'User',
-          avatarUrl: otherProfile?.avatar_url,
-        },
-        isCaller,
-        startedAt: new Date(data.created_at),
-        answeredAt: data.answered_at ? new Date(data.answered_at) : undefined,
-      });
-      
       if (data.status === 'accepted' || data.status === 'active') {
+        // Both parties should connect to the room
+        setActiveCall({
+          callId: data.id,
+          roomName: data.room_name,
+          callType: data.call_type as CallType,
+          otherParticipant: {
+            id: otherUserId,
+            username: otherProfile?.username || 'User',
+            avatarUrl: otherProfile?.avatar_url,
+          },
+          isCaller,
+          startedAt: new Date(data.created_at),
+          answeredAt: data.answered_at ? new Date(data.answered_at) : undefined,
+        });
         setStatus('connecting');
         try {
           await connectToRoom(data.room_name, data.call_type as CallType);
@@ -695,11 +695,46 @@ export function useCallSessionWeb(options: UseCallSessionWebOptions = {}) {
           setStatus('failed');
         }
       } else if (data.status === 'pending') {
-        // Only show ringing if we're the callee (incoming call)
         if (!isCaller) {
+          // We're the callee - this is an INCOMING call, set incomingCall not activeCall
+          console.log('[CALL] Setting as incoming call for callee');
+          setIncomingCall({
+            callId: data.id,
+            caller: {
+              id: otherUserId,
+              username: otherProfile?.username || 'User',
+              avatarUrl: otherProfile?.avatar_url,
+            },
+            callType: data.call_type as CallType,
+            roomName: data.room_name,
+            createdAt: new Date(data.created_at),
+          });
           setStatus('ringing');
+          onIncomingCall?.({
+            callId: data.id,
+            caller: {
+              id: otherUserId,
+              username: otherProfile?.username || 'User',
+              avatarUrl: otherProfile?.avatar_url,
+            },
+            callType: data.call_type as CallType,
+            roomName: data.room_name,
+            createdAt: new Date(data.created_at),
+          });
         } else {
           // We're the caller - this is an outgoing call that's still ringing
+          setActiveCall({
+            callId: data.id,
+            roomName: data.room_name,
+            callType: data.call_type as CallType,
+            otherParticipant: {
+              id: otherUserId,
+              username: otherProfile?.username || 'User',
+              avatarUrl: otherProfile?.avatar_url,
+            },
+            isCaller,
+            startedAt: new Date(data.created_at),
+          });
           setStatus('ringing');
         }
       }

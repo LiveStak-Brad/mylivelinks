@@ -3,6 +3,8 @@ import { View, Text, ScrollView, StyleSheet, TouchableOpacity, Dimensions, Image
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import MllProBadge from '../components/shared/MllProBadge';
+import TopLeaderBadge from '../components/shared/TopLeaderBadge';
+import { useTopLeaders, getLeaderType } from '../hooks/useTopLeaders';
 import { useRoute } from '@react-navigation/native';
 import { useTheme } from '../theme/useTheme';
 import { useAuth } from '../state/AuthContext';
@@ -479,6 +481,7 @@ export default function LeaderboardsScreen() {
                 isLive={r.is_live}
                 isMllPro={r.is_mll_pro}
                 isLast={idx === rows.length - 1}
+                profileId={r.id}
               />
             ))
           )}
@@ -604,6 +607,7 @@ function LeaderboardRow(props: {
   isLive?: boolean;
   isMllPro?: boolean;
   isLast: boolean;
+  profileId?: string;
 }) {
   const themed = useLeaderboardTheme();
   const trendIcon =
@@ -636,6 +640,7 @@ function LeaderboardRow(props: {
               {props.name}
             </Text>
             {props.isMllPro && <MllProBadge size="sm" />}
+            <LeaderBadgeInRow profileId={props.profileId} />
           </View>
           {props.handle ? (
             <Text style={[styles.userHandle, { color: themed.mutedText }]} numberOfLines={1}>
@@ -651,6 +656,13 @@ function LeaderboardRow(props: {
       </View>
     </View>
   );
+}
+
+function LeaderBadgeInRow({ profileId }: { profileId?: string }) {
+  const leaders = useTopLeaders();
+  const leaderType = getLeaderType(profileId, leaders);
+  if (!leaderType) return null;
+  return <TopLeaderBadge type={leaderType} size="sm" />;
 }
 
 function getInitials(name: string) {

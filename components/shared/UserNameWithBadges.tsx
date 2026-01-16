@@ -6,6 +6,8 @@ import { GifterBadge as TierBadge } from '@/components/gifter';
 import type { GifterStatus } from '@/lib/gifter-status';
 import { createClient } from '@/lib/supabase';
 import { MllProExplainerModal } from '@/components/mll-pro/MllProExplainerModal';
+import TopLeaderBadge from '@/components/TopLeaderBadge';
+import { useTopLeaders, getLeaderType } from '@/hooks/useTopLeaders';
 
 interface UserNameWithBadgesProps {
   /** Profile ID for MLL PRO badge check */
@@ -106,6 +108,9 @@ export default function UserNameWithBadges({
   const isMllPro = isMllProProp !== undefined ? isMllProProp : isMllProFetched;
   const showMllPro = shouldShowMllProBadge(profileId, { is_mll_pro: isMllPro });
   const hasGifterBadge = showGifterBadge && gifterStatus && Number(gifterStatus.lifetime_coins ?? 0) > 0;
+  
+  const topLeaders = useTopLeaders();
+  const leaderType = getLeaderType(profileId, topLeaders);
 
   const nameElement = (
     <span
@@ -135,6 +140,9 @@ export default function UserNameWithBadges({
             level={gifterStatus.level_in_tier}
             size={gifterBadgeSize}
           />
+        )}
+        {leaderType && (
+          <TopLeaderBadge type={leaderType} size="sm" />
         )}
         {children}
       </div>
