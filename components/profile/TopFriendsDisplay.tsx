@@ -200,13 +200,6 @@ export default function TopFriendsDisplay({
                   </div>
                 )}
 
-                {/* Position Badge */}
-                <div
-                  className="absolute top-2 left-2 w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold shadow-lg"
-                  style={{ backgroundColor: accentColor }}
-                >
-                  {friend.position}
-                </div>
 
                 {/* Gradient Overlay + Name inside - ONLY for square avatars */}
                 {topFriendsAvatarStyle === 'square' && (

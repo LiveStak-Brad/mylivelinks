@@ -374,31 +374,34 @@ export default function TVPage() {
         )}
 
         {/* Creator Context Header */}
-        <div className="flex items-center justify-between mb-6 p-4 bg-gray-50 dark:bg-gray-800/50 rounded-xl">
-          <div className="flex items-center gap-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6 p-3 sm:p-4 bg-gray-50 dark:bg-gray-800/50 rounded-xl">
+          <div className="flex items-center gap-3 sm:gap-4">
             {/* Creator Avatar */}
             <Link href={`/${username}`}>
-              <div className="w-14 h-14 rounded-full overflow-hidden bg-gray-200 dark:bg-gray-700 ring-2 ring-purple-500">
+              <div className="w-10 h-10 sm:w-14 sm:h-14 rounded-full overflow-hidden bg-gray-200 dark:bg-gray-700 ring-2 ring-purple-500 flex-shrink-0">
                 {profile?.avatar_url && (
                   <Image
                     src={profile.avatar_url}
                     alt={profile.display_name || username}
                     width={56}
                     height={56}
-                    className="object-cover"
+                    className="object-cover w-full h-full"
                   />
                 )}
               </div>
             </Link>
-            <div>
-              <div className="flex items-center gap-2">
-                <Tv className="w-5 h-5 text-purple-600 dark:text-purple-400" />
-                <h1 className="text-xl font-bold text-gray-900 dark:text-white">
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5 sm:gap-2">
+                <Tv className="w-4 h-4 sm:w-5 sm:h-5 text-purple-600 dark:text-purple-400 flex-shrink-0" />
+                <h1 className="text-base sm:text-xl font-bold text-gray-900 dark:text-white truncate">
                   {username}TV
                 </h1>
               </div>
-              <p className="text-sm text-gray-500 dark:text-gray-400">
-                {profile?.follower_count?.toLocaleString() || 0} followers • {videos.length} videos
+              <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">
+                {videos.length} videos
+              </p>
+              <p className="text-xs text-gray-400 dark:text-gray-500 hidden sm:block">
+                {profile?.follower_count?.toLocaleString() || 0} followers
               </p>
             </div>
           </div>
@@ -406,24 +409,24 @@ export default function TVPage() {
           <div className="flex items-center gap-2">
             <button
               onClick={() => setIsFollowing(!isFollowing)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-full font-medium text-sm transition-colors ${
+              className={`flex items-center justify-center gap-1.5 px-3 sm:px-4 py-1.5 sm:py-2 rounded-full font-medium text-xs sm:text-sm transition-colors flex-1 sm:flex-none ${
                 isFollowing
                   ? 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300'
                   : 'bg-purple-600 hover:bg-purple-700 text-white'
               }`}
             >
               {isFollowing ? (
-                <><UserCheck className="w-4 h-4" /> Following</>
+                <><UserCheck className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> <span className="hidden xs:inline">Following</span></>
               ) : (
-                <><UserPlus className="w-4 h-4" /> Follow</>
+                <><UserPlus className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> <span className="hidden xs:inline">Follow</span></>
               )}
             </button>
             <Link
               href={`/${username}`}
-              className="p-2 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+              className="p-1.5 sm:p-2 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
               title="About this channel"
             >
-              <Info className="w-5 h-5" />
+              <Info className="w-4 h-4 sm:w-5 sm:h-5" />
             </Link>
           </div>
         </div>
@@ -443,17 +446,17 @@ export default function TVPage() {
           </div>
         )}
 
-        {/* Search + Sort + Filter Controls */}
-        <div className="flex flex-col sm:flex-row gap-4 mb-6">
-          {/* Search Input */}
-          <div className="relative flex-1 max-w-md">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+        {/* Search + Sort Controls */}
+        <div className="flex items-center gap-2 mb-4">
+          {/* Search Input - icon only on mobile, expands on focus */}
+          <div className="relative flex-1 sm:max-w-md">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 sm:w-5 sm:h-5 text-gray-400" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder={`Search @${username}TV`}
-              className="w-full pl-10 pr-4 py-2 bg-gray-100 dark:bg-gray-800 border border-transparent focus:border-purple-500 rounded-full text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none transition-colors"
+              placeholder="Search..."
+              className="w-full pl-9 sm:pl-10 pr-8 py-2 bg-gray-100 dark:bg-gray-800 border border-transparent focus:border-purple-500 rounded-full text-sm sm:text-base text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none transition-colors"
             />
             {searchQuery && (
               <button
@@ -466,16 +469,17 @@ export default function TVPage() {
           </div>
           
           {/* Sort Dropdown */}
-          <div className="relative">
+          <div className="relative flex-shrink-0">
             <button
               onClick={() => setShowSortDropdown(!showSortDropdown)}
-              className="flex items-center gap-2 px-4 py-2 bg-gray-100 dark:bg-gray-800 rounded-full text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+              className="flex items-center gap-1 sm:gap-2 px-2.5 sm:px-4 py-2 bg-gray-100 dark:bg-gray-800 rounded-full text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors whitespace-nowrap"
             >
-              {SORT_OPTIONS.find(s => s.id === sortBy)?.label}
-              <ChevronDown className={`w-4 h-4 transition-transform ${showSortDropdown ? 'rotate-180' : ''}`} />
+              <span className="hidden sm:inline">{SORT_OPTIONS.find(s => s.id === sortBy)?.label}</span>
+              <span className="sm:hidden">{SORT_OPTIONS.find(s => s.id === sortBy)?.label.slice(0, 6)}</span>
+              <ChevronDown className={`w-3.5 h-3.5 sm:w-4 sm:h-4 transition-transform ${showSortDropdown ? 'rotate-180' : ''}`} />
             </button>
             {showSortDropdown && (
-              <div className="absolute right-0 mt-2 w-40 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 py-1 z-10">
+              <div className="absolute right-0 mt-2 w-36 sm:w-40 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 py-1 z-20">
                 {SORT_OPTIONS.map(option => (
                   <button
                     key={option.id}
@@ -483,7 +487,7 @@ export default function TVPage() {
                       setSortBy(option.id);
                       setShowSortDropdown(false);
                     }}
-                    className={`w-full px-4 py-2 text-left text-sm transition-colors ${
+                    className={`w-full px-3 sm:px-4 py-2 text-left text-xs sm:text-sm transition-colors ${
                       sortBy === option.id
                         ? 'bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400'
                         : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
@@ -497,21 +501,23 @@ export default function TVPage() {
           </div>
         </div>
 
-        {/* Filter Pills - "Other" intentionally excluded */}
-        <div className="flex flex-wrap gap-2 mb-6 pb-4 border-b border-gray-200 dark:border-gray-700">
-          {CONTENT_FILTERS.map((filter) => (
-            <button
-              key={filter.id}
-              onClick={() => setActiveFilter(filter.id as ContentFilter)}
-              className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${
-                activeFilter === filter.id
-                  ? 'bg-purple-600 text-white'
-                  : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
-              }`}
-            >
-              {filter.label}
-            </button>
-          ))}
+        {/* Filter Pills - Horizontal scroll on mobile */}
+        <div className="overflow-x-auto scrollbar-none -mx-4 px-4 mb-6 pb-4 border-b border-gray-200 dark:border-gray-700">
+          <div className="flex gap-2 min-w-max">
+            {CONTENT_FILTERS.map((filter) => (
+              <button
+                key={filter.id}
+                onClick={() => setActiveFilter(filter.id as ContentFilter)}
+                className={`px-3 sm:px-4 py-1.5 rounded-full text-xs sm:text-sm font-medium transition-colors whitespace-nowrap ${
+                  activeFilter === filter.id
+                    ? 'bg-purple-600 text-white'
+                    : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
+                }`}
+              >
+                {filter.label}
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* Results count when searching */}
