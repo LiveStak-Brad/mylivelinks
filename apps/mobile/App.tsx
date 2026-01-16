@@ -9,6 +9,7 @@ import AppMenus from './components/AppMenus';
 import { MenusProvider } from './state/MenusContext';
 import { AuthProvider } from './state/AuthContext';
 import { CurrentUserProvider } from './hooks/useCurrentUser';
+import { CallProvider } from './state/CallContext';
 import { ThemeProvider, useTheme } from './theme/useTheme';
 import { brand } from './theme/colors';
 
@@ -48,7 +49,9 @@ export default function App() {
         <AuthProvider>
           <CurrentUserProvider>
             <MenusProvider>
-              <AppWithTheme />
+              <CallProvider>
+                <AppWithTheme />
+              </CallProvider>
             </MenusProvider>
           </CurrentUserProvider>
         </AuthProvider>

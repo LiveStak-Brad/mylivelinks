@@ -207,25 +207,28 @@ export async function POST(request: NextRequest) {
         return sendJson(400, { error: 'roomName and participantName are required', stage: 'body_parse' }, 'body_parse');
       }
 
-      // ROOM GATE: Allow live_central (group mode), solo_* (solo streams), and battle_*/cohost_* (sessions)
+      // ROOM GATE: Allow live_central (group mode), solo_* (solo streams), battle_*/cohost_* (sessions), and call_* (1:1 calls)
       // Solo streams use unique room names:
       // - solo_${live_stream_id} (numeric) - e.g. solo_12345
       // - solo_${profile_id} (UUID) - e.g. solo_abc123-def456-...
       // Battle/Cohost sessions use:
       // - battle_${session_uuid} - e.g. battle_abc123-def456-...
       // - cohost_${session_uuid} - e.g. cohost_abc123-def456-...
+      // 1:1 Calls use:
+      // - call_${call_uuid} - e.g. call_abc123-def456-...
       const isLiveCentralRoom = roomName === 'live_central' || roomName === 'live-central';
       const isSoloRoom = /^solo_[a-f0-9-]+$/i.test(roomName); // solo_ followed by alphanumeric/dashes (covers both IDs)
       const isBattleRoom = /^battle_[a-f0-9-]+$/i.test(roomName); // battle_ followed by UUID
       const isCohostRoom = /^cohost_[a-f0-9-]+$/i.test(roomName); // cohost_ followed by UUID
+      const isCallRoom = /^call_[a-f0-9-]+$/i.test(roomName); // call_ followed by UUID (1:1 calls)
       const isSessionRoom = isBattleRoom || isCohostRoom;
       
-      if (!isLiveCentralRoom && !isSoloRoom && !isSessionRoom) {
-        console.log('[LIVEKIT_TOKEN] Room gate blocked:', { roomName, isLiveCentralRoom, isSoloRoom, isSessionRoom });
+      if (!isLiveCentralRoom && !isSoloRoom && !isSessionRoom && !isCallRoom) {
+        console.log('[LIVEKIT_TOKEN] Room gate blocked:', { roomName, isLiveCentralRoom, isSoloRoom, isSessionRoom, isCallRoom });
         return sendJson(403, { error: 'Room not available', stage: 'room_gate' }, 'room_gate');
       }
       
-      console.log('[LIVEKIT_TOKEN] Room gate passed:', { roomName, isLiveCentralRoom, isSoloRoom, isSessionRoom });
+      console.log('[LIVEKIT_TOKEN] Room gate passed:', { roomName, isLiveCentralRoom, isSoloRoom, isSessionRoom, isCallRoom });
 
       const wantsPublish = canPublish === true || body?.role === 'publisher';
       const isGuestRole = body?.role === 'guest';
@@ -265,6 +268,39 @@ export async function POST(request: NextRequest) {
           }
         } catch (err) {
           console.log('[LIVEKIT_TOKEN] Error checking session participant:', err);
+        }
+      }
+      
+      // 1:1 CALL ROOM: Check if user is a participant in the call
+      // Extract call_id from room name (call_<uuid>)
+      let isCallParticipant = false;
+      if (isCallRoom) {
+        const callId = roomName.replace(/^call_/i, '');
+        try {
+          const adminClient = getSupabaseAdmin();
+          const { data: call } = await adminClient
+            .from('calls')
+            .select('caller_id, callee_id, status')
+            .eq('id', callId)
+            .in('status', ['ringing', 'accepted'])
+            .maybeSingle();
+          
+          if (call && (call.caller_id === user.id || call.callee_id === user.id)) {
+            isCallParticipant = true;
+            console.log('[LIVEKIT_TOKEN] User is call participant, allowing publish', { 
+              userId: user.id, 
+              callId,
+              roomName 
+            });
+          } else {
+            console.log('[LIVEKIT_TOKEN] User is NOT call participant', { 
+              userId: user.id, 
+              callId,
+              call: call ? { caller_id: call.caller_id, callee_id: call.callee_id, status: call.status } : null 
+            });
+          }
+        } catch (err) {
+          console.log('[LIVEKIT_TOKEN] Error checking call participant:', err);
         }
       }
       
@@ -382,8 +418,9 @@ export async function POST(request: NextRequest) {
       // For launch: publish is granted when:
       // 1. Explicitly requested AND admin-gated (regular streamers), OR
       // 2. User is an accepted guest, OR
-      // 3. User is a battle/cohost session participant (host_a or host_b)
-      const effectiveCanPublish = (wantsPublish && canGoLive) || isAcceptedGuest || isSessionParticipant;
+      // 3. User is a battle/cohost session participant (host_a or host_b), OR
+      // 4. User is a 1:1 call participant (caller or callee)
+      const effectiveCanPublish = (wantsPublish && canGoLive) || isAcceptedGuest || isSessionParticipant || isCallParticipant;
 
       if (wantsPublish && !effectiveCanPublish) {
         console.log('[LIVEKIT_TOKEN] publish_denied', { reqId, userId: user.id, roomName, isMainRoom, canGoLive });
@@ -396,6 +433,8 @@ export async function POST(request: NextRequest) {
         isMainRoom,
         isSessionRoom,
         isSessionParticipant,
+        isCallRoom,
+        isCallParticipant,
         wantsPublish, 
         canGoLive, 
         effectiveCanPublish 

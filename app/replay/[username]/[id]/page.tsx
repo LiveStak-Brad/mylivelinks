@@ -146,13 +146,13 @@ export default function ReplayPlayerPage() {
         // If still not found, check replay_playlist_items (for curated playlist videos)
         if (!musicVideo) {
           
-          // First try by youtube_video_id
+          // First try by youtube_video_id - search across all playlists, not just this profile's
           let playlistItem = null;
           const { data: itemByYoutubeId } = await supabase
             .from('replay_playlist_items')
-            .select('*, replay_playlists!inner(profile_id)')
-            .eq('replay_playlists.profile_id', profile.id)
+            .select('*')
             .eq('youtube_video_id', currentVideoId)
+            .limit(1)
             .maybeSingle();
           
           playlistItem = itemByYoutubeId;
@@ -163,8 +163,7 @@ export default function ReplayPlayerPage() {
             if (uuidRegex.test(currentVideoId)) {
               const { data: itemById } = await supabase
                 .from('replay_playlist_items')
-                .select('*, replay_playlists!inner(profile_id)')
-                .eq('replay_playlists.profile_id', profile.id)
+                .select('*')
                 .eq('id', currentVideoId)
                 .maybeSingle();
               playlistItem = itemById;
@@ -230,44 +229,59 @@ export default function ReplayPlayerPage() {
           return;
         }
         
-        // Try creator_studio_items (check if currentVideoId is a valid UUID first)
+        // Try creator_studio_items - by UUID or by YouTube ID in media_url
         const uuidRegex2 = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+        let studioItem = null;
+        
+        // First try by UUID
         if (uuidRegex2.test(currentVideoId)) {
-          const { data: studioItem } = await supabase
+          const { data } = await supabase
             .from('creator_studio_items')
             .select('*')
             .eq('id', currentVideoId)
             .eq('owner_profile_id', profile.id)
             .maybeSingle();
+          studioItem = data;
+        }
+        
+        // If not found by UUID, try by YouTube ID in media_url
+        if (!studioItem) {
+          const { data } = await supabase
+            .from('creator_studio_items')
+            .select('*')
+            .eq('owner_profile_id', profile.id)
+            .ilike('media_url', `%${currentVideoId}%`)
+            .maybeSingle();
+          studioItem = data;
+        }
           
-          if (studioItem) {
-            const youtubeId = extractYoutubeId(studioItem.media_url || '');
-            const isYoutube = !!youtubeId;
-            
-            const videoData: TVVideoItem = {
-              id: studioItem.id,
-              title: studioItem.title,
-              description: studioItem.description || '',
-              thumbnail_url: studioItem.thumb_url || studioItem.artwork_url || (youtubeId ? getYoutubeThumbnail(youtubeId) : ''),
-              video_url: isYoutube && youtubeId ? getYoutubeEmbedUrl(youtubeId) : (studioItem.media_url || ''),
-              duration: '',
-              duration_seconds: studioItem.duration_seconds || 0,
-              views: 0,
-              likes: 0,
-              published_at: studioItem.created_at,
-              content_type: studioItem.item_type || 'music_video',
-              creator: {
-                id: profile.id,
-                username: profile.username,
-                display_name: profile.display_name || profile.username,
-                avatar_url: profile.avatar_url || '',
-                subscriber_count: 0,
-              },
-            };
-            setVideo(videoData);
-            setIsLoading(false);
-            return;
-          }
+        if (studioItem) {
+          const youtubeId = extractYoutubeId(studioItem.media_url || '');
+          const isYoutube = !!youtubeId;
+          
+          const videoData: TVVideoItem = {
+            id: studioItem.id,
+            title: studioItem.title,
+            description: studioItem.description || '',
+            thumbnail_url: studioItem.thumb_url || studioItem.artwork_url || (youtubeId ? getYoutubeThumbnail(youtubeId) : ''),
+            video_url: isYoutube && youtubeId ? getYoutubeEmbedUrl(youtubeId) : (studioItem.media_url || ''),
+            duration: '',
+            duration_seconds: studioItem.duration_seconds || 0,
+            views: 0,
+            likes: 0,
+            published_at: studioItem.created_at,
+            content_type: studioItem.item_type || 'music_video',
+            creator: {
+              id: profile.id,
+              username: profile.username,
+              display_name: profile.display_name || profile.username,
+              avatar_url: profile.avatar_url || '',
+              subscriber_count: 0,
+            },
+          };
+          setVideo(videoData);
+          setIsLoading(false);
+          return;
         }
         
         setError('Video not found');
@@ -282,12 +296,18 @@ export default function ReplayPlayerPage() {
     loadVideo();
   }, [currentVideoId, username]);
 
-  // Handle video change from playlist (without full page reload)
+  // Handle video change from playlist or queue (without full page reload)
   const handleVideoChange = (newVideoId: string) => {
     setCurrentVideoId(newVideoId);
     setAutoPlay(true);
-    // Update URL without full navigation
-    window.history.pushState({}, '', `/replay/${username}/${newVideoId}?playlist=${playlistId}`);
+    // Update URL without full navigation - preserve playlist or queue param
+    let newUrl = `/replay/${username}/${newVideoId}`;
+    if (playlistId) {
+      newUrl += `?playlist=${playlistId}`;
+    } else if (queueParam) {
+      newUrl += `?queue=${queueParam}`;
+    }
+    window.history.pushState({}, '', newUrl);
   };
 
   // Handle video ended - auto-advance to next in playlist

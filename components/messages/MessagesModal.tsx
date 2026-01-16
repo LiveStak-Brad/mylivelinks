@@ -1,12 +1,14 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { X, MessageCircle, Edit } from 'lucide-react';
 import { useMessages, Conversation } from './MessagesContext';
 import ConversationList from './ConversationList';
 import MessageThread from './MessageThread';
 import FriendsList from './FriendsList';
+import { CallModal, CallMinimizedBubble } from '@/components/call';
+import type { CallType, CallStatus, CallParticipant } from '@/components/call';
 
 interface MessagesModalProps {
   isOpen: boolean;
@@ -27,6 +29,20 @@ export default function MessagesModal({ isOpen, onClose, anchorRef }: MessagesMo
   const [isMobile, setIsMobile] = useState(false);
   const [showThread, setShowThread] = useState(false);
   const [modalPosition, setModalPosition] = useState<ModalPosition>({ top: 0, left: 0 });
+
+  // Call state
+  const [isCallActive, setIsCallActive] = useState(false);
+  const [isCallMinimized, setIsCallMinimized] = useState(false);
+  const [callType, setCallType] = useState<CallType>('voice');
+  const [callStatus, setCallStatus] = useState<CallStatus>('connecting');
+  const [callDuration, setCallDuration] = useState(0);
+  const [isMuted, setIsMuted] = useState(false);
+  const [isVideoOff, setIsVideoOff] = useState(false);
+  const [isSpeakerOn, setIsSpeakerOn] = useState(true);
+  const [callParticipant, setCallParticipant] = useState<CallParticipant | null>(null);
+  const localVideoRef = useRef<HTMLVideoElement>(null);
+  const remoteVideoRef = useRef<HTMLVideoElement>(null);
+  const durationIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   // Get active conversation object
   const activeConversation = conversations.find(c => c.id === activeConversationId);
@@ -157,6 +173,95 @@ export default function MessagesModal({ isOpen, onClose, anchorRef }: MessagesMo
     setActiveConversationId(null);
   };
 
+  // Call duration timer
+  useEffect(() => {
+    if (callStatus === 'active') {
+      durationIntervalRef.current = setInterval(() => {
+        setCallDuration((prev) => prev + 1);
+      }, 1000);
+    } else {
+      if (durationIntervalRef.current) {
+        clearInterval(durationIntervalRef.current);
+        durationIntervalRef.current = null;
+      }
+    }
+
+    return () => {
+      if (durationIntervalRef.current) {
+        clearInterval(durationIntervalRef.current);
+      }
+    };
+  }, [callStatus]);
+
+  // Start a call with the active conversation recipient
+  const startCall = useCallback((type: CallType) => {
+    if (!activeConversation) return;
+
+    setCallParticipant({
+      id: activeConversation.recipientId,
+      username: activeConversation.recipientUsername,
+      displayName: activeConversation.recipientDisplayName,
+      avatarUrl: activeConversation.recipientAvatar,
+    });
+    setCallType(type);
+    setCallStatus('connecting');
+    setCallDuration(0);
+    setIsMuted(false);
+    setIsVideoOff(false);
+    setIsSpeakerOn(true);
+    setIsCallMinimized(false);
+    setIsCallActive(true);
+
+    // Simulate call connection
+    setTimeout(() => setCallStatus('ringing'), 1000);
+    setTimeout(() => setCallStatus('active'), 3000);
+  }, [activeConversation]);
+
+  const handleStartVoiceCall = useCallback(() => {
+    startCall('voice');
+  }, [startCall]);
+
+  const handleStartVideoCall = useCallback(() => {
+    startCall('video');
+  }, [startCall]);
+
+  const handleEndCall = useCallback(() => {
+    setCallStatus('ended');
+    setTimeout(() => {
+      setIsCallActive(false);
+      setIsCallMinimized(false);
+      setCallParticipant(null);
+      setCallDuration(0);
+    }, 500);
+  }, []);
+
+  const handleMinimizeCall = useCallback(() => {
+    setIsCallMinimized(true);
+  }, []);
+
+  const handleRestoreCall = useCallback(() => {
+    setIsCallMinimized(false);
+  }, []);
+
+  const handleToggleMute = useCallback(() => {
+    setIsMuted((prev) => !prev);
+  }, []);
+
+  const handleToggleVideo = useCallback(() => {
+    setIsVideoOff((prev) => !prev);
+  }, []);
+
+  const handleToggleSpeaker = useCallback(() => {
+    setIsSpeakerOn((prev) => !prev);
+  }, []);
+
+  // Get current user info for local participant
+  const localParticipant: CallParticipant = {
+    id: 'current-user',
+    username: 'You',
+    displayName: 'You',
+  };
+
   if (!isOpen || !mounted) return null;
 
   // Mobile: Full screen with single pane navigation (PWA-optimized)
@@ -173,6 +278,8 @@ export default function MessagesModal({ isOpen, onClose, anchorRef }: MessagesMo
             conversation={activeConversation}
             onBack={handleBack}
             showBackButton={true}
+            onStartVoiceCall={handleStartVoiceCall}
+            onStartVideoCall={handleStartVideoCall}
           />
         ) : (
           <>
@@ -257,7 +364,11 @@ export default function MessagesModal({ isOpen, onClose, anchorRef }: MessagesMo
         {/* Right Pane: Message Thread - FILLS REMAINING SPACE */}
         <div className="flex flex-col overflow-hidden">
           {activeConversation ? (
-            <MessageThread conversation={activeConversation} />
+            <MessageThread
+              conversation={activeConversation}
+              onStartVoiceCall={handleStartVoiceCall}
+              onStartVideoCall={handleStartVideoCall}
+            />
           ) : (
             <EmptyThreadPlaceholder />
           )}
@@ -268,7 +379,47 @@ export default function MessagesModal({ isOpen, onClose, anchorRef }: MessagesMo
 
   // Use portal to render at body level for proper z-index stacking
   return createPortal(
-    isMobile ? mobileContent : desktopContent,
+    <>
+      {isMobile ? mobileContent : desktopContent}
+
+      {/* Call Modal - Full screen when active and not minimized */}
+      {isCallActive && !isCallMinimized && callParticipant && (
+        <CallModal
+          isOpen={true}
+          onClose={handleEndCall}
+          onMinimize={handleMinimizeCall}
+          callType={callType}
+          localParticipant={localParticipant}
+          remoteParticipant={callParticipant}
+          status={callStatus}
+          duration={callDuration}
+          onToggleMute={handleToggleMute}
+          onToggleVideo={handleToggleVideo}
+          onToggleSpeaker={handleToggleSpeaker}
+          onEndCall={handleEndCall}
+          isMuted={isMuted}
+          isVideoOff={isVideoOff}
+          isSpeakerOn={isSpeakerOn}
+          localVideoRef={localVideoRef}
+          remoteVideoRef={remoteVideoRef}
+        />
+      )}
+
+      {/* Minimized Call Bubble - Shows when call is active but minimized */}
+      {isCallActive && isCallMinimized && callParticipant && (
+        <CallMinimizedBubble
+          isVisible={true}
+          onRestore={handleRestoreCall}
+          onEndCall={handleEndCall}
+          callType={callType}
+          remoteParticipant={callParticipant}
+          status={callStatus}
+          duration={callDuration}
+          isMuted={isMuted}
+          localVideoRef={localVideoRef}
+        />
+      )}
+    </>,
     document.body
   );
 }

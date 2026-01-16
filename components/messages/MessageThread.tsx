@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect, type KeyboardEvent, type ChangeEvent } from 'react';
-import { Send, Gift, Smile, ArrowLeft, Loader2, ExternalLink, ImagePlus, Share2 } from 'lucide-react';
+import { Send, Gift, Smile, ArrowLeft, Loader2, ExternalLink, ImagePlus, Share2, Phone, Video } from 'lucide-react';
 import { useMessages, Message, Conversation } from './MessagesContext';
 import GiftPickerMini from './GiftPickerMini';
 import { useIM } from '@/components/im';
@@ -16,6 +16,8 @@ interface MessageThreadProps {
   conversation: Conversation;
   onBack?: () => void;
   showBackButton?: boolean;
+  onStartVoiceCall?: () => void;
+  onStartVideoCall?: () => void;
 }
 
 // Map gift names to emojis
@@ -72,7 +74,7 @@ const EMOJIS = [
   '😅', '😭', '😡', '🤔', '😴', '🙌', '✅', '❌', '⭐', '🌈',
 ];
 
-export default function MessageThread({ conversation, onBack, showBackButton = false }: MessageThreadProps) {
+export default function MessageThread({ conversation, onBack, showBackButton = false, onStartVoiceCall, onStartVideoCall }: MessageThreadProps) {
   const { messages, sendMessage, sendGift, sendImage, currentUserId } = useMessages();
   const { openChat } = useIM();
   const { isOnline } = usePresence();
@@ -289,6 +291,24 @@ export default function MessageThread({ conversation, onBack, showBackButton = f
 
         {/* Actions */}
         <div className="flex items-center gap-1">
+          {onStartVoiceCall && (
+            <button
+              onClick={onStartVoiceCall}
+              className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-full transition"
+              title="Voice call"
+            >
+              <Phone className="w-5 h-5" />
+            </button>
+          )}
+          {onStartVideoCall && (
+            <button
+              onClick={onStartVideoCall}
+              className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-full transition"
+              title="Video call"
+            >
+              <Video className="w-5 h-5" />
+            </button>
+          )}
           <button
             onClick={() =>
               openChat(

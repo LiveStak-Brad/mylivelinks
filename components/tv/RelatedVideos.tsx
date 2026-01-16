@@ -415,19 +415,17 @@ export default function RelatedVideos({ currentVideoId, contentType, username, p
   // Expose auto-next function to parent for video end handling
   // Use refs to avoid stale closures
   const nextVideoRef = useRef(nextVideo);
+  const queueNextVideoRef = useRef(queueNextVideo);
   const onVideoChangeRef = useRef(onVideoChange);
   
   // Keep refs updated (no deps - runs every render to keep refs fresh)
   nextVideoRef.current = nextVideo;
+  queueNextVideoRef.current = queueNextVideo;
   onVideoChangeRef.current = onVideoChange;
   
-  // Register auto-next callback once when playlist loads
-  const hasRegisteredRef = useRef(false);
+  // Register auto-next callback for playlist mode
   useEffect(() => {
-    if (onAutoNextReady && playlistId && !hasRegisteredRef.current) {
-      hasRegisteredRef.current = true;
-      // Pass a function wrapped in another function for setState
-      // setAutoNextFn(() => fn) stores fn, so we pass () => actualFn
+    if (onAutoNextReady && playlistId && playlistVideos.length > 0) {
       const autoNextFn = () => {
         if (nextVideoRef.current && onVideoChangeRef.current) {
           onVideoChangeRef.current(nextVideoRef.current.youtube_video_id);
@@ -435,7 +433,22 @@ export default function RelatedVideos({ currentVideoId, contentType, username, p
       };
       onAutoNextReady(() => autoNextFn);
     }
-  }, [onAutoNextReady, playlistId]);
+  }, [onAutoNextReady, playlistId, playlistVideos.length]);
+  
+  // Register auto-next callback for queue mode
+  useEffect(() => {
+    if (onAutoNextReady && videoQueue && videoQueue.length > 0 && queueVideos.length > 0) {
+      const autoNextFn = () => {
+        if (queueNextVideoRef.current && onVideoChangeRef.current) {
+          const youtubeId = extractYoutubeId(queueNextVideoRef.current.video_url);
+          if (youtubeId) {
+            onVideoChangeRef.current(youtubeId);
+          }
+        }
+      };
+      onAutoNextReady(() => autoNextFn);
+    }
+  }, [onAutoNextReady, videoQueue, queueVideos.length]);
 
   // Queue mode (from /replay feed)
   if (videoQueue && videoQueue.length > 0 && queueVideos.length > 0) {

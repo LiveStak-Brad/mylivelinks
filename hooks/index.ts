@@ -69,3 +69,13 @@ export type {
   UseOwnerLiveOpsDataReturn,
 } from './useOwnerLiveOpsData';
 
+// Call session hook for 1:1 voice/video calls
+export { useCallSessionWeb } from './useCallSessionWeb';
+export type {
+  CallStatus,
+  CallType,
+  CallParticipant,
+  IncomingCall,
+  ActiveCall,
+} from './useCallSessionWeb';
+

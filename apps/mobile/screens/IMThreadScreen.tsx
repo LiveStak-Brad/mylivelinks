@@ -2,6 +2,9 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ActivityIndicator, Alert, FlatList, Image, KeyboardAvoidingView, Modal, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import ReportModal from '../components/ReportModal';
 import ShareModal from '../components/ShareModal';
+import { CallModal, CallMinimizedBubble } from '../components/call';
+import type { CallMode } from '../components/call';
+import { useCall } from '../state/CallContext';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
@@ -165,6 +168,18 @@ export default function IMThreadScreen() {
   const listRef = useRef<FlatList>(null);
   const [fetchedProfile, setFetchedProfile] = useState<{ displayName?: string; avatarUrl?: string } | null>(null);
   const [myAvatarUrl, setMyAvatarUrl] = useState<string | null>(null);
+
+  // Real call system
+  const call = useCall();
+  const [callMinimized, setCallMinimized] = useState(false);
+  
+  // Derived call state from real call system
+  const showCallModal = call.callState !== 'idle' && call.callState !== 'ended' && call.callState !== 'incoming_invite';
+  const callMode: CallMode = call.callType || 'voice';
+  const isCallConnected = call.callState === 'in_call';
+  const isMuted = !call.isMicEnabled;
+  const isSpeakerOn = call.isSpeakerEnabled;
+  const isCameraOn = call.isCameraEnabled;
 
   const myId = user?.id ?? null;
   
@@ -572,12 +587,51 @@ export default function IMThreadScreen() {
           <Text style={styles.headerTitle} numberOfLines={1}>
             {title}
           </Text>
-          <Pressable
-            style={{ marginLeft: 'auto', padding: 8 }}
-            onPress={() => setShowOverflowMenu(true)}
-          >
-            <Feather name="more-vertical" size={20} color={stylesVars.mutedText} />
-          </Pressable>
+          {/* Call buttons */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginLeft: 'auto', gap: 4 }}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Start voice call"
+              onPress={() => {
+                if (otherProfileId && call.callState === 'idle') {
+                  setCallMinimized(false);
+                  call.startVoiceCall(otherProfileId);
+                }
+              }}
+              disabled={call.callState !== 'idle'}
+              style={({ pressed }) => [
+                { padding: 8, borderRadius: 8 },
+                pressed && { opacity: 0.7 },
+                call.callState !== 'idle' && { opacity: 0.5 },
+              ]}
+            >
+              <Feather name="phone" size={20} color={stylesVars.primary} />
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Start video call"
+              onPress={() => {
+                if (otherProfileId && call.callState === 'idle') {
+                  setCallMinimized(false);
+                  call.startVideoCall(otherProfileId);
+                }
+              }}
+              disabled={call.callState !== 'idle'}
+              style={({ pressed }) => [
+                { padding: 8, borderRadius: 8 },
+                pressed && { opacity: 0.7 },
+                call.callState !== 'idle' && { opacity: 0.5 },
+              ]}
+            >
+              <Feather name="video" size={20} color={stylesVars.primary} />
+            </Pressable>
+            <Pressable
+              style={{ padding: 8 }}
+              onPress={() => setShowOverflowMenu(true)}
+            >
+              <Feather name="more-vertical" size={20} color={stylesVars.mutedText} />
+            </Pressable>
+          </View>
         </View>
         {loading ? <Text style={styles.headerSub}>Loading…</Text> : null}
         {error ? (
@@ -926,6 +980,48 @@ export default function IMThreadScreen() {
         shareText={shareModalData?.text || ''}
         shareThumbnail={shareModalData?.thumbnail}
         shareContentType={shareModalData?.contentType}
+      />
+
+      {/* Call Modal - wired to real call system */}
+      <CallModal
+        visible={showCallModal && !callMinimized}
+        onClose={() => {
+          call.endCall();
+          setCallMinimized(false);
+        }}
+        onMinimize={() => {
+          setCallMinimized(true);
+        }}
+        callMode={callMode}
+        remoteUserId={otherProfileId}
+        remoteUsername={call.remoteParticipant?.username ?? fetchedProfile?.displayName ?? otherDisplayName ?? 'user'}
+        remoteDisplayName={call.remoteParticipant?.username ?? title}
+        remoteAvatarUrl={call.remoteParticipant?.avatarUrl ?? headerAvatarUrl ?? null}
+        localAvatarUrl={myAvatarUrl}
+        callDuration={call.callDuration}
+        isConnected={isCallConnected}
+        isMuted={isMuted}
+        isSpeakerOn={isSpeakerOn}
+        isCameraOn={isCameraOn}
+        onToggleMute={() => call.toggleMic()}
+        onToggleSpeaker={() => call.toggleSpeaker()}
+        onToggleCamera={() => call.toggleCam()}
+        onEndCall={() => call.endCall()}
+      />
+
+      {/* Minimized Call Bubble */}
+      <CallMinimizedBubble
+        visible={showCallModal && callMinimized}
+        onRestore={() => setCallMinimized(false)}
+        onEndCall={() => {
+          call.endCall();
+          setCallMinimized(false);
+        }}
+        callMode={callMode}
+        remoteDisplayName={call.remoteParticipant?.username ?? title}
+        remoteAvatarUrl={call.remoteParticipant?.avatarUrl ?? headerAvatarUrl ?? null}
+        callDuration={call.callDuration}
+        isConnected={isCallConnected}
       />
     </SafeAreaView>
   );
