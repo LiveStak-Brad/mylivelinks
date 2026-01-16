@@ -78,8 +78,8 @@ export default function CreatorStudioSeriesScreen() {
         ]}
       >
         {/* Thumbnail */}
-        <View style={[styles.thumbnail, { backgroundColor: 'rgba(34,197,94,0.1)' }]}>
-          <Ionicons name="albums-outline" size={24} color="#22C55E" />
+        <View style={[styles.thumbnail, { backgroundColor: `${colors.primary}15` }]}>
+          <Ionicons name="albums-outline" size={24} color={colors.primary} />
         </View>
 
         {/* Content Info */}
@@ -88,8 +88,8 @@ export default function CreatorStudioSeriesScreen() {
             {item.title}
           </Text>
           <View style={styles.metaRow}>
-            <View style={[styles.episodeBadge, { backgroundColor: 'rgba(34,197,94,0.15)' }]}>
-              <Text style={styles.episodeBadgeText}>{item.episodeCount} episodes</Text>
+            <View style={[styles.episodeBadge, { backgroundColor: `${colors.primary}15` }]}>
+              <Text style={[styles.episodeBadgeText, { color: colors.primary }]}>{item.episodeCount} episodes</Text>
             </View>
             <View style={[styles.statusBadge, { backgroundColor: statusConfig.bgColor }]}>
               <Text style={[styles.statusBadgeText, { color: statusConfig.textColor }]}>{statusConfig.label}</Text>
@@ -119,7 +119,7 @@ export default function CreatorStudioSeriesScreen() {
       {/* Header */}
       <View style={[styles.header, { borderBottomColor: colors.border }]}>
         <View style={styles.headerLeft}>
-          <View style={[styles.headerIcon, { backgroundColor: '#22C55E' }]}>
+          <View style={[styles.headerIcon, { backgroundColor: colors.primary }]}>
             <Ionicons name="albums-outline" size={18} color="#FFFFFF" />
           </View>
           <Text style={[styles.headerTitle, { color: colors.text }]}>Series</Text>
@@ -127,7 +127,7 @@ export default function CreatorStudioSeriesScreen() {
         <Pressable
           accessibilityRole="button"
           onPress={() => navigation.navigate('CreatorStudioUploadScreen')}
-          style={({ pressed }) => [styles.uploadBtn, pressed && styles.pressedSoft]}
+          style={({ pressed }) => [styles.uploadBtn, { backgroundColor: colors.primary }, pressed && styles.pressedSoft]}
         >
           <Ionicons name="add" size={20} color="#FFFFFF" />
         </Pressable>
@@ -144,7 +144,7 @@ export default function CreatorStudioSeriesScreen() {
               onPress={() => setActiveFilter(chip.key)}
               style={[
                 styles.filterChip,
-                { backgroundColor: isActive ? '#22C55E' : colors.surface, borderColor: isActive ? '#22C55E' : colors.border },
+                { backgroundColor: isActive ? colors.primary : colors.surface, borderColor: isActive ? colors.primary : colors.border },
               ]}
             >
               <Text style={[styles.filterChipText, { color: isActive ? '#FFFFFF' : colors.text }]}>
@@ -220,7 +220,6 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 12,
-    backgroundColor: '#22C55E',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -264,7 +263,7 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
     borderRadius: 999,
   },
-  episodeBadgeText: { fontSize: 10, fontWeight: '800', color: '#22C55E' },
+  episodeBadgeText: { fontSize: 10, fontWeight: '800' },
   statusBadge: {
     paddingHorizontal: 8,
     paddingVertical: 3,

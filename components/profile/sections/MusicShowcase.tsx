@@ -54,6 +54,7 @@ interface MusicShowcaseProps {
   artistProfileId?: string;
   /** Username of the artist (for gifting) */
   artistUsername?: string;
+  buttonColor?: string;
 }
 
 function safeUuid() {
@@ -62,6 +63,41 @@ function safeUuid() {
   } catch {
     return `tmp_${Math.random().toString(16).slice(2)}_${Date.now()}`;
   }
+}
+
+// SoundCloud-style waveform bars visualization
+function WaveformBars({ progress, buttonColor }: { progress: number; buttonColor: string }) {
+  // Generate random bar heights (memoized on mount)
+  const bars = 50;
+  const heights = React.useMemo(
+    () => Array.from({ length: bars }, () => 0.3 + Math.random() * 0.7),
+    []
+  );
+
+  return (
+    <div className="flex items-center h-10 gap-[2px] w-full">
+      {heights.map((h, i) => {
+        const isActive = (i / bars) <= progress;
+        return (
+          <div
+            key={i}
+            className="flex-1 rounded-sm transition-colors"
+            style={{
+              height: `${h * 100}%`,
+              backgroundColor: isActive ? buttonColor : `${buttonColor}30`,
+            }}
+          />
+        );
+      })}
+    </div>
+  );
+}
+
+// Format time in mm:ss
+function formatTime(seconds: number): string {
+  const mins = Math.floor(seconds / 60);
+  const secs = Math.floor(seconds % 60);
+  return `${mins}:${secs.toString().padStart(2, '0')}`;
 }
 
 export default function MusicShowcase({
@@ -73,6 +109,7 @@ export default function MusicShowcase({
   borderRadiusClass = 'rounded-2xl',
   artistProfileId,
   artistUsername,
+  buttonColor = '#DB2777',
 }: MusicShowcaseProps) {
   const supabase = useMemo(() => createClient(), []);
   const emptyState = getEmptyStateText('music_showcase', profileType);
@@ -83,6 +120,9 @@ export default function MusicShowcase({
   const [isPlaying, setIsPlaying] = useState(false);
   const [playlistOpen, setPlaylistOpen] = useState(false);
   const [showGiftModal, setShowGiftModal] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
 
   const [showAddModal, setShowAddModal] = useState(false);
   const [newTitle, setNewTitle] = useState('');
@@ -192,12 +232,17 @@ export default function MusicShowcase({
       el.pause();
       el.removeAttribute('src');
       setIsPlaying(false);
+      setProgress(0);
+      setCurrentTime(0);
+      setDuration(0);
       return;
     }
 
     if (el.src !== currentTrack.audio_url) {
       el.src = currentTrack.audio_url;
       el.load();
+      setProgress(0);
+      setCurrentTime(0);
     }
 
     if (isPlaying) {
@@ -206,6 +251,32 @@ export default function MusicShowcase({
       el.pause();
     }
   }, [currentTrack?.audio_url, isPlaying]);
+
+  // Track audio progress for waveform
+  useEffect(() => {
+    const el = audioRef.current;
+    if (!el) return;
+
+    const handleTimeUpdate = () => {
+      setCurrentTime(el.currentTime);
+      if (el.duration && !isNaN(el.duration)) {
+        setProgress(el.currentTime / el.duration);
+      }
+    };
+
+    const handleLoadedMetadata = () => {
+      if (el.duration && !isNaN(el.duration)) {
+        setDuration(el.duration);
+      }
+    };
+
+    el.addEventListener('timeupdate', handleTimeUpdate);
+    el.addEventListener('loadedmetadata', handleLoadedMetadata);
+    return () => {
+      el.removeEventListener('timeupdate', handleTimeUpdate);
+      el.removeEventListener('loadedmetadata', handleLoadedMetadata);
+    };
+  }, []);
 
   // Cycle playlist on end.
   useEffect(() => {
@@ -445,13 +516,13 @@ export default function MusicShowcase({
     if (!isOwner) return null;
     return (
       <div
-        className={`backdrop-blur-sm ${borderRadiusClass} p-6 border border-gray-200/50 dark:border-gray-700/50 shadow-lg mb-6`}
+        className={`${borderRadiusClass} p-6 border border-gray-200/50 dark:border-gray-700/50 shadow-lg mb-6 bg-white/80 dark:bg-gray-800/80`}
         style={cardStyle}
       >
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-xl font-extrabold text-gray-900 dark:text-white flex items-center gap-2">
             <Music className="w-5 h-5 text-purple-500" />
-            🎵 Music
+            Music
           </h2>
         </div>
 
@@ -461,9 +532,11 @@ export default function MusicShowcase({
           <p className="text-gray-600 dark:text-gray-400 mb-4">{emptyState.text}</p>
           <button
             onClick={openAdd}
-            className="px-6 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-semibold transition-colors"
+            className="inline-flex items-center gap-1.5 px-5 py-2.5 text-sm font-semibold rounded-full text-white transition-opacity hover:opacity-80"
+            style={{ backgroundColor: buttonColor }}
           >
-            {emptyState.ownerCTA || 'Add Track'}
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+            Creator Studio
           </button>
         </div>
 
@@ -498,20 +571,22 @@ export default function MusicShowcase({
 
   return (
     <div
-      className={`backdrop-blur-sm ${borderRadiusClass} p-6 border border-gray-200/50 dark:border-gray-700/50 shadow-lg mb-6`}
+      className={`${borderRadiusClass} p-6 border border-gray-200/50 dark:border-gray-700/50 shadow-lg mb-6 bg-white/80 dark:bg-gray-800/80`}
       style={cardStyle}
     >
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-xl font-extrabold text-gray-900 dark:text-white flex items-center gap-2">
           <Music className="w-5 h-5 text-purple-500" />
-          🎵 Music
+          Music
         </h2>
         {isOwner && (
           <button
             onClick={openAdd}
-            className="text-sm font-semibold text-purple-600 hover:text-purple-700 dark:text-purple-400 dark:hover:text-purple-300"
+            className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-semibold rounded-full text-white transition-opacity hover:opacity-80"
+            style={{ backgroundColor: buttonColor }}
           >
-            + Add Track
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+            Creator Studio
           </button>
         )}
       </div>
@@ -621,9 +696,11 @@ export default function MusicShowcase({
                     <button
                       type="button"
                       onClick={openAdd}
-                      className="w-full px-3 py-2 rounded-lg bg-purple-600 hover:bg-purple-700 text-white font-extrabold"
+                      className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-full text-white font-semibold text-sm transition-opacity hover:opacity-80"
+                      style={{ backgroundColor: buttonColor }}
                     >
-                      + Add Track
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+                      Add Track
                     </button>
                     <div className="mt-2 text-[11px] text-gray-600 dark:text-gray-400">
                       Reordering is UI-only for now (saving is wired later).
@@ -635,7 +712,19 @@ export default function MusicShowcase({
           </div>
         </div>
 
-        <div className="mt-4 flex items-center justify-center gap-3">
+        {/* SoundCloud-style Waveform */}
+        <div className="mt-4 mb-2">
+          <WaveformBars progress={progress} buttonColor={buttonColor} />
+        </div>
+
+        {/* Time Display */}
+        <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mb-3">
+          <span>{formatTime(currentTime)}</span>
+          <span>{formatTime(duration)}</span>
+        </div>
+
+        {/* Playback Controls */}
+        <div className="flex items-center justify-center gap-3">
           <button
             type="button"
             onClick={goPrev}
@@ -649,9 +738,8 @@ export default function MusicShowcase({
             type="button"
             onClick={togglePlay}
             disabled={!canPlay}
-            className={`w-12 h-12 rounded-full flex items-center justify-center text-white transition-colors ${
-              canPlay ? 'bg-purple-600 hover:bg-purple-700' : 'bg-gray-400 cursor-not-allowed'
-            }`}
+            className="w-12 h-12 rounded-full flex items-center justify-center text-white transition-colors"
+            style={{ backgroundColor: canPlay ? buttonColor : '#9CA3AF' }}
             title={isPlaying ? 'Pause' : 'Play'}
           >
             {isPlaying ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5 ml-0.5" />}
@@ -676,6 +764,11 @@ export default function MusicShowcase({
               <Gift className="w-5 h-5 text-white" />
             </button>
           )}
+        </div>
+
+        {/* Track Counter */}
+        <div className="mt-3 text-center text-xs text-gray-500 dark:text-gray-400">
+          {currentIndex + 1} / {uiTracks.length}
         </div>
       </div>
 
@@ -741,6 +834,7 @@ function AddTrackModal(props: {
   formError: string | null;
   onClose: () => void;
   onSubmit: () => void | Promise<void>;
+  buttonColor?: string;
 }) {
   const [mounted, setMounted] = useState(false);
   useEffect(() => {
@@ -923,8 +1017,10 @@ function AddTrackModal(props: {
           <button
             type="button"
             onClick={props.onSubmit}
-            className="px-4 py-2 rounded-lg bg-purple-600 hover:bg-purple-700 text-white font-extrabold"
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-white font-semibold text-sm transition-opacity hover:opacity-80"
+            style={{ backgroundColor: props.buttonColor || '#8B5CF6' }}
           >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
             Add Track
           </button>
         </div>

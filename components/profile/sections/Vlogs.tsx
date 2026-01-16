@@ -1,9 +1,9 @@
 'use client';
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Plus, Trash2, Play, Video as VideoIcon, SkipBack, SkipForward, ChevronDown } from 'lucide-react';
+import Link from 'next/link';
+import { Trash2, Play, Video as VideoIcon, SkipBack, SkipForward, ChevronDown } from 'lucide-react';
 import { createClient } from '@/lib/supabase';
-import { uploadProfileMedia } from '@/lib/storage';
 
 type VlogRow = {
   id: string;
@@ -20,15 +20,10 @@ type Props = {
   isOwner: boolean;
   cardStyle?: React.CSSProperties;
   borderRadiusClass?: string;
+  buttonColor?: string;
 };
 
-async function uploadVlogVideo(profileId: string, file: File): Promise<string> {
-  const vlogId = typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : String(Date.now());
-  const relPath = `vlogs/${vlogId}/video`;
-  return uploadProfileMedia(profileId, relPath, file, { upsert: true });
-}
-
-export default function Vlogs({ profileId, isOwner, cardStyle, borderRadiusClass = 'rounded-2xl' }: Props) {
+export default function Vlogs({ profileId, isOwner, cardStyle, borderRadiusClass = 'rounded-2xl', buttonColor = '#DB2777' }: Props) {
   const supabase = useMemo(() => createClient(), []);
   const videoRef = useRef<HTMLVideoElement | null>(null);
 
@@ -36,13 +31,6 @@ export default function Vlogs({ profileId, isOwner, cardStyle, borderRadiusClass
   const [rows, setRows] = useState<VlogRow[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [playlistOpen, setPlaylistOpen] = useState(false);
-
-  // modal state
-  const [showModal, setShowModal] = useState(false);
-  const [formCaption, setFormCaption] = useState('');
-  const [formFile, setFormFile] = useState<File | null>(null);
-  const [durationSeconds, setDurationSeconds] = useState<number | null>(null);
-  const [saving, setSaving] = useState(false);
 
   const load = async () => {
     setLoading(true);
@@ -71,13 +59,6 @@ export default function Vlogs({ profileId, isOwner, cardStyle, borderRadiusClass
 
   if (!isOwner && !hasAny && !loading) return null;
 
-  const openAdd = () => {
-    setFormCaption('');
-    setFormFile(null);
-    setDurationSeconds(null);
-    setShowModal(true);
-  };
-
   const goNext = () => {
     if (!rows.length) return;
     const idx = rows.findIndex((r) => r.id === activeId);
@@ -94,7 +75,7 @@ export default function Vlogs({ profileId, isOwner, cardStyle, borderRadiusClass
 
   return (
     <div
-      className={`backdrop-blur-sm ${borderRadiusClass} p-6 border border-gray-200/50 dark:border-gray-700/50 shadow-lg mb-6`}
+      className={`${borderRadiusClass} p-6 border border-gray-200/50 dark:border-gray-700/50 shadow-lg mb-6 bg-white/80 dark:bg-gray-800/80`}
       style={cardStyle}
     >
       <div className="flex items-center justify-between mb-4">
@@ -102,14 +83,15 @@ export default function Vlogs({ profileId, isOwner, cardStyle, borderRadiusClass
           <VideoIcon className="w-5 h-5 text-purple-500" />
           🎞️ Vlogs
         </h2>
-        {isOwner && (
-          <button
-            onClick={openAdd}
-            className="inline-flex items-center gap-2 text-sm font-semibold text-purple-600 hover:text-purple-700 dark:text-purple-400 dark:hover:text-purple-300"
+        {isOwner && hasAny && (
+          <Link
+            href="/creator-studio/upload?type=vlog"
+            className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-semibold rounded-full text-white transition-opacity hover:opacity-80"
+            style={{ backgroundColor: buttonColor }}
           >
-            <Plus className="w-4 h-4" />
-            Add Vlog
-          </button>
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+            Creator Studio
+          </Link>
         )}
       </div>
 
@@ -117,13 +99,15 @@ export default function Vlogs({ profileId, isOwner, cardStyle, borderRadiusClass
         <div className="text-center py-12">
           <VideoIcon className="w-16 h-16 text-gray-400 dark:text-gray-600 mx-auto mb-4" />
           <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2">No Vlogs Yet</h3>
-          <p className="text-gray-600 dark:text-gray-400 mb-4">Upload a short (≤ 60s) vlog clip.</p>
-          <button
-            onClick={openAdd}
-            className="px-6 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-semibold transition-colors"
+          <p className="text-gray-600 dark:text-gray-400 mb-4">Short videos throughout your day to keep fans updated.</p>
+          <Link
+            href="/creator-studio/upload?type=vlog"
+            className="inline-flex items-center gap-1.5 px-5 py-2.5 text-sm font-semibold rounded-full text-white transition-opacity hover:opacity-80"
+            style={{ backgroundColor: buttonColor }}
           >
-            + Add Vlog
-          </button>
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+            Creator Studio
+          </Link>
         </div>
       )}
 
@@ -242,126 +226,6 @@ export default function Vlogs({ profileId, isOwner, cardStyle, borderRadiusClass
         </div>
       )}
 
-      {showModal && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/60" onClick={() => (!saving ? setShowModal(false) : null)} />
-          <div className="relative w-full max-w-lg bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 shadow-2xl p-5">
-            <div className="flex items-center justify-between mb-4">
-              <div className="text-lg font-extrabold text-gray-900 dark:text-white">Add Vlog</div>
-              <button
-                className="text-sm font-bold text-gray-600 dark:text-gray-300 hover:opacity-80"
-                onClick={() => (!saving ? setShowModal(false) : null)}
-              >
-                Close
-              </button>
-            </div>
-
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1">Caption (optional)</label>
-                <input
-                  value={formCaption}
-                  onChange={(e) => setFormCaption(e.target.value)}
-                  className="w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-950 px-3 py-2 text-sm"
-                  placeholder="Say something…"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1">Upload Video (≤ 60s)</label>
-                <input
-                  type="file"
-                  accept="video/*"
-                  onChange={async (e) => {
-                    const f = e.target.files?.[0] ?? null;
-                    setFormFile(f);
-                    setDurationSeconds(null);
-                    if (!f) return;
-
-                    try {
-                      const tmpUrl = URL.createObjectURL(f);
-                      const el = document.createElement('video');
-                      el.preload = 'metadata';
-                      el.src = tmpUrl;
-                      await new Promise<void>((resolve, reject) => {
-                        el.onloadedmetadata = () => resolve();
-                        el.onerror = () => reject(new Error('Failed to read video metadata'));
-                      });
-                      URL.revokeObjectURL(tmpUrl);
-                      const d = Math.ceil(Number(el.duration || 0));
-                      setDurationSeconds(Number.isFinite(d) ? d : null);
-                    } catch (err) {
-                      console.error('[Vlogs] duration read failed', err);
-                      setDurationSeconds(null);
-                    }
-                  }}
-                  className="w-full text-sm"
-                />
-                {typeof durationSeconds === 'number' && (
-                  <div className={`mt-1 text-xs font-semibold ${durationSeconds > 60 ? 'text-red-600' : 'text-gray-500 dark:text-gray-400'}`}>
-                    Duration: {durationSeconds}s
-                  </div>
-                )}
-              </div>
-
-              <div className="flex gap-2 justify-end pt-2">
-                <button
-                  className="px-4 py-2 rounded-lg text-sm font-bold border border-gray-200 dark:border-gray-700"
-                  disabled={saving}
-                  onClick={() => setShowModal(false)}
-                >
-                  Cancel
-                </button>
-                <button
-                  className="px-4 py-2 rounded-lg text-sm font-bold bg-purple-600 hover:bg-purple-700 text-white disabled:opacity-60"
-                  disabled={saving}
-                  onClick={async () => {
-                    if (!formFile) {
-                      alert('Please select a video file.');
-                      return;
-                    }
-                    if (typeof durationSeconds !== 'number' || !Number.isFinite(durationSeconds)) {
-                      alert('Could not determine video duration.');
-                      return;
-                    }
-                    if (durationSeconds > 60) {
-                      alert('Vlogs must be 60 seconds or less.');
-                      return;
-                    }
-
-                    setSaving(true);
-                    try {
-                      const videoUrl = await uploadVlogVideo(profileId, formFile);
-                      const payload: any = {
-                        video_url: videoUrl,
-                        caption: formCaption.trim() || null,
-                        thumbnail_url: null,
-                        duration_seconds: durationSeconds,
-                      };
-
-                      const { error } = await supabase.rpc('create_vlog', { p_payload: payload });
-                      if (error) throw error;
-
-                      setShowModal(false);
-                      setFormCaption('');
-                      setFormFile(null);
-                      setDurationSeconds(null);
-                      await load();
-                    } catch (e) {
-                      console.error('[Vlogs] save failed', e);
-                      alert('Failed to save vlog.');
-                    } finally {
-                      setSaving(false);
-                    }
-                  }}
-                >
-                  {saving ? 'Saving…' : 'Add Vlog'}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

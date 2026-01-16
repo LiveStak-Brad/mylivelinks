@@ -96,8 +96,8 @@ export default function PortfolioSection({
     <View style={[styles.container, { backgroundColor: cardBg, borderRadius: cardRadius }]}>
       <View style={styles.header}>
         <View style={styles.headerLeft}>
-          <Feather name="briefcase" size={20} color={colors.primary} />
-          <Text style={[styles.title, { color: textColor }]}>Portfolio</Text>
+          <Feather name="shopping-bag" size={20} color={colors.primary} />
+          <Text style={[styles.title, { color: textColor }]}>Products</Text>
         </View>
         {isOwnProfile && onAddItem && (
           <Pressable onPress={onAddItem} style={styles.addButton}>
@@ -110,7 +110,7 @@ export default function PortfolioSection({
       {items.length === 0 ? (
         <View style={styles.emptyState}>
           <Text style={[styles.emptyText, { color: colors.mutedText }]}>
-            No portfolio items yet
+            No products yet
           </Text>
         </View>
       ) : (

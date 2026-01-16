@@ -114,6 +114,138 @@
 .container-xl { max-width: var(--page-max-width-xl); }
 .container-2xl { max-width: var(--page-max-width-2xl); }
 
+/* =============================================================================
+   DESKTOP WIDE MODE (2xl: 1440px+)
+   
+   These styles ONLY activate at min-width: 1440px.
+   Everything below this breakpoint remains UNCHANGED.
+   
+   Strategy:
+   - Wider main content area for better horizontal utilization
+   - Optional right rail for related content (YouTube-style)
+   - Text sections stay readable (max-width controlled)
+   - Media/grids can expand wider than text
+============================================================================= */
+
+/* Wide mode tokens - only defined at 2xl+ */
+@media (min-width: 1440px) {
+  :root {
+    /* Wide mode container widths */
+    --wide-max-width: 1600px;
+    --wide-content-max: 1100px;
+    --wide-text-max: 720px;
+    --wide-right-rail-width: 340px;
+    --wide-gutter: 2.5rem;
+  }
+}
+
+/* Wide container - expands at 2xl only */
+@media (min-width: 1440px) {
+  .wide-container {
+    max-width: var(--wide-max-width);
+    margin-left: auto;
+    margin-right: auto;
+    padding-left: var(--wide-gutter);
+    padding-right: var(--wide-gutter);
+  }
+  
+  /* Wide content area (main column in 2-column layout) */
+  .wide-content {
+    max-width: var(--wide-content-max);
+  }
+  
+  /* Readable text width - prevents text from stretching too wide */
+  .wide-text-readable {
+    max-width: var(--wide-text-max);
+  }
+  
+  /* Wide layout with optional right rail */
+  .wide-layout {
+    display: grid;
+    grid-template-columns: 1fr var(--wide-right-rail-width);
+    gap: 2rem;
+    max-width: var(--wide-max-width);
+    margin-left: auto;
+    margin-right: auto;
+  }
+  
+  /* Wide layout single column (no rail) */
+  .wide-layout-single {
+    display: block;
+    max-width: var(--wide-content-max);
+    margin-left: auto;
+    margin-right: auto;
+  }
+  
+  /* Right rail container */
+  .wide-right-rail {
+    width: var(--wide-right-rail-width);
+    flex-shrink: 0;
+  }
+  
+  /* Sticky right rail content */
+  .wide-right-rail-sticky {
+    position: sticky;
+    top: calc(var(--header-height-lg) + 1rem);
+    max-height: calc(100vh - var(--header-height-lg) - 2rem);
+    overflow-y: auto;
+  }
+  
+  /* Video player layout (YouTube-style) */
+  .wide-video-layout {
+    display: grid;
+    grid-template-columns: 1fr var(--wide-right-rail-width);
+    gap: 1.5rem;
+    max-width: var(--wide-max-width);
+    margin-left: auto;
+    margin-right: auto;
+  }
+  
+  /* Video player main area */
+  .wide-video-main {
+    min-width: 0;
+  }
+  
+  /* Video player aspect ratio container */
+  .wide-video-player {
+    aspect-ratio: 16 / 9;
+    width: 100%;
+    background: black;
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+  }
+  
+  /* Video info section below player */
+  .wide-video-info {
+    max-width: var(--wide-text-max);
+    margin-top: 1rem;
+  }
+  
+  /* Comments section */
+  .wide-video-comments {
+    max-width: var(--wide-text-max);
+    margin-top: 1.5rem;
+  }
+  
+  /* Expand PageShell at wide breakpoint when using wide-mode class */
+  .page-shell-wide {
+    max-width: var(--wide-max-width) !important;
+  }
+  
+  /* Grid layouts expand at wide */
+  .wide-grid-3 {
+    grid-template-columns: repeat(3, 1fr);
+  }
+  
+  .wide-grid-4 {
+    grid-template-columns: repeat(4, 1fr);
+  }
+  
+  .wide-grid-5 {
+    grid-template-columns: repeat(5, 1fr);
+  }
+}
+
 /* Responsive grid layouts */
 .grid-auto-fit {
   display: grid;

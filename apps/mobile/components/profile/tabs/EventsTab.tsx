@@ -1,30 +1,88 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, Pressable, ActivityIndicator } from 'react-native';
+import React, { useState, useEffect, useMemo } from 'react';
+import { View, Text, StyleSheet, Pressable, ActivityIndicator, ScrollView, Alert } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { supabase } from '../../../lib/supabase';
-import ModuleEmptyState from '../ModuleEmptyState';
+import AddEventModal from '../AddEventModal';
+import EventsCalendarStrip, { CalendarEvent } from '../EventsCalendarStrip';
 
 interface EventsTabProps {
   profileId: string;
   isOwnProfile?: boolean;
   onAddEvent?: () => void;
   colors: any;
+  cardStyle?: {
+    backgroundColor: string;
+    borderRadius: number;
+    textColor?: string;
+  };
 }
 
 interface Event {
   id: string;
-  title: string;
-  description?: string;
-  event_date?: string;
-  venue_name?: string;
-  venue_location?: string;
-  ticket_url?: string;
+  title: string | null;
+  start_at: string;
+  end_at?: string | null;
+  location?: string | null;
+  url?: string | null;
+  notes?: string | null;
+  sort_order: number;
   created_at: string;
+  profile_id: string;
 }
 
-export default function EventsTab({ profileId, isOwnProfile = false, onAddEvent, colors }: EventsTabProps) {
+export default function EventsTab({ profileId, isOwnProfile = false, onAddEvent, colors, cardStyle }: EventsTabProps) {
   const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showAddModal, setShowAddModal] = useState(false);
+  
+  const calendarEvents: CalendarEvent[] = useMemo(() => 
+    events.map(e => ({
+      id: e.id,
+      title: e.title,
+      start_at: e.start_at,
+      end_at: e.end_at,
+      location: e.location,
+      url: e.url,
+      notes: e.notes,
+      profile_id: e.profile_id || profileId,
+    })), 
+    [events, profileId]
+  );
+  
+  const handleAddEvent = () => {
+    if (onAddEvent) {
+      onAddEvent();
+    } else {
+      setShowAddModal(true);
+    }
+  };
+  
+  const handleEventAdded = () => {
+    loadEvents();
+  };
+  
+  const handleSetReminder = async (event: CalendarEvent) => {
+    try {
+      const { data, error } = await supabase.rpc('set_event_reminder', {
+        p_event_id: event.id,
+      });
+      
+      if (error) throw error;
+      
+      Alert.alert(
+        'Reminder Set',
+        `You'll be notified on ${new Date(event.start_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric' })} about "${event.title || 'this event'}"`,
+        [{ text: 'OK' }]
+      );
+    } catch (error: any) {
+      console.error('Error setting reminder:', error);
+      Alert.alert('Error', 'Could not set reminder. Please try again.');
+    }
+  };
+  
+  // Apply card style
+  const cardBg = cardStyle?.backgroundColor || colors.surface;
+  const cardRadius = cardStyle?.borderRadius || 12;
 
   useEffect(() => {
     loadEvents();
@@ -33,10 +91,10 @@ export default function EventsTab({ profileId, isOwnProfile = false, onAddEvent,
   const loadEvents = async () => {
     try {
       const { data, error } = await supabase
-        .from('profile_comedy_specials')
+        .from('profile_events')
         .select('*')
         .eq('profile_id', profileId)
-        .order('event_date', { ascending: true });
+        .order('start_at', { ascending: true });
 
       if (error) throw error;
       setEvents(data || []);
@@ -47,164 +105,205 @@ export default function EventsTab({ profileId, isOwnProfile = false, onAddEvent,
     }
   };
 
-  const renderEvent = ({ item }: { item: Event }) => (
-    <View style={[styles.eventCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-      <View style={styles.eventHeader}>
-        <View style={[styles.dateBox, { backgroundColor: colors.primary }]}>
-          <Text style={styles.dateMonth}>
-            {item.event_date ? new Date(item.event_date).toLocaleDateString('en-US', { month: 'short' }).toUpperCase() : 'TBA'}
-          </Text>
-          <Text style={styles.dateDay}>
-            {item.event_date ? new Date(item.event_date).getDate() : '--'}
-          </Text>
-        </View>
-        <View style={styles.eventInfo}>
-          <Text style={[styles.eventTitle, { color: colors.text }]}>
-            {item.title}
-          </Text>
-          {item.venue_name && (
-            <View style={styles.venueRow}>
-              <Feather name="map-pin" size={14} color={colors.mutedText} />
-              <Text style={[styles.venueText, { color: colors.mutedText }]}>
-                {item.venue_name}
-              </Text>
-            </View>
-          )}
-          {item.venue_location && (
-            <Text style={[styles.locationText, { color: colors.mutedText }]}>
-              {item.venue_location}
-            </Text>
-          )}
-        </View>
-      </View>
-      {item.description && (
-        <Text style={[styles.description, { color: colors.text }]}>
-          {item.description}
-        </Text>
-      )}
-      {item.ticket_url && (
-        <Pressable style={[styles.ticketButton, { backgroundColor: colors.primary }]}>
-          <Feather name="calendar" size={16} color="#fff" />
-          <Text style={styles.ticketButtonText}>Get Tickets</Text>
-        </Pressable>
-      )}
-    </View>
-  );
+  const textColor = cardStyle?.textColor || colors.text;
 
   if (loading) {
     return (
-      <View style={styles.centerContainer}>
-        <ActivityIndicator size="large" color={colors.primary} />
+      <View style={[styles.container, { backgroundColor: cardBg, borderRadius: cardRadius }]}>
+        <ActivityIndicator size="small" color={colors.primary} />
       </View>
-    );
-  }
-
-  if (events.length === 0) {
-    if (!isOwnProfile) {
-      return (
-        <View style={[styles.emptyContainer, { backgroundColor: colors.surface }]}>
-          <Feather name="calendar" size={48} color={colors.mutedText} />
-          <Text style={[styles.emptyText, { color: colors.mutedText }]}>
-            No upcoming events
-          </Text>
-        </View>
-      );
-    }
-    
-    return (
-      <ModuleEmptyState
-        icon="calendar"
-        title="No Events Yet"
-        description="Add your upcoming shows, appearances, or events."
-        ctaLabel="Add Event"
-        onCtaPress={onAddEvent}
-        colors={colors}
-      />
     );
   }
 
   return (
-    <FlatList
-      data={events}
-      renderItem={renderEvent}
-      keyExtractor={(item) => item.id}
-      contentContainerStyle={styles.listContainer}
-      showsVerticalScrollIndicator={false}
-    />
+    <View style={[styles.container, { backgroundColor: cardBg, borderRadius: cardRadius }]}>
+      {/* Header */}
+      <View style={styles.header}>
+        <View style={styles.headerLeft}>
+          <Feather name="calendar" size={20} color={colors.primary} />
+          <Text style={[styles.title, { color: textColor }]}>Events</Text>
+        </View>
+        {isOwnProfile && (
+          <Pressable onPress={handleAddEvent} style={[styles.addButton, { backgroundColor: colors.primary }]}>
+            <Feather name="plus" size={16} color="#fff" />
+            <Text style={styles.addButtonText}>Event</Text>
+          </Pressable>
+        )}
+      </View>
+
+      {/* Calendar Strip - always visible */}
+      <EventsCalendarStrip
+        colors={colors}
+        events={calendarEvents}
+        isOwnProfile={isOwnProfile}
+        onSetReminder={handleSetReminder}
+      />
+      
+      {/* Events list or empty state */}
+      {events.length === 0 ? (
+        <View style={styles.emptyState}>
+          <Feather name="calendar" size={32} color={colors.mutedText} />
+          <Text style={[styles.emptyText, { color: colors.mutedText }]}>
+            {isOwnProfile ? 'No events yet' : 'No upcoming events'}
+          </Text>
+        </View>
+      ) : (
+        <View style={styles.eventsList}>
+          {events.map((item) => {
+            const eventDate = new Date(item.start_at);
+            return (
+              <View key={item.id} style={[styles.eventCard, { borderColor: colors.border }]}>
+                <View style={styles.eventRow}>
+                  <View style={[styles.dateBox, { backgroundColor: colors.primary }]}>
+                    <Text style={styles.dateMonth}>
+                      {eventDate.toLocaleDateString('en-US', { month: 'short' }).toUpperCase()}
+                    </Text>
+                    <Text style={styles.dateDay}>
+                      {eventDate.getDate()}
+                    </Text>
+                  </View>
+                  <View style={styles.eventInfo}>
+                    <Text style={[styles.eventTitle, { color: colors.text }]} numberOfLines={1}>
+                      {item.title || 'Untitled Event'}
+                    </Text>
+                    {item.location && (
+                      <View style={styles.venueRow}>
+                        <Feather name="map-pin" size={12} color={colors.mutedText} />
+                        <Text style={[styles.venueText, { color: colors.mutedText }]} numberOfLines={1}>
+                          {item.location}
+                        </Text>
+                      </View>
+                    )}
+                    <Text style={[styles.timeText, { color: colors.mutedText }]}>
+                      {eventDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+                    </Text>
+                  </View>
+                </View>
+                {item.url && (
+                  <Pressable style={[styles.detailsButton, { backgroundColor: colors.primary }]}>
+                    <Feather name="external-link" size={14} color="#fff" />
+                    <Text style={styles.detailsButtonText}>View Details</Text>
+                  </Pressable>
+                )}
+              </View>
+            );
+          })}
+        </View>
+      )}
+      
+      <AddEventModal
+        visible={showAddModal}
+        onClose={() => setShowAddModal(false)}
+        onEventAdded={handleEventAdded}
+        colors={colors}
+      />
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  listContainer: {
-    paddingBottom: 16,
-  },
-  centerContainer: {
-    padding: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  emptyContainer: {
-    padding: 40,
+  container: {
+    padding: 16,
     borderRadius: 12,
+    marginBottom: 16,
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 16,
   },
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  title: {
+    fontSize: 18,
+    fontWeight: '600',
+  },
+  addButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 20,
+  },
+  addButtonText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  emptyState: {
+    paddingVertical: 24,
+    alignItems: 'center',
+  },
   emptyText: {
-    fontSize: 16,
-    marginTop: 12,
+    fontSize: 14,
+    marginTop: 8,
+  },
+  eventsList: {
+    gap: 12,
   },
   eventCard: {
-    borderRadius: 12,
-    borderWidth: 1,
-    padding: 16,
-    marginBottom: 12,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
   },
-  eventHeader: {
+  eventRow: {
     flexDirection: 'row',
-    marginBottom: 12,
+    alignItems: 'center',
+    gap: 12,
   },
   dateBox: {
-    width: 60,
-    height: 60,
+    width: 48,
+    height: 48,
     borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 12,
   },
   dateMonth: {
-    fontSize: 12,
+    fontSize: 10,
     fontWeight: '700',
     color: '#fff',
   },
   dateDay: {
-    fontSize: 24,
-    fontWeight: '700',
+    fontSize: 18,
+    fontWeight: '800',
     color: '#fff',
   },
   eventInfo: {
     flex: 1,
+    gap: 2,
   },
   eventTitle: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '600',
-    marginBottom: 4,
   },
   venueRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    marginBottom: 2,
   },
   venueText: {
-    fontSize: 14,
-  },
-  locationText: {
     fontSize: 13,
   },
-  description: {
-    fontSize: 14,
-    lineHeight: 20,
-    marginBottom: 12,
+  timeText: {
+    fontSize: 12,
+  },
+  detailsButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 8,
+    borderRadius: 8,
+    marginTop: 10,
+  },
+  detailsButtonText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '600',
   },
   ticketButton: {
     flexDirection: 'row',

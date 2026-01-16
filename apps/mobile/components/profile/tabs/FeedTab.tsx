@@ -1,9 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, FlatList, Image, Pressable, ActivityIndicator } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { Video, ResizeMode } from 'expo-av';
 import { supabase } from '../../../lib/supabase';
+import { useAuth } from '../../../state/AuthContext';
 import ModuleEmptyState from '../ModuleEmptyState';
+import FeedComposerModal from '../../feed/FeedComposerModal';
 
 function getMediaKindFromUrl(url: string): 'image' | 'video' {
   const clean = url.split('?')[0] ?? url;
@@ -14,9 +16,15 @@ function getMediaKindFromUrl(url: string): 'image' | 'video' {
 
 interface FeedTabProps {
   profileId: string;
+  profileUsername?: string;
   isOwnProfile?: boolean;
   onAddPost?: () => void;
   colors: any;
+  cardStyle?: {
+    backgroundColor: string;
+    borderRadius: number;
+    textColor?: string;
+  };
 }
 
 interface Post {
@@ -35,15 +43,21 @@ interface Post {
   };
 }
 
-export default function FeedTab({ profileId, isOwnProfile = false, onAddPost, colors }: FeedTabProps) {
+export default function FeedTab({ profileId, profileUsername, isOwnProfile = false, onAddPost, colors, cardStyle }: FeedTabProps) {
+  const { user } = useAuth();
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showComposerModal, setShowComposerModal] = useState(false);
+  
+  // Apply card style
+  const cardBg = cardStyle?.backgroundColor || colors.surface;
+  const cardRadius = cardStyle?.borderRadius || 12;
+  const textColor = cardStyle?.textColor || colors.text;
 
-  useEffect(() => {
-    loadPosts();
-  }, [profileId]);
+  // Check if current user can post (either own profile or viewer posting to someone's page)
+  const canPost = Boolean(user);
 
-  const loadPosts = async () => {
+  const loadPosts = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from('posts')
@@ -69,10 +83,14 @@ export default function FeedTab({ profileId, isOwnProfile = false, onAddPost, co
     } finally {
       setLoading(false);
     }
-  };
+  }, [profileId]);
+
+  useEffect(() => {
+    loadPosts();
+  }, [loadPosts]);
 
   const renderPost = ({ item }: { item: Post }) => (
-    <View style={[styles.postCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+    <View style={[styles.postCard, { backgroundColor: cardBg, borderColor: colors.border, borderRadius: cardRadius }]}>
       <View style={styles.postHeader}>
         <Image
           source={{ uri: item.profiles?.avatar_url || undefined }}
@@ -152,7 +170,7 @@ export default function FeedTab({ profileId, isOwnProfile = false, onAddPost, co
   if (posts.length === 0) {
     if (!isOwnProfile) {
       return (
-        <View style={[styles.emptyContainer, { backgroundColor: colors.surface }]}>
+        <View style={[styles.emptyContainer, { backgroundColor: cardBg }]}>
           <Feather name="file-text" size={48} color={colors.mutedText} />
           <Text style={[styles.emptyText, { color: colors.mutedText }]}>
             No posts yet
@@ -166,18 +184,44 @@ export default function FeedTab({ profileId, isOwnProfile = false, onAddPost, co
         icon="file-text"
         title="No Posts Yet"
         description="Share updates, photos, and thoughts with your followers."
-        ctaLabel="Create Post"
+        ctaLabel="Add Post"
         onCtaPress={onAddPost}
         colors={colors}
+        cardStyle={cardStyle}
       />
     );
   }
 
   return (
     <View style={styles.listContainer}>
+      {/* Composer trigger - visible to any logged-in user */}
+      {canPost && (
+        <Pressable
+          onPress={() => setShowComposerModal(true)}
+          style={[styles.composerTrigger, { backgroundColor: cardBg, borderColor: colors.border, borderRadius: cardRadius }]}
+        >
+          <View style={[styles.composerAvatar, { backgroundColor: colors.primary }]}>
+            <Feather name="edit-2" size={16} color="#fff" />
+          </View>
+          <Text style={[styles.composerPlaceholder, { color: colors.mutedText }]}>
+            {isOwnProfile ? "What's on your mind?" : `Write something to ${profileUsername || 'this user'}...`}
+          </Text>
+        </Pressable>
+      )}
+
       {posts.map((item) => (
         <View key={item.id}>{renderPost({ item })}</View>
       ))}
+
+      {/* Composer Modal */}
+      <FeedComposerModal
+        visible={showComposerModal}
+        onClose={() => setShowComposerModal(false)}
+        onPostCreated={() => {
+          setShowComposerModal(false);
+          loadPosts();
+        }}
+      />
     </View>
   );
 }
@@ -185,6 +229,25 @@ export default function FeedTab({ profileId, isOwnProfile = false, onAddPost, co
 const styles = StyleSheet.create({
   listContainer: {
     paddingBottom: 16,
+  },
+  composerTrigger: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    borderWidth: 1,
+    marginBottom: 12,
+    gap: 12,
+  },
+  composerAvatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  composerPlaceholder: {
+    flex: 1,
+    fontSize: 14,
   },
   centerContainer: {
     padding: 40,

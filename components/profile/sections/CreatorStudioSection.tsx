@@ -55,6 +55,7 @@ interface CreatorStudioSectionProps {
   isOwner?: boolean;
   cardStyle?: React.CSSProperties;
   borderRadiusClass?: string;
+  buttonColor?: string;
 }
 
 function getItemTypeIcon(type: CreatorStudioItemType) {
@@ -145,6 +146,23 @@ function ItemCard({
           </p>
         )}
 
+        {/* Tags/Categories for Movies & Education */}
+        {item.tags && item.tags.length > 0 && (
+          <div className="flex flex-wrap gap-1 mb-2">
+            {item.tags.slice(0, 3).map((tag, idx) => (
+              <span
+                key={idx}
+                className="px-2 py-0.5 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 text-[10px] font-medium rounded-full"
+              >
+                #{tag}
+              </span>
+            ))}
+            {item.tags.length > 3 && (
+              <span className="text-[10px] text-gray-400">+{item.tags.length - 3}</span>
+            )}
+          </div>
+        )}
+
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3 text-xs text-gray-500 dark:text-gray-400">
             {item.likes_count > 0 && (
@@ -183,6 +201,7 @@ export default function CreatorStudioSection({
   isOwner = false,
   cardStyle,
   borderRadiusClass = 'rounded-2xl',
+  buttonColor = '#DB2777',
 }: CreatorStudioSectionProps) {
   const { items, loading, error } = useCreatorStudioItems({
     profileId,
@@ -202,7 +221,7 @@ export default function CreatorStudioSection({
   if (loading) {
     return (
       <div
-        className={`backdrop-blur-sm ${borderRadiusClass} p-6 border border-gray-200/50 dark:border-gray-700/50 shadow-lg mb-6`}
+        className={`${borderRadiusClass} p-6 border border-gray-200/50 dark:border-gray-700/50 shadow-lg mb-6 bg-white/80 dark:bg-gray-800/80`}
         style={cardStyle}
       >
         <h2 className="text-lg font-bold mb-4">{title}</h2>
@@ -239,19 +258,13 @@ export default function CreatorStudioSection({
   };
 
   const getAddLabel = () => {
-    switch (itemType) {
-      case 'podcast': return '+ Add Podcast';
-      case 'movie': return '+ Add Movie';
-      case 'education': return '+ Add Education';
-      case 'series_episode': return '+ Create Series';
-      default: return '+ Upload Content';
-    }
+    return '+ Creator Studio';
   };
 
   if (items.length === 0) {
     return (
       <div
-        className={`backdrop-blur-sm ${borderRadiusClass} p-6 border border-gray-200/50 dark:border-gray-700/50 shadow-lg mb-6`}
+        className={`${borderRadiusClass} p-6 border border-gray-200/50 dark:border-gray-700/50 shadow-lg mb-6 bg-white/80 dark:bg-gray-800/80`}
         style={cardStyle}
       >
         <h2 className="text-lg font-bold mb-4">{title}</h2>
@@ -261,9 +274,11 @@ export default function CreatorStudioSection({
           {isOwner && (
             <Link
               href={getUploadUrl()}
-              className="inline-block mt-4 px-4 py-2 bg-purple-600 text-white rounded-lg text-sm font-medium hover:bg-purple-700 transition"
+              className="inline-flex items-center gap-1.5 mt-4 px-5 py-2.5 text-sm font-semibold rounded-full text-white transition-opacity hover:opacity-80"
+              style={{ backgroundColor: buttonColor }}
             >
-              {getAddLabel()}
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+              Creator Studio
             </Link>
           )}
         </div>
@@ -273,7 +288,7 @@ export default function CreatorStudioSection({
 
   return (
     <div
-      className={`backdrop-blur-sm ${borderRadiusClass} p-6 border border-gray-200/50 dark:border-gray-700/50 shadow-lg mb-6`}
+      className={`${borderRadiusClass} p-6 border border-gray-200/50 dark:border-gray-700/50 shadow-lg mb-6 bg-white/80 dark:bg-gray-800/80`}
       style={cardStyle}
     >
       <div className="flex items-center justify-between mb-4">
@@ -281,9 +296,11 @@ export default function CreatorStudioSection({
         {isOwner && (
           <Link
             href={getUploadUrl()}
-            className="text-sm text-purple-600 dark:text-purple-400 hover:underline"
+            className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-semibold rounded-full text-white transition-opacity hover:opacity-80"
+            style={{ backgroundColor: buttonColor }}
           >
-            {getAddLabel()}
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+            Creator Studio
           </Link>
         )}
       </div>

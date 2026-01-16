@@ -18,6 +18,7 @@ export default function AppMenus() {
   const leftItems = useMemo<SlideMenuItem[]>(
     () => [
       { key: 'owner', label: 'Owner Panel', onPress: () => navTo('OwnerPanelScreen') },
+      { key: 'replay', label: '🍿 Replay', onPress: () => navTo('ReplayScreen') },
       { key: 'watch', label: 'Watch', onPress: () => navToTab('Watch') },
       { key: 'home', label: 'Home', onPress: () => navToTab('Home') },
       { key: 'feed', label: 'Feed', onPress: () => navToTab('Feed') },

@@ -32,8 +32,8 @@ const OPTIONAL_TABS: Record<string, TabMetadata> = {
   },
   reels: {
     id: 'reels',
-    label: 'Reels',
-    description: 'Short-form video content',
+    label: 'Vlogs',
+    description: 'Short videos throughout your day to keep fans updated.',
   },
   photos: {
     id: 'photos',
@@ -64,6 +64,11 @@ const OPTIONAL_TABS: Record<string, TabMetadata> = {
   },
   
   // Creator Studio Content Tabs
+  username_tv: {
+    id: 'username_tv',
+    label: '[Username]TV',
+    description: 'All long-form video content hub',
+  },
   podcasts: {
     id: 'podcasts',
     label: 'Podcasts',
@@ -83,6 +88,16 @@ const OPTIONAL_TABS: Record<string, TabMetadata> = {
     id: 'education',
     label: 'Education',
     description: 'Tutorials & courses',
+  },
+  comedy: {
+    id: 'comedy',
+    label: 'Comedy',
+    description: 'Stand-up specials & comedy clips',
+  },
+  playlists: {
+    id: 'playlists',
+    label: 'Playlists',
+    description: 'Curated YouTube video playlists',
   },
 };
 

@@ -25,10 +25,20 @@
 'use client';
 
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
+import Link from 'next/link';
+import { Play, Music, Film } from 'lucide-react';
 import { createClient } from '@/lib/supabase';
 import { uploadProfileMedia } from '@/lib/storage';
-import VideoPlaylistPlayer, { type VideoPlaylistItem } from './VideoPlaylistPlayer';
 import { useCreatorStudioItems, type CreatorStudioItem } from '@/hooks/useCreatorStudioItems';
+
+type VideoPlaylistItem = {
+  id: string;
+  title: string;
+  video_type: 'upload' | 'youtube';
+  video_url: string;
+  youtube_id?: string | null;
+  thumbnail_url?: string | null;
+};
 
 type VideoType = 'upload' | 'youtube';
 
@@ -56,6 +66,7 @@ type Props = {
   borderRadiusClass?: string;
   /** Username of the artist (for gifting) */
   artistUsername?: string;
+  buttonColor?: string;
 };
 
 function getYoutubeIdFromUrl(url: string): string | null {
@@ -86,7 +97,10 @@ async function uploadToProfileMedia(profileId: string, videoId: string, file: Fi
   return uploadProfileMedia(profileId, relPath, file, { upsert });
 }
 
-export default function MusicVideos({ profileId, isOwner, cardStyle, borderRadiusClass = 'rounded-2xl', artistUsername }: Props) {
+export default function MusicVideos({ profileId, isOwner, cardStyle, borderRadiusClass = 'rounded-2xl', artistUsername, buttonColor = '#DB2777' }: Props) {
+  // Pill button style for Creator Studio link
+  const pillButtonClass = "inline-flex items-center gap-1.5 px-4 py-2 text-sm font-semibold rounded-full text-white transition-opacity hover:opacity-80";
+  const pillButtonLightClass = "inline-flex items-center gap-1.5 px-4 py-2 text-sm font-semibold rounded-full transition-opacity hover:opacity-80";
   const supabase = useMemo(() => createClient(), []);
 
   const [loading, setLoading] = useState(true);
@@ -234,53 +248,115 @@ export default function MusicVideos({ profileId, isOwner, cardStyle, borderRadiu
     return match?.[1] || null;
   }
 
+  // Get YouTube thumbnail URL
+  const getYoutubeThumbnail = (item: VideoPlaylistItem): string | null => {
+    const videoId = item.youtube_id || getYoutubeIdFromUrl(item.video_url);
+    return videoId ? `https://img.youtube.com/vi/${videoId}/hqdefault.jpg` : null;
+  };
+
+  // Build replay URL for video (canonical long-form player)
+  const getWatchUrl = (item: VideoPlaylistItem): string => {
+    if (!artistUsername) return '#';
+    // Creator Studio items use music-video route, legacy items use replay route
+    if (creatorStudioIds.has(item.id)) {
+      return `/${artistUsername}/music-video/${item.id}`;
+    }
+    return `/replay/${artistUsername}/${item.id}`;
+  };
+
   return (
     <>
-      {(loading || csLoading) ? (
-        <div
-          className={`backdrop-blur-sm ${borderRadiusClass} p-6 border border-gray-200/50 dark:border-gray-700/50 shadow-lg mb-6`}
-          style={cardStyle}
-        >
+      <div
+        className={`${borderRadiusClass} p-4 border border-gray-200/50 dark:border-gray-700/50 shadow-lg mb-6 bg-white/80 dark:bg-gray-800/80`}
+        style={cardStyle}
+      >
+        {/* Header with Creator Studio button */}
+        {isOwner && hasAny && (
+          <div className="flex justify-end mb-3">
+            <Link
+              href="/creator-studio/upload?type=music_video"
+              className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-semibold rounded-full text-white transition-opacity hover:opacity-80"
+              style={{ backgroundColor: buttonColor }}
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+              Creator Studio
+            </Link>
+          </div>
+        )}
+
+        {/* Loading state */}
+        {(loading || csLoading) && (
           <div className="py-10 text-center text-gray-600 dark:text-gray-400">Loading videos…</div>
-        </div>
-      ) : (
-        <VideoPlaylistPlayer
-          title="🎬 Music Videos"
-          items={playlistItems}
-          isOwner={isOwner}
-          onAdd={openAdd}
-          onEdit={(it) => {
-            // Only allow editing legacy items (not Creator Studio items)
-            if (creatorStudioIds.has(it.id)) return;
-            const row = rows.find((r) => r.id === it.id);
-            if (row) openEdit(row);
-          }}
-          onDelete={async (it) => {
-            // Only allow deleting legacy items (not Creator Studio items)
-            if (creatorStudioIds.has(it.id)) {
-              alert('To delete Creator Studio items, use the Creator Studio dashboard.');
-              return;
-            }
-            if (!confirm('Delete this video?')) return;
-            try {
-              const { error } = await supabase.rpc('delete_music_video', { p_id: it.id });
-              if (error) throw error;
-              await load();
-            } catch (e) {
-              console.error('[MusicVideos] delete failed', e);
-              alert('Failed to delete video.');
-            }
-          }}
-          cardStyle={cardStyle}
-          borderRadiusClass={borderRadiusClass}
-          emptyTitle="No Music Videos Yet"
-          emptyText="Add an uploaded video or a YouTube URL so fans can watch in-app."
-          emptyOwnerCTA="+ Add Video"
-          artistProfileId={profileId}
-          artistUsername={artistUsername}
-          itemLinkBuilder={itemLinkBuilder}
-        />
-      )}
+        )}
+
+        {/* Empty state */}
+        {!loading && !csLoading && !hasAny && (
+          <div className="text-center py-12">
+            <Film className="w-16 h-16 text-gray-400 dark:text-gray-600 mx-auto mb-4" />
+            <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2">No Music Videos Yet</h3>
+            <p className="text-gray-600 dark:text-gray-400 mb-4">Add videos so fans can watch in-app.</p>
+            {isOwner && (
+              <Link
+                href="/creator-studio/upload?type=music_video"
+                className="inline-flex items-center gap-1.5 px-5 py-2.5 text-sm font-semibold rounded-full text-white transition-opacity hover:opacity-80"
+                style={{ backgroundColor: buttonColor }}
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+                Creator Studio
+              </Link>
+            )}
+          </div>
+        )}
+
+        {/* Video Grid - 3 columns matching mobile */}
+        {!loading && !csLoading && hasAny && (
+          <div className="grid grid-cols-3 gap-0.5">
+            {playlistItems.map((item) => {
+              const thumbnailUrl = item.thumbnail_url || getYoutubeThumbnail(item);
+              const watchUrl = getWatchUrl(item);
+              
+              return (
+                <Link
+                  key={item.id}
+                  href={watchUrl}
+                  className="relative aspect-square bg-gray-900 overflow-hidden group"
+                >
+                  {/* Thumbnail */}
+                  {thumbnailUrl ? (
+                    <img
+                      src={thumbnailUrl}
+                      alt={item.title}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center bg-gray-800">
+                      <Music className="w-8 h-8 text-gray-500" />
+                    </div>
+                  )}
+                  
+                  {/* Play overlay */}
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/20 group-hover:bg-black/40 transition-colors">
+                    <div 
+                      className="w-10 h-10 rounded-full flex items-center justify-center text-white opacity-90 group-hover:opacity-100 transition-opacity"
+                      style={{ backgroundColor: buttonColor }}
+                    >
+                      <Play className="w-5 h-5 ml-0.5" fill="currentColor" />
+                    </div>
+                  </div>
+                  
+                  {/* Music badge */}
+                  <div 
+                    className="absolute top-1.5 left-1.5 w-5 h-5 rounded-full flex items-center justify-center"
+                    style={{ backgroundColor: buttonColor }}
+                  >
+                    <Music className="w-2.5 h-2.5 text-white" />
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
+        )}
+      </div>
 
       {/* Add/Edit Modal */}
       {showModal && (
@@ -438,7 +514,8 @@ export default function MusicVideos({ profileId, isOwner, cardStyle, borderRadiu
                   Cancel
                 </button>
                 <button
-                  className="px-4 py-2 rounded-lg text-sm font-bold bg-purple-600 hover:bg-purple-700 text-white disabled:opacity-60"
+                  className="px-4 py-2 rounded-lg text-sm font-bold text-white disabled:opacity-60 transition-opacity hover:opacity-80"
+                  style={{ backgroundColor: buttonColor }}
                   disabled={saving}
                   onClick={async () => {
                     const title = formTitle.trim();

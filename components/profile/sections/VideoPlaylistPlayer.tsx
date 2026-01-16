@@ -34,6 +34,7 @@ type Props = {
   artistUsername?: string;
   /** Optional function to build canonical URL for an item */
   itemLinkBuilder?: (item: VideoPlaylistItem) => string | null;
+  buttonColor?: string;
 };
 
 declare global {
@@ -105,6 +106,7 @@ export default function VideoPlaylistPlayer({
   artistProfileId,
   artistUsername,
   itemLinkBuilder,
+  buttonColor = '#DB2777',
 }: Props) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -272,16 +274,18 @@ export default function VideoPlaylistPlayer({
   const headerRight = isOwner && onAdd ? (
     <button
       onClick={onAdd}
-      className="text-sm font-semibold text-purple-600 hover:text-purple-700 dark:text-purple-400 dark:hover:text-purple-300"
+      className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-semibold rounded-full text-white transition-opacity hover:opacity-80"
+      style={{ backgroundColor: buttonColor }}
     >
-      + Add
+      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+      Creator Studio
     </button>
   ) : null;
 
   if (!items.length) {
     return (
       <div
-        className={`backdrop-blur-sm ${borderRadiusClass} p-6 border border-gray-200/50 dark:border-gray-700/50 shadow-lg mb-6`}
+        className={`${borderRadiusClass} p-6 border border-gray-200/50 dark:border-gray-700/50 shadow-lg mb-6 bg-white/80 dark:bg-gray-800/80`}
         style={cardStyle}
       >
         <div className="flex items-center justify-between mb-4">
@@ -299,9 +303,11 @@ export default function VideoPlaylistPlayer({
           {isOwner && onAdd && (
             <button
               onClick={onAdd}
-              className="px-6 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-semibold transition-colors"
+              className="inline-flex items-center gap-1.5 px-5 py-2.5 text-sm font-semibold rounded-full text-white transition-opacity hover:opacity-80"
+              style={{ backgroundColor: buttonColor }}
             >
-              {emptyOwnerCTA}
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+              Creator Studio
             </button>
           )}
         </div>

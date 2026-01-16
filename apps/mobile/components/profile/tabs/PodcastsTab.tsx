@@ -1,7 +1,16 @@
+/**
+ * PodcastsTab - Podcasts Content Profile Tab (Mobile)
+ * 
+ * Displays podcast episodes.
+ * 
+ * REAL DATA: Fetches from creator_studio_items via get_public_creator_studio_items RPC
+ */
+
 import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
+import { supabase } from '../../../lib/supabase';
 
 type PodcastItem = {
   id: string;
@@ -16,11 +25,20 @@ interface PodcastsTabProps {
   profileId: string;
   colors: any;
   isOwnProfile?: boolean;
+  cardStyle?: {
+    backgroundColor: string;
+    borderRadius: number;
+    textColor?: string;
+  };
 }
 
-export default function PodcastsTab({ profileId, colors, isOwnProfile = false }: PodcastsTabProps) {
+export default function PodcastsTab({ profileId, colors, isOwnProfile = false, cardStyle }: PodcastsTabProps) {
   const navigation = useNavigation<any>();
   const [loading, setLoading] = useState(true);
+  
+  // Apply card style
+  const cardBg = cardStyle?.backgroundColor || colors.surface;
+  const cardRadius = cardStyle?.borderRadius || 12;
   const [error, setError] = useState<string | null>(null);
   const [podcasts, setPodcasts] = useState<PodcastItem[]>([]);
 
@@ -28,11 +46,47 @@ export default function PodcastsTab({ profileId, colors, isOwnProfile = false }:
     setLoading(true);
     setError(null);
     try {
-      // API endpoint: GET /api/profile/:profileId/podcasts
-      // Will be implemented by web team
-      setPodcasts([]);
+      const { data, error: rpcError } = await supabase.rpc('get_public_creator_studio_items', {
+        p_profile_id: profileId,
+        p_item_type: 'podcast',
+        p_limit: 50,
+        p_offset: 0,
+      });
+      
+      if (rpcError) {
+        console.error('Error fetching podcasts:', rpcError);
+        setPodcasts([]);
+        return;
+      }
+      
+      if (!data || data.length === 0) {
+        setPodcasts([]);
+        return;
+      }
+      
+      const formatDuration = (seconds: number): string => {
+        if (!seconds || seconds <= 0) return '0:00';
+        const hours = Math.floor(seconds / 3600);
+        const minutes = Math.floor((seconds % 3600) / 60);
+        if (hours > 0) {
+          return `${hours}h ${minutes}m`;
+        }
+        return `${minutes}m`;
+      };
+      
+      const transformedPodcasts: PodcastItem[] = data.map((item: any) => ({
+        id: item.id,
+        title: item.title || 'Untitled',
+        description: item.description || '',
+        duration: formatDuration(item.duration_seconds || 0),
+        episodeNumber: item.episode_number,
+        publishedAt: item.created_at,
+      }));
+      
+      setPodcasts(transformedPodcasts);
     } catch (e: any) {
       setError(e?.message || 'Failed to load podcasts');
+      setPodcasts([]);
     } finally {
       setLoading(false);
     }
@@ -43,12 +97,9 @@ export default function PodcastsTab({ profileId, colors, isOwnProfile = false }:
   }, [fetchPodcasts]);
 
   const handlePodcastPress = useCallback((item: PodcastItem) => {
-    navigation.navigate('LongFormPlayerScreen', {
-      contentId: item.id,
-      contentType: 'podcast',
-      title: item.title,
-    });
-  }, [navigation]);
+    // TODO: Implement modal player like PlaylistsTab
+    console.log('Podcast pressed:', item.id);
+  }, []);
 
   if (loading) {
     return (
@@ -76,9 +127,9 @@ export default function PodcastsTab({ profileId, colors, isOwnProfile = false }:
 
   if (podcasts.length === 0) {
     return (
-      <View style={[styles.centered, { backgroundColor: colors.bg }]}>
-        <View style={[styles.emptyIcon, { backgroundColor: 'rgba(236,72,153,0.1)' }]}>
-          <Ionicons name="mic-outline" size={32} color="#EC4899" />
+      <View style={[styles.centered, { backgroundColor: cardBg, borderRadius: cardRadius }]}>
+        <View style={[styles.emptyIcon, { backgroundColor: `${colors.primary}15` }]}>
+          <Ionicons name="mic-outline" size={32} color={colors.primary} />
         </View>
         <Text style={[styles.emptyTitle, { color: colors.text }]}>No Podcasts Yet</Text>
         <Text style={[styles.emptySubtitle, { color: colors.mutedText }]}>
@@ -88,10 +139,10 @@ export default function PodcastsTab({ profileId, colors, isOwnProfile = false }:
           <Pressable
             accessibilityRole="button"
             onPress={() => navigation.navigate('CreatorStudioUploadScreen', { defaultType: 'podcast' })}
-            style={({ pressed }) => [styles.addBtn, pressed && styles.pressed]}
+            style={({ pressed }) => [styles.addBtn, { backgroundColor: colors.primary }, pressed && styles.pressed]}
           >
             <Ionicons name="add" size={18} color="#FFFFFF" />
-            <Text style={styles.addBtnText}>Add Podcast</Text>
+            <Text style={styles.addBtnText}>Creator Studio</Text>
           </Pressable>
         )}
       </View>
@@ -109,7 +160,7 @@ export default function PodcastsTab({ profileId, colors, isOwnProfile = false }:
           onPress={() => handlePodcastPress(item)}
           style={({ pressed }) => [
             styles.podcastCard,
-            { backgroundColor: colors.surface, borderColor: colors.border },
+            { backgroundColor: cardBg, borderColor: colors.border, borderRadius: cardRadius },
             pressed && styles.pressed,
           ]}
         >
@@ -211,10 +262,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 6,
     marginTop: 16,
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 12,
-    backgroundColor: '#EC4899',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
   },
   addBtnText: {
     fontSize: 14,

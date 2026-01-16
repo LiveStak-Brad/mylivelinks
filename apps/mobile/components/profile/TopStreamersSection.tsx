@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, Image, Pressable, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, Image, Pressable } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 
 interface TopStreamer {
@@ -11,6 +11,7 @@ interface TopStreamer {
   diamonds_earned_lifetime: number;
   peak_viewers: number;
   total_streams: number;
+  total_gifted_to?: number; // How much this profile has sent to them
 }
 
 interface TopStreamersSectionProps {
@@ -23,6 +24,12 @@ interface TopStreamersSectionProps {
     textColor?: string;
   };
 }
+
+const PODIUM_COLORS = {
+  gold: '#FFD700',
+  silver: '#C0C0C0',
+  bronze: '#CD7F32',
+};
 
 export default function TopStreamersSection({
   streamers,
@@ -38,10 +45,85 @@ export default function TopStreamersSection({
     return null;
   }
 
-  const formatAmount = (amount: number) => {
-    if (amount >= 1000000) return `${(amount / 1000000).toFixed(1)}M`;
-    if (amount >= 1000) return `${(amount / 1000).toFixed(1)}K`;
-    return amount.toString();
+  const formatAmount = (amount: number | undefined | null) => {
+    const val = amount ?? 0;
+    if (val >= 1000000) return `${(val / 1000000).toFixed(1)}M`;
+    if (val >= 1000) return `${(val / 1000).toFixed(1)}K`;
+    return val.toString();
+  };
+
+  // Get top 3 streamers
+  const top3 = streamers.slice(0, 3);
+  const first = top3[0];
+  const second = top3[1];
+  const third = top3[2];
+
+  const renderPodiumPlace = (
+    streamer: TopStreamer | undefined,
+    place: 1 | 2 | 3,
+    podiumColor: string,
+    podiumHeight: number,
+    avatarSize: number
+  ) => {
+    if (!streamer) return <View style={{ flex: 1 }} />;
+    
+    const displayName = streamer.display_name || streamer.username;
+    const placeLabels = { 1: '1st', 2: '2nd', 3: '3rd' };
+
+    return (
+      <Pressable
+        style={styles.podiumPlace}
+        onPress={() => onPressProfile(streamer.id, streamer.username)}
+      >
+        {/* Avatar with crown/medal */}
+        <View style={styles.avatarContainer}>
+          {place === 1 && (
+            <View style={styles.crownContainer}>
+              <Text style={styles.crownEmoji}>👑</Text>
+            </View>
+          )}
+          <Image
+            source={{ uri: streamer.avatar_url || undefined }}
+            style={[
+              styles.avatar,
+              { 
+                width: avatarSize, 
+                height: avatarSize, 
+                borderRadius: avatarSize / 2,
+                borderWidth: 3,
+                borderColor: podiumColor,
+              }
+            ]}
+          />
+          {/* Live badge */}
+          {streamer.is_live && (
+            <View style={styles.liveBadge}>
+              <View style={styles.liveDot} />
+              <Text style={styles.liveText}>LIVE</Text>
+            </View>
+          )}
+          {/* Place badge */}
+          <View style={[styles.placeBadge, { backgroundColor: podiumColor }]}>
+            <Text style={styles.placeText}>{placeLabels[place]}</Text>
+          </View>
+        </View>
+
+        {/* Name */}
+        <Text style={[styles.name, { color: textColor }]} numberOfLines={1}>
+          {displayName}
+        </Text>
+
+        {/* Amount gifted to this streamer */}
+        <Text style={[styles.amount, { color: colors.primary }]}>
+          {formatAmount(streamer.total_gifted_to ?? streamer.diamonds_earned_lifetime)}
+        </Text>
+
+        {/* Podium block */}
+        <View style={[styles.podiumBlock, { height: podiumHeight, backgroundColor: podiumColor }]}>
+          <Text style={styles.podiumNumber}>{place}</Text>
+        </View>
+      </Pressable>
+    );
   };
 
   return (
@@ -51,46 +133,12 @@ export default function TopStreamersSection({
         <Text style={[styles.title, { color: textColor }]}>Top Streamers</Text>
       </View>
       
-      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-        <View style={styles.streamersRow}>
-          {streamers.map((streamer, index) => {
-            const displayName = streamer.display_name || streamer.username;
-            
-            return (
-              <Pressable
-                key={streamer.id}
-                onPress={() => onPressProfile(streamer.id, streamer.username)}
-                style={styles.streamerCard}
-              >
-                <View style={styles.rankBadge}>
-                  <Text style={styles.rankText}>#{index + 1}</Text>
-                </View>
-                <View style={styles.avatarContainer}>
-                  <Image
-                    source={{ uri: streamer.avatar_url || undefined }}
-                    style={styles.avatar}
-                  />
-                  {streamer.is_live && (
-                    <View style={styles.liveBadge}>
-                      <View style={styles.liveDot} />
-                      <Text style={styles.liveText}>LIVE</Text>
-                    </View>
-                  )}
-                </View>
-                <Text style={[styles.name, { color: colors.text }]} numberOfLines={1}>
-                  {displayName}
-                </Text>
-                <Text style={[styles.amount, { color: colors.primary }]}>
-                  💎 {formatAmount(streamer.diamonds_earned_lifetime)}
-                </Text>
-                <Text style={[styles.stats, { color: colors.mutedText }]}>
-                  {formatAmount(streamer.peak_viewers)} peak • {streamer.total_streams} streams
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
-      </ScrollView>
+      {/* Podium Layout: 2nd - 1st - 3rd */}
+      <View style={styles.podiumContainer}>
+        {renderPodiumPlace(second, 2, PODIUM_COLORS.silver, 50, 60)}
+        {renderPodiumPlace(first, 1, PODIUM_COLORS.gold, 70, 76)}
+        {renderPodiumPlace(third, 3, PODIUM_COLORS.bronze, 40, 56)}
+      </View>
     </View>
   );
 }
@@ -105,81 +153,100 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    marginBottom: 12,
+    marginBottom: 16,
   },
   title: {
     fontSize: 18,
     fontWeight: '600',
   },
-  streamersRow: {
+  podiumContainer: {
     flexDirection: 'row',
-    gap: 12,
+    alignItems: 'flex-end',
+    justifyContent: 'center',
+    paddingTop: 20,
   },
-  streamerCard: {
-    width: 120,
+  podiumPlace: {
+    flex: 1,
     alignItems: 'center',
-    position: 'relative',
-  },
-  rankBadge: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    backgroundColor: '#FFD700',
-    borderRadius: 12,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    zIndex: 1,
-  },
-  rankText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#000',
+    justifyContent: 'flex-end',
   },
   avatarContainer: {
     position: 'relative',
-    marginBottom: 4,
+    marginBottom: 8,
+  },
+  crownContainer: {
+    position: 'absolute',
+    top: -24,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+    zIndex: 10,
+  },
+  crownEmoji: {
+    fontSize: 24,
   },
   avatar: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+    backgroundColor: '#333',
   },
   liveBadge: {
     position: 'absolute',
-    bottom: 0,
-    right: 0,
+    top: -4,
+    right: -4,
     backgroundColor: '#FF0000',
-    borderRadius: 12,
-    paddingHorizontal: 6,
+    borderRadius: 10,
+    paddingHorizontal: 5,
     paddingVertical: 2,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 3,
   },
   liveDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
     backgroundColor: '#fff',
   },
   liveText: {
-    fontSize: 10,
+    fontSize: 8,
     fontWeight: '700',
     color: '#fff',
   },
+  placeBadge: {
+    position: 'absolute',
+    bottom: -8,
+    left: '50%',
+    marginLeft: -18,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+  },
+  placeText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#000',
+  },
   name: {
-    fontSize: 14,
-    fontWeight: '500',
+    fontSize: 13,
+    fontWeight: '600',
     textAlign: 'center',
     marginBottom: 2,
+    maxWidth: 90,
   },
   amount: {
     fontSize: 12,
-    fontWeight: '600',
-    marginBottom: 2,
+    fontWeight: '700',
+    marginBottom: 8,
   },
-  stats: {
-    fontSize: 10,
-    textAlign: 'center',
+  podiumBlock: {
+    width: '90%',
+    borderTopLeftRadius: 8,
+    borderTopRightRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  podiumNumber: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: 'rgba(0,0,0,0.3)',
   },
 });

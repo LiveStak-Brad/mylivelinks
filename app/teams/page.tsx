@@ -580,6 +580,7 @@ export default function TeamsIndexPage() {
         gradientClass="bg-[radial-gradient(circle_at_top,_#1a1035_0%,_#0c0c16_40%,_#050507_100%)]"
         className="text-white"
         contentClassName="py-8 sm:py-10"
+        wideMode
       >
         <div className="space-y-10">
         <header className="glass-panel flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">

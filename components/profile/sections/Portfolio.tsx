@@ -1,14 +1,16 @@
 /**
- * Portfolio Section (Business + Creator)
+ * Products/Shop Section (Business + Creator)
  *
  * IMPORTANT:
  * - No mock data for visitors.
  * - Owner actions must be wired to real forms + persistence via callbacks.
+ * 
+ * NOTE: Renamed from "Portfolio" to "Products" to match mobile naming.
  */
 
 'use client';
 
-import { Briefcase, Pencil, Trash2, ExternalLink, Video as VideoIcon, Image as ImageIcon, Link2 } from 'lucide-react';
+import { ShoppingBag, Pencil, Trash2, ExternalLink, Video as VideoIcon, Image as ImageIcon, Link2 } from 'lucide-react';
 import Image from 'next/image';
 import { getEmptyStateText } from '@/lib/mockDataProviders';
 import type { ProfileType } from '@/lib/profileTypeConfig';
@@ -33,6 +35,7 @@ interface PortfolioProps {
   onDeleteItem?: (itemId: string) => void;
   cardStyle?: React.CSSProperties;
   borderRadiusClass?: string;
+  buttonColor?: string;
 }
 
 export default function Portfolio({
@@ -44,6 +47,7 @@ export default function Portfolio({
   onDeleteItem,
   cardStyle,
   borderRadiusClass = 'rounded-2xl',
+  buttonColor = '#DB2777',
 }: PortfolioProps) {
   const emptyState = getEmptyStateText('portfolio', profileType);
 
@@ -51,26 +55,28 @@ export default function Portfolio({
     if (!isOwner) return null;
     return (
       <div
-        className={`backdrop-blur-sm ${borderRadiusClass} p-6 border border-gray-200/50 dark:border-gray-700/50 shadow-lg mb-6`}
+        className={`${borderRadiusClass} p-6 border border-gray-200/50 dark:border-gray-700/50 shadow-lg mb-6 bg-white/80 dark:bg-gray-800/80`}
         style={cardStyle}
       >
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-xl font-extrabold text-gray-900 dark:text-white flex items-center gap-2">
-            <Briefcase className="w-5 h-5 text-purple-500" />
-            🎨 Portfolio
+            <ShoppingBag className="w-5 h-5 text-purple-500" />
+            🛍️ Products
           </h2>
         </div>
 
         <div className="text-center py-12">
-          <Briefcase className="w-16 h-16 text-gray-400 dark:text-gray-600 mx-auto mb-4" />
-          <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2">{emptyState.title}</h3>
-          <p className="text-gray-600 dark:text-gray-400 mb-4">{emptyState.text}</p>
+          <ShoppingBag className="w-16 h-16 text-gray-400 dark:text-gray-600 mx-auto mb-4" />
+          <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2">No Shop Items Yet</h3>
+          <p className="text-gray-600 dark:text-gray-400 mb-4">Add your shop links or individual product links here.</p>
           {typeof onAddItem === 'function' && (
             <button
               onClick={onAddItem}
-              className="px-6 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-semibold transition-colors"
+              className="inline-flex items-center gap-1.5 px-5 py-2.5 text-sm font-semibold rounded-full text-white transition-opacity hover:opacity-80"
+              style={{ backgroundColor: buttonColor }}
             >
-              {emptyState.ownerCTA || 'Add Portfolio Item'}
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+              Add Product
             </button>
           )}
         </div>
@@ -80,20 +86,22 @@ export default function Portfolio({
 
   return (
     <div
-      className={`backdrop-blur-sm ${borderRadiusClass} p-6 border border-gray-200/50 dark:border-gray-700/50 shadow-lg mb-6`}
+      className={`${borderRadiusClass} p-6 border border-gray-200/50 dark:border-gray-700/50 shadow-lg mb-6 bg-white/80 dark:bg-gray-800/80`}
       style={cardStyle}
     >
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-xl font-extrabold text-gray-900 dark:text-white flex items-center gap-2">
-          <Briefcase className="w-5 h-5 text-purple-500" />
-          🎨 Portfolio
+          <ShoppingBag className="w-5 h-5 text-purple-500" />
+          🛍️ Products
         </h2>
         {isOwner && typeof onAddItem === 'function' && (
           <button
             onClick={onAddItem}
-            className="text-sm font-semibold text-purple-600 hover:text-purple-700 dark:text-purple-400 dark:hover:text-purple-300"
+            className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-semibold rounded-full text-white transition-opacity hover:opacity-80"
+            style={{ backgroundColor: buttonColor }}
           >
-            + Add
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+            Add Product
           </button>
         )}
       </div>

@@ -23,105 +23,97 @@ interface ModuleMetadata {
   category: string;
 }
 
+// AUTHORITATIVE ORDER from Brad's notepad (1-15):
+// 1. Social Links, 2. Custom Links, 3. Top Friends, 4. Tab Bar (not a module),
+// 5. Info/About (always on, profile_stats inside), 6. Top Supporters, 7. Top Streamers,
+// 8. Merchandise, 9. Business Info, 10. Products, 11. Events, 12. Music Tracks,
+// 13. Music Videos/Streaming Stats, 14. Connections, 15. Referral Network
+// NOTE: social_counts belongs in TOP BANNER (not in module list)
+// NOTE: profile_stats is included inside Info/About (not a separate module position)
 const OPTIONAL_MODULES: Record<string, ModuleMetadata> = {
-  // Essential Profile Elements (now customizable!)
-  social_counts: {
-    id: 'social_counts',
-    label: 'Social Counts',
-    description: 'Follower/following/friends counts',
-    category: 'Profile',
-  },
+  // 1. Social Links
   social_media: {
     id: 'social_media',
-    label: 'Social Media Links',
+    label: 'Social Links',
     description: 'Instagram, Twitter, TikTok icons',
     category: 'Profile',
   },
+  // 2. Custom Links
   links: {
     id: 'links',
     label: 'Custom Links',
     description: 'Your Linktree-style link section',
     category: 'Profile',
   },
-  connections: {
-    id: 'connections',
-    label: 'Connections',
-    description: 'Friends and followers display',
-    category: 'Profile',
-  },
-  
-  // Network & Community
-  referral_network: {
-    id: 'referral_network',
-    label: 'Referral Network',
-    description: 'Your referral stats and network tree',
-    category: 'Community',
-  },
+  // 3. Top Friends
   top_friends: {
     id: 'top_friends',
     label: 'Top Friends',
     description: 'Your favorite people',
     category: 'Community',
   },
-  
-  // Music & Entertainment
-  music_showcase: {
-    id: 'music_showcase',
-    label: 'Music Tracks',
-    description: 'Your music library',
-    category: 'Content',
-  },
-  upcoming_events: {
-    id: 'upcoming_events',
-    label: 'Events / Shows',
-    description: 'Your event schedule',
-    category: 'Content',
-  },
-  
-  // Streaming & Stats
-  streaming_stats: {
-    id: 'streaming_stats',
-    label: 'Streaming Stats',
-    description: 'Live hours, viewer counts',
-    category: 'Stats',
-  },
-  profile_stats: {
-    id: 'profile_stats',
-    label: 'Profile Stats',
-    description: 'Account age, join date',
-    category: 'Stats',
-  },
+  // 6. Top Supporters
   top_supporters: {
     id: 'top_supporters',
     label: 'Top Supporters',
     description: 'Users who gifted you',
     category: 'Stats',
   },
+  // 7. Top Streamers
   top_streamers: {
     id: 'top_streamers',
     label: 'Top Streamers',
     description: 'Streamers you support',
     category: 'Stats',
   },
-  
-  // Products & Business
+  // 8. Merchandise
   merchandise: {
     id: 'merchandise',
     label: 'Merchandise',
     description: 'Your merch store',
     category: 'Business',
   },
-  portfolio: {
-    id: 'portfolio',
-    label: 'Portfolio / Products',
-    description: 'Your work showcase',
-    category: 'Business',
-  },
+  // 9. Business Info
   business_info: {
     id: 'business_info',
     label: 'Business Info',
     description: 'Hours, location, contact',
     category: 'Business',
+  },
+  // 10. Products
+  portfolio: {
+    id: 'portfolio',
+    label: 'Products',
+    description: 'Your work showcase',
+    category: 'Business',
+  },
+  // 11. Events
+  upcoming_events: {
+    id: 'upcoming_events',
+    label: 'Events',
+    description: 'Your event schedule',
+    category: 'Content',
+  },
+  // 12. Music Tracks
+  music_showcase: {
+    id: 'music_showcase',
+    label: 'Music Tracks',
+    description: 'Your music library',
+    category: 'Content',
+  },
+  // 13. Streaming Stats (placed after Music Videos per note)
+  streaming_stats: {
+    id: 'streaming_stats',
+    label: 'Streaming Stats',
+    description: 'Live hours, viewer counts',
+    category: 'Stats',
+  },
+  // 15. Referral Network
+  referral_network: {
+    id: 'referral_network',
+    label: 'Referral Network',
+    description: 'Your referral stats and network tree',
+    category: 'Community',
   },
 };
 

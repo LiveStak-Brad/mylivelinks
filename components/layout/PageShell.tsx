@@ -34,6 +34,12 @@ export interface PageShellProps {
   scrollable?: boolean;
   /** ID for the main element (default: 'main' for skip-link accessibility) */
   id?: string;
+  /** 
+   * Enable wide mode at 2xl breakpoint (1440px+).
+   * When true, container expands to use more horizontal space on large desktops.
+   * Has NO EFFECT below 1440px viewport width.
+   */
+  wideMode?: boolean;
 }
 
 // Maps to CSS custom properties from layout.css
@@ -71,6 +77,7 @@ export function PageShell({
   centerVertical = false,
   scrollable = true,
   id = 'main',
+  wideMode = false,
 }: PageShellProps) {
   const paddingClasses = {
     none: '',
@@ -96,6 +103,8 @@ export function PageShell({
     'px-[var(--page-gutter)] sm:px-[var(--page-gutter-sm)] lg:px-[var(--page-gutter-lg)]',
     paddingClasses[padding],
     centerVertical ? 'flex flex-col items-center justify-center min-h-page' : '',
+    // Wide mode: at 2xl+ breakpoint, expand container (CSS handles the breakpoint)
+    wideMode ? 'page-shell-wide' : '',
     contentClassName,
   ].filter(Boolean).join(' ');
 

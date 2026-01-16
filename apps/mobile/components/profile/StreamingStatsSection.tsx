@@ -4,9 +4,13 @@ import { Feather } from '@expo/vector-icons';
 
 interface StreamStats {
   total_streams: number;
+  total_minutes_live: number;
   total_viewers: number;
   peak_viewers: number;
   diamonds_earned_lifetime: number;
+  diamonds_earned_7d: number;
+  followers_gained_from_streams: number;
+  last_stream_at?: string | null;
 }
 
 interface StreamingStatsSectionProps {
@@ -30,6 +34,14 @@ export default function StreamingStatsSection({
   const cardRadius = cardStyle?.borderRadius || 12;
   const textColor = cardStyle?.textColor || colors.text;
   const hasData = stats && stats.total_streams > 0;
+
+  const formatDuration = (minutes: number) => {
+    const hours = Math.floor(minutes / 60);
+    if (hours < 1) return `${minutes}m`;
+    if (hours < 24) return `${hours}h ${minutes % 60}m`;
+    const days = Math.floor(hours / 24);
+    return `${days}d ${hours % 24}h`;
+  };
 
   // Visitor + no data = hide
   if (!hasData && !isOwnProfile) {
@@ -59,9 +71,15 @@ export default function StreamingStatsSection({
           </View>
           <View style={styles.statItem}>
             <Text style={[styles.statValue, { color: colors.primary }]}>
+              {formatDuration(stats.total_minutes_live || 0)}
+            </Text>
+            <Text style={[styles.statLabel, { color: colors.mutedText }]}>Time Live</Text>
+          </View>
+          <View style={styles.statItem}>
+            <Text style={[styles.statValue, { color: colors.primary }]}>
               {stats.total_viewers.toLocaleString()}
             </Text>
-            <Text style={[styles.statLabel, { color: colors.mutedText }]}>Total Viewers</Text>
+            <Text style={[styles.statLabel, { color: colors.mutedText }]}>Total Views</Text>
           </View>
           <View style={styles.statItem}>
             <Text style={[styles.statValue, { color: colors.primary }]}>
@@ -71,9 +89,15 @@ export default function StreamingStatsSection({
           </View>
           <View style={styles.statItem}>
             <Text style={[styles.statValue, { color: colors.primary }]}>
-              {stats.diamonds_earned_lifetime}
+              💎 {(stats.diamonds_earned_lifetime || 0).toLocaleString()}
             </Text>
-            <Text style={[styles.statLabel, { color: colors.mutedText }]}>Diamonds</Text>
+            <Text style={[styles.statLabel, { color: colors.mutedText }]}>Lifetime Diamonds</Text>
+          </View>
+          <View style={styles.statItem}>
+            <Text style={[styles.statValue, { color: colors.primary }]}>
+              💎 {(stats.diamonds_earned_7d || 0).toLocaleString()}
+            </Text>
+            <Text style={[styles.statLabel, { color: colors.mutedText }]}>Last 7 Days</Text>
           </View>
         </View>
       )}

@@ -49,7 +49,7 @@ import LinkSettingsScreen from '../screens/LinkSettingsScreen';
 import LiveHostScreen from '../screens/LiveHostScreen';
 import LiveScreen from '../screens/LiveScreen';
 import LiveUserScreen from '../screens/LiveUserScreen';
-import LongFormPlayerScreen from '../screens/LongFormPlayerScreen';
+import CuratorPlaylistPlayerScreen from '../screens/CuratorPlaylistPlayerScreen';
 import LoginScreen from '../screens/LoginScreen';
 import MllProApplyScreen from '../screens/MllProApplyScreen';
 import MllProScreen from '../screens/MllProScreen';
@@ -96,6 +96,8 @@ import WalletScreen from '../screens/WalletScreen';
 import MediaViewerScreen from '../screens/MediaViewerScreen';
 import BlockedUsersScreen from '../screens/BlockedUsersScreen';
 import PostDetailScreen from '../screens/PostDetailScreen';
+import ReplayScreen from '../screens/ReplayScreen';
+import ReplayPlaylistsScreen from '../screens/ReplayPlaylistsScreen';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Text, View } from 'react-native';
 import { useAuth } from '../state/AuthContext';
@@ -268,7 +270,9 @@ export default function RootNavigator({ header }: { header: () => React.ReactNod
       <RootStack.Screen name="LiveHostScreen" component={LiveHostScreen} />
       <RootStack.Screen name="LiveScreen" component={LiveScreen} />
       <RootStack.Screen name="LiveUserScreen" component={LiveUserScreen} />
-      <RootStack.Screen name="LongFormPlayerScreen" component={LongFormPlayerScreen} />
+      <RootStack.Screen name="ReplayScreen" component={ReplayScreen} />
+      <RootStack.Screen name="ReplayPlaylistsScreen" component={ReplayPlaylistsScreen} />
+      <RootStack.Screen name="CuratorPlaylistPlayerScreen" component={CuratorPlaylistPlayerScreen} />
       <RootStack.Screen name="MessagesScreen" component={MessagesScreen} />
       <RootStack.Screen name="MllProApplyScreen" component={MllProApplyScreen} />
       <RootStack.Screen name="MllProScreen" component={MllProScreen} />

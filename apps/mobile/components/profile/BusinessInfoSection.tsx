@@ -111,7 +111,7 @@ export default function BusinessInfoSection({
           <Feather name="briefcase" size={20} color={colors.primary} />
           <Text style={[styles.title, { color: textColor }]}>Business Info</Text>
         </View>
-        {isOwnProfile && onEdit && (
+        {isOwnProfile && onEdit && hasData && (
           <Pressable onPress={onEdit} style={styles.editButton}>
             <Feather name="edit-2" size={16} color={colors.primary} />
           </Pressable>
@@ -123,6 +123,12 @@ export default function BusinessInfoSection({
           <Text style={[styles.emptyText, { color: colors.mutedText }]}>
             No business information yet
           </Text>
+          {isOwnProfile && onEdit && (
+            <Pressable onPress={onEdit} style={[styles.addButton, { backgroundColor: colors.primary }]}>
+              <Feather name="plus" size={18} color="#FFFFFF" />
+              <Text style={styles.addButtonText}>Business</Text>
+            </Pressable>
+          )}
         </View>
       ) : (
         <View style={styles.content}>
@@ -220,6 +226,20 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 14,
+    marginBottom: 12,
+  },
+  addButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 24,
+    gap: 8,
+  },
+  addButtonText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '600',
   },
   content: {
     gap: 12,

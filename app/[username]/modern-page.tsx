@@ -28,6 +28,9 @@ import {
   Camera,
   Repeat2,
   Bookmark,
+  Tv,
+  Laugh,
+  ListVideo,
 } from 'lucide-react';
 import SocialCountsWidget from '@/components/profile/SocialCountsWidget';
 import TopSupportersWidget from '@/components/profile/TopSupportersWidget';
@@ -71,6 +74,10 @@ import ProfilePhotosClient from '@/components/photos/ProfilePhotosClient';
 import VlogReelsClient from '@/components/profile/VlogReelsClient';
 import ProfileRepostsTab from '@/components/profile/tabs/ProfileRepostsTab';
 import ProfileFavoritesTab from '@/components/profile/tabs/ProfileFavoritesTab';
+import UsernameTVTab from '@/components/profile/tabs/UsernameTVTab';
+import ComedyTab from '@/components/profile/tabs/ComedyTab';
+import SeriesTab from '@/components/profile/tabs/SeriesTab';
+import { PlaylistsTab } from '@/components/playlist';
 import { ReferralProgressModule } from '@/components/referral';
 import ReportModal from '@/components/ReportModal';
 import { ShareModal } from '@/components/ShareModal';
@@ -137,6 +144,8 @@ interface ProfileData {
     location_hidden?: boolean | null;
     location_show_zip?: boolean | null;
     location_updated_at?: string | null;
+    // Channel banner
+    channel_banner_url?: string | null;
     // Private (only if owner)
     coin_balance?: number;
     earnings_balance?: number;
@@ -329,7 +338,7 @@ export default function ModernProfilePage() {
           ? profileData.top_supporters.filter((s: any) => Number(s?.total_gifted ?? 0) > 0)
           : [],
         top_streamers: Array.isArray(profileData?.top_streamers)
-          ? profileData.top_streamers.filter((s: any) => Number(s?.diamonds_earned_lifetime ?? 0) > 0)
+          ? profileData.top_streamers.filter((s: any) => Number(s?.total_gifted_to ?? s?.diamonds_earned_lifetime ?? 0) > 0)
           : [],
       };
 
@@ -851,16 +860,19 @@ export default function ModernProfilePage() {
     feed: LayoutGrid,
     reels: Clapperboard,
     photos: ImageIcon,
+    username_tv: Tv,
     music_videos: Video,
+    podcasts: Music,
+    series: Video,
+    movies: Clapperboard,
+    education: Info,
+    comedy: Laugh,
     music: Music,
     events: Calendar,
     products: ShoppingCart,
+    playlists: ListVideo,
     reposts: Repeat2,
     highlights: Bookmark,
-    podcasts: Music,
-    movies: Clapperboard,
-    series: Video,
-    education: Info,
   };
   
   // Apply customization
@@ -969,7 +981,8 @@ export default function ModernProfilePage() {
       </div>
       
       {/* Content - Scrollable */}
-      <div className="relative z-10 max-w-6xl mx-auto px-3 sm:px-4 py-4 sm:py-8 pb-48 sm:pb-40 md:pb-24 pointer-events-auto">
+      {/* Wide mode: at 2xl+ expands to wider container, below 2xl stays max-w-6xl */}
+      <div className="relative z-10 max-w-6xl 2xl:max-w-[1400px] mx-auto px-3 sm:px-4 2xl:px-10 py-4 sm:py-8 pb-48 sm:pb-40 md:pb-24 pointer-events-auto">
         {/* MLL PRO Hero - Only on own profile */}
         {isOwnProfile && (
           <div className="mb-4 sm:mb-6">
@@ -1195,18 +1208,7 @@ export default function ModernProfilePage() {
                   {/* Profile Type Badge */}
                   <ProfileTypeBadge profileType={profile.profile_type || 'creator'} />
                 </div>
-                <div className="flex justify-center md:justify-start">
-                  <LocationBadge location={profileLocation} isSelf={isOwnProfile} muted className="mt-1" />
-                </div>
-                
-                {profile.bio && (
-                  <p 
-                    className="mb-4 max-w-2xl text-sm sm:text-base break-words"
-                    style={{ color: contentTextColor }}
-                  >
-                    {profile.bio}
-                  </p>
-                )}
+                {/* Location removed from header - now in Info tab About section */}
                 
                 {/* Action Buttons */}
                 <div className="flex flex-wrap gap-2 sm:gap-3 justify-center md:justify-start">
@@ -1310,6 +1312,49 @@ export default function ModernProfilePage() {
           </div>
         </div>
 
+        {/* Social Media Bar - Right under profile card */}
+        {isSectionEnabled('social_media', profile.profile_type as ConfigProfileType, profile.enabled_modules as any) && 
+          (profile.social_instagram || profile.social_twitter || profile.social_youtube || 
+          profile.social_tiktok || profile.social_facebook || profile.social_twitch ||
+          profile.social_discord || profile.social_snapchat || profile.social_linkedin ||
+          profile.social_github || profile.social_spotify || profile.social_onlyfans) && (
+          <div className={`${borderRadiusClass} overflow-hidden shadow-lg mb-4 sm:mb-6 p-4 sm:p-6`} style={cardStyle}>
+            <SocialMediaBar
+              socials={{
+                social_instagram: profile.social_instagram,
+                social_twitter: profile.social_twitter,
+                social_youtube: profile.social_youtube,
+                social_tiktok: profile.social_tiktok,
+                social_facebook: profile.social_facebook,
+                social_twitch: profile.social_twitch,
+                social_discord: profile.social_discord,
+                social_snapchat: profile.social_snapchat,
+                social_linkedin: profile.social_linkedin,
+                social_github: profile.social_github,
+                social_spotify: profile.social_spotify,
+                social_onlyfans: profile.social_onlyfans
+              }}
+              accentColor={accentColor}
+            />
+          </div>
+        )}
+        
+        {/* Links Section - Right under socials */}
+        {isSectionEnabled('links', profile.profile_type as ConfigProfileType, profile.enabled_modules as any) && 
+          profileData.links.length > 0 && (
+          <ModernLinksSection
+            links={profileData.links}
+            sectionTitle={profile.links_section_title || 'My Links'}
+            cardStyle={cardStyle}
+            borderRadiusClass={borderRadiusClass}
+            accentColor={accentColor}
+            buttonColor={buttonColor}
+            linkColor={linkColor}
+            uiTextColor={uiTextColor}
+            isOwner={isOwnProfile}
+          />
+        )}
+
         {showGenderReminder && (
           <div className="mb-4 sm:mb-6">
             <div
@@ -1356,6 +1401,8 @@ export default function ModernProfilePage() {
             {enabledTabs.map((tab) => {
               const TabIcon = tabIconMap[tab.id as ConfigProfileTab] || Info;
               const isActive = activeTab === tab.id;
+              // Dynamic label for username_tv tab
+              const tabLabel = tab.id === 'username_tv' ? `${profile.username}TV` : tab.label;
               return (
                 <button
                   key={tab.id}
@@ -1368,7 +1415,7 @@ export default function ModernProfilePage() {
                   style={isActive ? { borderColor: accentColor, color: accentColor } : {}}
                 >
                   <TabIcon className="w-4 h-4 sm:w-5 sm:h-5" />
-                  <span className="text-[10px] sm:text-sm leading-tight">{tab.label}</span>
+                  <span className="text-[10px] sm:text-sm leading-tight">{tabLabel}</span>
                 </button>
               );
             })}
@@ -1378,94 +1425,29 @@ export default function ModernProfilePage() {
         {/* Tab Content - Render based on activeTab */}
         {activeTab === 'info' && (
           <>
-            {/* Referral Progress Module - Owner View Only - Check if referral_network is enabled */}
-            {isOwnProfile && isSectionEnabled('referral_network', profile.profile_type as ConfigProfileType, profile.enabled_modules as any) && (
-              <div className="mb-4 sm:mb-6">
-                <ReferralProgressModule
-                  cardStyle={cardStyle}
-                  borderRadiusClass={borderRadiusClass}
-                  accentColor={accentColor}
-                />
+            {/* About Section - Bio + Location (matching mobile) */}
+            {(profile.bio || profileLocation.city || profileLocation.region) && (
+              <div className={`${borderRadiusClass} overflow-hidden shadow-lg mb-4 sm:mb-6 p-4 sm:p-6`} style={cardStyle}>
+                <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-3">About</h3>
+                {profile.bio && (
+                  <p className="text-gray-700 dark:text-gray-300 mb-3" style={{ color: contentTextColor }}>
+                    {profile.bio}
+                  </p>
+                )}
+                {(profileLocation.city || profileLocation.region) && (
+                  <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
+                    <LocationBadge location={profileLocation} isSelf={isOwnProfile} />
+                  </div>
+                )}
               </div>
             )}
-
-            {/* Streamer schedule (real data, owner-only empty state) */}
-            {profile.profile_type === 'streamer' && (
-              <Schedule
-                isOwner={isOwnProfile}
-                items={scheduleItems}
-                onAdd={openAddSchedule}
-                onEdit={openEditSchedule}
-                onDelete={deleteSchedule}
-                cardStyle={cardStyle}
-                borderRadiusClass={borderRadiusClass}
-              />
-            )}
             
-            {/* Config-driven section rendering for musician showcase */}
-            {isSectionEnabled('music_showcase', profile.profile_type as ConfigProfileType, profile.enabled_modules as any) && (
-              <MusicShowcase 
-                profileType={profile.profile_type as ConfigProfileType}
-                isOwner={isOwnProfile}
-                tracks={musicTracks}
-                cardStyle={cardStyle}
-                borderRadiusClass={borderRadiusClass}
-                artistProfileId={profile.id}
-                artistUsername={profile.username}
-              />
-            )}
+            {/* AUTHORITATIVE ORDER from Brad's notepad:
+               6. Top Supporters, 7. Top Streamers, 8. Merchandise, 9. Business Info,
+               10. Products, 11. Events, 12. Music Tracks, 13. Streaming Stats,
+               14. Connections, 15. Referral Network */}
             
-            {/* Config-driven section rendering for upcoming events */}
-            {isSectionEnabled('upcoming_events', profile.profile_type as ConfigProfileType, profile.enabled_modules as any) && (
-              <UpcomingEvents 
-                profileType={profile.profile_type as ConfigProfileType}
-                isOwner={isOwnProfile}
-                events={upcomingEvents}
-                onAddEvent={openAddEvent}
-                onEditEvent={openEditEvent}
-                onDeleteEvent={deleteEvent}
-                cardStyle={cardStyle}
-                borderRadiusClass={borderRadiusClass}
-              />
-            )}
-            
-            {/* Config-driven section rendering for merchandise */}
-            {isSectionEnabled('merchandise', profile.profile_type as ConfigProfileType, profile.enabled_modules as any) && (
-              <Merchandise 
-                profileId={profile.id}
-                profileType={profile.profile_type as ConfigProfileType}
-                isOwner={isOwnProfile}
-                cardStyle={cardStyle}
-                borderRadiusClass={borderRadiusClass}
-              />
-            )}
-            
-            {/* Config-driven section rendering for business info */}
-            {isSectionEnabled('business_info', profile.profile_type as ConfigProfileType, profile.enabled_modules as any) && (
-              <BusinessInfo 
-                profileId={profile.id}
-                profileType={profile.profile_type as ConfigProfileType}
-                isOwner={isOwnProfile}
-                cardStyle={cardStyle}
-                borderRadiusClass={borderRadiusClass}
-              />
-            )}
-            
-            {/* Config-driven section rendering for portfolio */}
-            {isSectionEnabled('portfolio', profile.profile_type as ConfigProfileType, profile.enabled_modules as any) && (
-              <Portfolio 
-                profileType={profile.profile_type as ConfigProfileType}
-                isOwner={isOwnProfile}
-                items={portfolioItems}
-                onAddItem={openAddPortfolio}
-                onEditItem={openEditPortfolio}
-                onDeleteItem={deletePortfolio}
-                cardStyle={cardStyle}
-                borderRadiusClass={borderRadiusClass}
-              />
-            )}
-            
-            {/* Stats Grid - Top Supporters & Top Streamers */}
+            {/* 6. Top Supporters & 7. Top Streamers */}
             {!profile.hide_streaming_stats && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-6 mb-4 sm:mb-6">
                 {isSectionEnabled('top_supporters', profile.profile_type as ConfigProfileType, profile.enabled_modules as any) && (
@@ -1489,46 +1471,112 @@ export default function ModernProfilePage() {
               </div>
             )}
             
-            {/* Social Media Bar - Check if social_media is enabled */}
-            {isSectionEnabled('social_media', profile.profile_type as ConfigProfileType, profile.enabled_modules as any) && 
-              (profile.social_instagram || profile.social_twitter || profile.social_youtube || 
-              profile.social_tiktok || profile.social_facebook || profile.social_twitch ||
-              profile.social_discord || profile.social_snapchat || profile.social_linkedin ||
-              profile.social_github || profile.social_spotify || profile.social_onlyfans) && (
-              <div className={`${borderRadiusClass} overflow-hidden shadow-lg mb-4 sm:mb-6 p-4 sm:p-6`} style={cardStyle}>
-                <SocialMediaBar
-                  socials={{
-                    social_instagram: profile.social_instagram,
-                    social_twitter: profile.social_twitter,
-                    social_youtube: profile.social_youtube,
-                    social_tiktok: profile.social_tiktok,
-                    social_facebook: profile.social_facebook,
-                    social_twitch: profile.social_twitch,
-                    social_discord: profile.social_discord,
-                    social_snapchat: profile.social_snapchat,
-                    social_linkedin: profile.social_linkedin,
-                    social_github: profile.social_github,
-                    social_spotify: profile.social_spotify,
-                    social_onlyfans: profile.social_onlyfans
-                  }}
+            {/* 8. Merchandise */}
+            {isSectionEnabled('merchandise', profile.profile_type as ConfigProfileType, profile.enabled_modules as any) && (
+              <Merchandise 
+                profileId={profile.id}
+                profileType={profile.profile_type as ConfigProfileType}
+                isOwner={isOwnProfile}
+                buttonColor={buttonColor}
+                cardStyle={cardStyle}
+                borderRadiusClass={borderRadiusClass}
+              />
+            )}
+            
+            {/* 9. Business Info */}
+            {isSectionEnabled('business_info', profile.profile_type as ConfigProfileType, profile.enabled_modules as any) && (
+              <BusinessInfo 
+                profileId={profile.id}
+                profileType={profile.profile_type as ConfigProfileType}
+                isOwner={isOwnProfile}
+                buttonColor={buttonColor}
+                cardStyle={cardStyle}
+                borderRadiusClass={borderRadiusClass}
+              />
+            )}
+            
+            {/* 10. Products (portfolio) */}
+            {isSectionEnabled('portfolio', profile.profile_type as ConfigProfileType, profile.enabled_modules as any) && (
+              <Portfolio 
+                profileType={profile.profile_type as ConfigProfileType}
+                isOwner={isOwnProfile}
+                items={portfolioItems}
+                buttonColor={buttonColor}
+                onAddItem={openAddPortfolio}
+                onEditItem={openEditPortfolio}
+                onDeleteItem={deletePortfolio}
+                cardStyle={cardStyle}
+                borderRadiusClass={borderRadiusClass}
+              />
+            )}
+            
+            {/* 11. Events (upcoming_events) */}
+            {isSectionEnabled('upcoming_events', profile.profile_type as ConfigProfileType, profile.enabled_modules as any) && (
+              <UpcomingEvents 
+                profileType={profile.profile_type as ConfigProfileType}
+                isOwner={isOwnProfile}
+                events={upcomingEvents}
+                buttonColor={buttonColor}
+                onAddEvent={openAddEvent}
+                onEditEvent={openEditEvent}
+                onDeleteEvent={deleteEvent}
+                cardStyle={cardStyle}
+                borderRadiusClass={borderRadiusClass}
+              />
+            )}
+            
+            {/* 12. Music Tracks (music_showcase) */}
+            {isSectionEnabled('music_showcase', profile.profile_type as ConfigProfileType, profile.enabled_modules as any) && (
+              <MusicShowcase 
+                profileType={profile.profile_type as ConfigProfileType}
+                isOwner={isOwnProfile}
+                tracks={musicTracks}
+                buttonColor={buttonColor}
+                cardStyle={cardStyle}
+                borderRadiusClass={borderRadiusClass}
+                artistProfileId={profile.id}
+                artistUsername={profile.username}
+              />
+            )}
+            
+            {/* Music Videos on Info tab */}
+            {isSectionEnabled('music_videos', profile.profile_type as ConfigProfileType, profile.enabled_modules as any) && (
+              <MusicVideos
+                profileId={profile.id}
+                isOwner={isOwnProfile}
+                buttonColor={buttonColor}
+                cardStyle={cardStyle}
+                borderRadiusClass={borderRadiusClass}
+                artistUsername={profile.username}
+              />
+            )}
+            
+            {/* 13. Streaming Stats (Stats Card) */}
+            {!profile.hide_streaming_stats && (isSectionEnabled('profile_stats', profile.profile_type as ConfigProfileType, profile.enabled_modules as any) || isSectionEnabled('streaming_stats', profile.profile_type as ConfigProfileType, profile.enabled_modules as any)) && (
+              <div className="mb-4 sm:mb-6">
+                <StatsCard
+                  streamStats={profileData.stream_stats}
+                  gifterStatus={(profileData as any)?.gifter_statuses?.[profile.id] ?? null}
+                  totalGiftsSent={profile.total_gifts_sent}
+                  totalGiftsReceived={profile.total_gifts_received}
+                  cardStyle={cardStyle}
+                  borderRadiusClass={borderRadiusClass}
                   accentColor={accentColor}
                 />
               </div>
             )}
             
-            {/* Links Section - Check if links is enabled */}
-            {isSectionEnabled('links', profile.profile_type as ConfigProfileType, profile.enabled_modules as any) && 
-              profileData.links.length > 0 && (
-              <ModernLinksSection
-                links={profileData.links}
-                sectionTitle={profile.links_section_title || 'My Links'}
+            {/* Streamer schedule (real data, owner-only empty state) */}
+            {profile.profile_type === 'streamer' && (
+              <Schedule
+                isOwner={isOwnProfile}
+                items={scheduleItems}
+                buttonColor={buttonColor}
+                onAdd={openAddSchedule}
+                onEdit={openEditSchedule}
+                onDelete={deleteSchedule}
                 cardStyle={cardStyle}
                 borderRadiusClass={borderRadiusClass}
-                accentColor={accentColor}
-                buttonColor={buttonColor}
-                linkColor={linkColor}
-                uiTextColor={uiTextColor}
-                isOwner={isOwnProfile}
               />
             )}
             
@@ -1541,17 +1589,15 @@ export default function ModernProfilePage() {
               accentColor={accentColor}
             />
             
-            {/* Stats Card - Check if profile_stats or streaming_stats modules are enabled */}
-            {!profile.hide_streaming_stats && (isSectionEnabled('profile_stats', profile.profile_type as ConfigProfileType, profile.enabled_modules as any) || isSectionEnabled('streaming_stats', profile.profile_type as ConfigProfileType, profile.enabled_modules as any)) && (
-              <StatsCard
-                streamStats={profileData.stream_stats}
-                gifterStatus={(profileData as any)?.gifter_statuses?.[profile.id] ?? null}
-                totalGiftsSent={profile.total_gifts_sent}
-                totalGiftsReceived={profile.total_gifts_received}
-                cardStyle={cardStyle}
-                borderRadiusClass={borderRadiusClass}
-                accentColor={accentColor}
-              />
+            {/* 15. Referral Network - LAST in Info tab */}
+            {isOwnProfile && isSectionEnabled('referral_network', profile.profile_type as ConfigProfileType, profile.enabled_modules as any) && (
+              <div className="mb-4 sm:mb-6">
+                <ReferralProgressModule
+                  cardStyle={cardStyle}
+                  borderRadiusClass={borderRadiusClass}
+                  accentColor={accentColor}
+                />
+              </div>
             )}
             
             {/* Premium Branding Footer - Powered by MyLiveLinks (Only show for visitors, not own profile) */}
@@ -1618,6 +1664,25 @@ export default function ModernProfilePage() {
             borderRadiusClass={borderRadiusClass}
           />
         )}
+
+        {/* [Username]TV Tab - Unified video hub */}
+        {activeTab === 'username_tv' && (
+          <UsernameTVTab
+            profileId={profile.id}
+            username={profile.username}
+            displayName={profile.display_name}
+            channelBannerUrl={profile.channel_banner_url}
+            isOwner={isOwnProfile}
+            cardStyle={cardStyle}
+            borderRadiusClass={borderRadiusClass}
+            onBannerUpdate={(newUrl) => {
+              setProfileData(prev => prev ? {
+                ...prev,
+                profile: { ...prev.profile, channel_banner_url: newUrl }
+              } : prev);
+            }}
+          />
+        )}
         
         {/* Music Videos Tab */}
         {activeTab === 'music_videos' && (
@@ -1626,6 +1691,7 @@ export default function ModernProfilePage() {
               <MusicVideos
                 profileId={profile.id}
                 isOwner={isOwnProfile}
+                buttonColor={buttonColor}
                 cardStyle={cardStyle}
                 borderRadiusClass={borderRadiusClass}
                 artistUsername={profile.username}
@@ -1636,6 +1702,7 @@ export default function ModernProfilePage() {
               <ComedySpecials
                 profileId={profile.id}
                 isOwner={isOwnProfile}
+                buttonColor={buttonColor}
                 cardStyle={cardStyle}
                 borderRadiusClass={borderRadiusClass}
               />
@@ -1656,17 +1723,29 @@ export default function ModernProfilePage() {
               profile.profile_type !== 'comedian' &&
               profile.profile_type !== 'creator' &&
               profile.profile_type !== 'streamer' && (
-                <TabEmptyState type="music_videos" isOwner={isOwnProfile} />
+                <TabEmptyState type="music_videos" isOwner={isOwnProfile} buttonColor={buttonColor} />
               )}
           </>
         )}
         
+        {/* Comedy Tab */}
+        {activeTab === 'comedy' && (
+          <ComedyTab
+            profileId={profile.id}
+            username={profile.username}
+            isOwner={isOwnProfile}
+            cardStyle={cardStyle}
+            borderRadiusClass={borderRadiusClass}
+          />
+        )}
+
         {/* Music Tab - Musician-specific (shows MusicShowcase) */}
         {activeTab === 'music' && (
           <MusicShowcase 
             profileType={profile.profile_type as ConfigProfileType}
             isOwner={isOwnProfile}
             tracks={musicTracks}
+            buttonColor={buttonColor}
             cardStyle={cardStyle}
             borderRadiusClass={borderRadiusClass}
             artistProfileId={profile.id}
@@ -1737,6 +1816,7 @@ export default function ModernProfilePage() {
             emptyTitle="No Podcasts Yet"
             emptyText="Check back later for podcast episodes."
             isOwner={isOwnProfile}
+            buttonColor={buttonColor}
             cardStyle={cardStyle}
             borderRadiusClass={borderRadiusClass}
           />
@@ -1752,20 +1832,17 @@ export default function ModernProfilePage() {
             emptyTitle="No Movies Yet"
             emptyText="Check back later for films and long-form content."
             isOwner={isOwnProfile}
+            buttonColor={buttonColor}
             cardStyle={cardStyle}
             borderRadiusClass={borderRadiusClass}
           />
         )}
         
-        {/* Series Tab - Creator Studio content */}
+        {/* Series Tab - Grouped by series with horizontal episode scroll */}
         {activeTab === 'series' && (
-          <CreatorStudioSection
+          <SeriesTab
             profileId={profile.id}
             username={profile.username}
-            itemType="series_episode"
-            title="📺 Series"
-            emptyTitle="No Series Yet"
-            emptyText="Check back later for episodic content."
             isOwner={isOwnProfile}
             cardStyle={cardStyle}
             borderRadiusClass={borderRadiusClass}
@@ -1782,6 +1859,19 @@ export default function ModernProfilePage() {
             emptyTitle="No Educational Content Yet"
             emptyText="Check back later for tutorials and courses."
             isOwner={isOwnProfile}
+            buttonColor={buttonColor}
+            cardStyle={cardStyle}
+            borderRadiusClass={borderRadiusClass}
+          />
+        )}
+        
+        {/* Playlists Tab - Curator playlists */}
+        {activeTab === 'playlists' && (
+          <PlaylistsTab
+            profileId={profile.id}
+            username={profile.username}
+            isOwner={isOwnProfile}
+            buttonColor={buttonColor}
             cardStyle={cardStyle}
             borderRadiusClass={borderRadiusClass}
           />
@@ -1790,27 +1880,19 @@ export default function ModernProfilePage() {
         {/* Type-specific tab placeholders (kept for backward compatibility) */}
       </div>
       
-      {/* Modals */}
-      {showFollowersModal && (
+      {/* Connections Modal (Followers/Following/Friends with tab switcher) */}
+      {(showFollowersModal || showFollowingModal || showFriendsModal) && (
         <FollowersModal
           profileId={profile.id}
-          onClose={() => setShowFollowersModal(false)}
-        />
-      )}
-      
-      {showFollowingModal && (
-        <FollowersModal
-          profileId={profile.id}
-          type="following"
-          onClose={() => setShowFollowingModal(false)}
-        />
-      )}
-      
-      {showFriendsModal && (
-        <FollowersModal
-          profileId={profile.id}
-          type="friends"
-          onClose={() => setShowFriendsModal(false)}
+          type={showFollowersModal ? 'followers' : showFollowingModal ? 'following' : 'friends'}
+          onClose={() => {
+            setShowFollowersModal(false);
+            setShowFollowingModal(false);
+            setShowFriendsModal(false);
+          }}
+          followerCount={profileData.follower_count}
+          followingCount={profileData.following_count}
+          friendsCount={profileData.friends_count}
         />
       )}
 

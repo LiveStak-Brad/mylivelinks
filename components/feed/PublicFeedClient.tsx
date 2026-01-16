@@ -16,6 +16,7 @@ import { uploadPostMedia } from '@/lib/storage';
 import { PHOTO_FILTER_PRESETS, type PhotoFilterId, getPhotoFilterPreset } from '@/lib/photoFilters';
 import { usePostLike } from '@/hooks/useFeedLikes';
 import { LinkOrNahPromoCard, type LinkOrNahPromoCardProps } from '@/components/link/LinkOrNahPromoCard';
+import PendingPostsApproval from './PendingPostsApproval';
 
 type FeedAuthor = {
   id: string;
@@ -117,7 +118,12 @@ export default function PublicFeedClient({
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [currentUsername, setCurrentUsername] = useState<string | null>(null);
   const [currentUser, setCurrentUser] = useState<{ avatar_url?: string | null } | null>(null);
-  const shouldShowComposer = !username || (currentUsername && currentUsername === username);
+  const [targetProfileId, setTargetProfileId] = useState<string | null>(null);
+  
+  // Composer visible to any logged-in user (viewer posting allowed)
+  const shouldShowComposer = Boolean(currentUserId);
+  const isOwnProfile = !username || (currentUsername && currentUsername === username);
+  const isViewerPosting = Boolean(username && currentUsername && currentUsername !== username);
 
   const [expandedComments, setExpandedComments] = useState<Record<string, boolean>>({});
   const [commentsByPost, setCommentsByPost] = useState<Record<string, FeedComment[]>>({});
@@ -263,6 +269,38 @@ export default function PublicFeedClient({
     };
   }, []);
 
+  // Load target profile ID when viewing someone else's profile
+  useEffect(() => {
+    if (!username) {
+      setTargetProfileId(null);
+      return;
+    }
+    
+    let canceled = false;
+    const loadTargetProfile = async () => {
+      try {
+        const supabase = createClient();
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('username', username)
+          .maybeSingle();
+
+        if (canceled) return;
+        if (profile?.id) {
+          setTargetProfileId(profile.id);
+        }
+      } catch {
+        // ignore
+      }
+    };
+
+    void loadTargetProfile();
+    return () => {
+      canceled = true;
+    };
+  }, [username]);
+
   // Load feelings list
   useEffect(() => {
     const loadFeelings = async () => {
@@ -371,6 +409,7 @@ export default function PublicFeedClient({
 
       const safeTextContent = text.length ? text : ' ';
 
+      // Include target_profile_id for viewer posting (posts to someone else's page)
       const res = await fetch('/api/posts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -379,6 +418,7 @@ export default function PublicFeedClient({
           media_url: mediaUrl,
           visibility: composerVisibility,
           feeling_id: composerFeeling?.id ?? null,
+          target_profile_id: isViewerPosting ? targetProfileId : null,
         }),
       });
 
@@ -397,14 +437,20 @@ export default function PublicFeedClient({
       setComposerPhotoFilterId('original');
       setComposerVisibility('public');
       setComposerFeeling(null);
-      await loadFeed('replace');
+      
+      // Show approval notice for viewer posts
+      if (json?.requires_approval) {
+        setLoadError(`Your post has been submitted and is pending approval from @${username}.`);
+      } else {
+        await loadFeed('replace');
+      }
     } catch (err) {
       setLoadError(err instanceof Error ? err.message : 'Failed to create post');
     } finally {
       setIsPosting(false);
       composerInFlightRef.current = false;
     }
-  }, [composerMediaFile, composerMediaKind, composerMediaPreviewUrl, composerPhotoFilterId, composerText, composerVisibility, composerFeeling, currentUserId, exportFilteredImage, loadFeed]);
+  }, [composerMediaFile, composerMediaKind, composerMediaPreviewUrl, composerPhotoFilterId, composerText, composerVisibility, composerFeeling, currentUserId, exportFilteredImage, loadFeed, isViewerPosting, targetProfileId, username]);
 
   const onComposerFileChange = useCallback((file: File | null) => {
     if (!file) return;
@@ -763,14 +809,19 @@ export default function PublicFeedClient({
         </Card>
       )}
 
+      {/* Pending posts approval section - only shown to page owner on their own profile */}
+      {isOwnProfile && <PendingPostsApproval cardStyle={cardStyle} borderRadiusClass={borderRadiusClass} />}
+
       <Card className={`overflow-hidden backdrop-blur-sm ${borderRadiusClass}`} style={cardStyle}>
         <div className="p-4 sm:p-5 space-y-3">
-          <div className="text-sm font-medium text-foreground">Create a post</div>
+          <div className="text-sm font-medium text-foreground">
+            {isViewerPosting ? `Write on ${username}'s page` : 'Create a post'}
+          </div>
           {shouldShowComposer ? (
             <>
               <Textarea
                 textareaSize="md"
-                placeholder="Share something with the community..."
+                placeholder={isViewerPosting ? `Write something to ${username}...` : "Share something with the community..."}
                 value={composerText}
                 onChange={(e) => setComposerText(e.target.value)}
                 disabled={isPosting}

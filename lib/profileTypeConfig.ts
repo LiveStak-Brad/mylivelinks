@@ -22,7 +22,7 @@ export type ProfileType =
 // TABS DEFINITION
 // ============================================================================
 
-export type ProfileTab = 'info' | 'feed' | 'reels' | 'photos' | 'music_videos' | 'music' | 'events' | 'products' | 'reposts' | 'highlights' | 'podcasts' | 'movies' | 'series' | 'education';
+export type ProfileTab = 'info' | 'feed' | 'photos' | 'reels' | 'username_tv' | 'music_videos' | 'podcasts' | 'series' | 'movies' | 'education' | 'comedy' | 'music' | 'events' | 'products' | 'reposts' | 'highlights' | 'playlists';
 
 export interface TabConfig {
   id: ProfileTab;
@@ -46,6 +46,7 @@ export type ProfileSection =
   | 'profile_stats'
   | 'streaming_stats'
   | 'music_showcase'
+  | 'music_videos'
   | 'upcoming_events'
   | 'merchandise'
   | 'portfolio'
@@ -103,29 +104,43 @@ export const PROFILE_TYPE_CONFIG: Record<ProfileType, ProfileTypeConfig> = {
       { id: 'feed', label: 'Feed', icon: 'LayoutGrid', enabled: true },
       { id: 'photos', label: 'Media', icon: 'Image', enabled: true },
       { id: 'reels', label: 'Vlogs', icon: 'Clapperboard', enabled: true },
+      { id: 'username_tv', label: 'TV', icon: 'Tv', enabled: true },
       { id: 'music_videos', label: 'Music Videos', icon: 'Video', enabled: true },
-      { id: 'music', label: 'Music', icon: 'Music', enabled: false },
       { id: 'podcasts', label: 'Podcasts', icon: 'Mic', enabled: false },
       { id: 'series', label: 'Series', icon: 'Layers', enabled: false },
       { id: 'movies', label: 'Movies', icon: 'Clapperboard', enabled: false },
       { id: 'education', label: 'Education', icon: 'BookOpen', enabled: false },
+      { id: 'comedy', label: 'Comedy', icon: 'Laugh', enabled: false },
+      { id: 'music', label: 'Music', icon: 'Music', enabled: false },
       { id: 'events', label: 'Events', icon: 'Calendar', enabled: true },
       { id: 'products', label: 'Products', icon: 'ShoppingCart', enabled: false },
+      { id: 'playlists', label: 'Playlists', icon: 'ListVideo', enabled: false },
       { id: 'reposts', label: 'Reposts', icon: 'Repeat2', enabled: true },
       { id: 'highlights', label: 'Highlights', icon: 'Bookmark', enabled: true },
     ],
+    // AUTHORITATIVE ORDER from Brad's notepad:
+    // 1. Social Links, 2. Custom Links, 3. Top Friends, 4. Tab Bar (UI element),
+    // 5. Info/About (always on, profile_stats inside), 6. Top Supporters, 7. Top Streamers,
+    // 8. Merchandise, 9. Business Info, 10. Products, 11. Events, 12. Music Tracks,
+    // 13. Streaming Stats, 14. Connections, 15. Referral Network
+    // NOTE: social_counts belongs in TOP BANNER, profile_stats inside Info/About
     sections: [
       { id: 'hero', enabled: true, order: 1 },
-      { id: 'social_counts', enabled: true, order: 2 },
-      { id: 'top_supporters', enabled: true, order: 3 },
-      { id: 'top_streamers', enabled: true, order: 4 },
-      { id: 'streaming_stats', enabled: true, order: 5 },
-      { id: 'social_media', enabled: true, order: 6 },
-      { id: 'connections', enabled: true, order: 7 },
-      { id: 'referral_network', enabled: true, order: 8 },
-      { id: 'links', enabled: true, order: 9 },
-      { id: 'profile_stats', enabled: true, order: 10 },
-      { id: 'footer', enabled: true, order: 11 },
+      { id: 'social_media', enabled: true, order: 2 },      // 1. Social Links
+      { id: 'links', enabled: true, order: 3 },             // 2. Custom Links
+      { id: 'top_friends', enabled: true, order: 4 },       // 3. Top Friends
+      { id: 'top_supporters', enabled: true, order: 5 },    // 6. Top Supporters
+      { id: 'top_streamers', enabled: true, order: 6 },     // 7. Top Streamers
+      { id: 'merchandise', enabled: true, order: 7 },       // 8. Merchandise
+      { id: 'business_info', enabled: true, order: 8 },     // 9. Business Info
+      { id: 'portfolio', enabled: true, order: 9 },         // 10. Products
+      { id: 'upcoming_events', enabled: true, order: 10 },  // 11. Events
+      { id: 'music_showcase', enabled: true, order: 11 },   // 12. Music Tracks
+      { id: 'streaming_stats', enabled: true, order: 12 },  // 13. Streaming Stats
+      { id: 'profile_stats', enabled: true, order: 12 },    // Legacy alias for streaming_stats
+      { id: 'connections', enabled: true, order: 13 },      // 14. Connections
+      { id: 'referral_network', enabled: true, order: 14 }, // 15. Referral Network
+      { id: 'footer', enabled: true, order: 15 },
     ],
     quickActions: [
       { id: 'follow', label: 'Follow', icon: 'UserPlus', enabled: true, primary: true },
@@ -145,26 +160,36 @@ export const PROFILE_TYPE_CONFIG: Record<ProfileType, ProfileTypeConfig> = {
       { id: 'feed', label: 'Feed', icon: 'LayoutGrid', enabled: false },
       { id: 'photos', label: 'Media', icon: 'Image', enabled: true },
       { id: 'reels', label: 'Vlogs', icon: 'Clapperboard', enabled: false },
+      { id: 'username_tv', label: 'TV', icon: 'Tv', enabled: true },
       { id: 'music_videos', label: 'Music Videos', icon: 'Video', enabled: true },
-      { id: 'music', label: 'Music', icon: 'Music', enabled: true },
       { id: 'podcasts', label: 'Podcasts', icon: 'Mic', enabled: false },
       { id: 'series', label: 'Series', icon: 'Layers', enabled: false },
       { id: 'movies', label: 'Movies', icon: 'Clapperboard', enabled: false },
       { id: 'education', label: 'Education', icon: 'BookOpen', enabled: false },
+      { id: 'comedy', label: 'Comedy', icon: 'Laugh', enabled: false },
+      { id: 'music', label: 'Music', icon: 'Music', enabled: true },
       { id: 'events', label: 'Events', icon: 'Calendar', enabled: true },
       { id: 'products', label: 'Products', icon: 'ShoppingCart', enabled: false },
+      { id: 'playlists', label: 'Playlists', icon: 'ListVideo', enabled: false },
     ],
+    // AUTHORITATIVE ORDER from Brad's notepad
     sections: [
       { id: 'hero', enabled: true, order: 1 },
-      { id: 'music_showcase', enabled: true, order: 2 },
-      { id: 'upcoming_events', enabled: true, order: 3 },
-      { id: 'social_counts', enabled: true, order: 4 },
-      { id: 'social_media', enabled: true, order: 5 },
-      { id: 'merchandise', enabled: true, order: 6 },
-      { id: 'connections', enabled: true, order: 7 },
-      { id: 'referral_network', enabled: true, order: 8 },
-      { id: 'links', enabled: true, order: 9 },
-      { id: 'footer', enabled: true, order: 10 },
+      { id: 'social_media', enabled: true, order: 2 },
+      { id: 'links', enabled: true, order: 3 },
+      { id: 'top_friends', enabled: true, order: 4 },
+      { id: 'top_supporters', enabled: true, order: 5 },
+      { id: 'top_streamers', enabled: true, order: 6 },
+      { id: 'merchandise', enabled: true, order: 7 },
+      { id: 'business_info', enabled: true, order: 8 },
+      { id: 'portfolio', enabled: true, order: 9 },
+      { id: 'upcoming_events', enabled: true, order: 10 },
+      { id: 'music_showcase', enabled: true, order: 11 },
+      { id: 'streaming_stats', enabled: true, order: 12 },
+      { id: 'profile_stats', enabled: true, order: 12 },    // Legacy alias for streaming_stats
+      { id: 'connections', enabled: true, order: 13 },
+      { id: 'referral_network', enabled: true, order: 14 },
+      { id: 'footer', enabled: true, order: 15 },
     ],
     quickActions: [
       { id: 'follow', label: 'Follow', icon: 'UserPlus', enabled: true, primary: true },
@@ -183,25 +208,36 @@ export const PROFILE_TYPE_CONFIG: Record<ProfileType, ProfileTypeConfig> = {
       { id: 'feed', label: 'Feed', icon: 'LayoutGrid', enabled: false },
       { id: 'photos', label: 'Media', icon: 'Image', enabled: true },
       { id: 'reels', label: 'Vlogs', icon: 'Clapperboard', enabled: false },
-      { id: 'music_videos', label: 'Music Videos', icon: 'Video', enabled: true },
-      { id: 'music', label: 'Music', icon: 'Music', enabled: false },
+      { id: 'username_tv', label: 'TV', icon: 'Tv', enabled: true },
+      { id: 'music_videos', label: 'Music Videos', icon: 'Video', enabled: false },
       { id: 'podcasts', label: 'Podcasts', icon: 'Mic', enabled: false },
       { id: 'series', label: 'Series', icon: 'Layers', enabled: false },
       { id: 'movies', label: 'Movies', icon: 'Clapperboard', enabled: false },
       { id: 'education', label: 'Education', icon: 'BookOpen', enabled: false },
+      { id: 'comedy', label: 'Comedy', icon: 'Laugh', enabled: true },
+      { id: 'music', label: 'Music', icon: 'Music', enabled: false },
       { id: 'events', label: 'Shows', icon: 'Calendar', enabled: true },
       { id: 'products', label: 'Products', icon: 'ShoppingCart', enabled: false },
+      { id: 'playlists', label: 'Playlists', icon: 'ListVideo', enabled: false },
     ],
+    // AUTHORITATIVE ORDER from Brad's notepad
     sections: [
       { id: 'hero', enabled: true, order: 1 },
-      { id: 'upcoming_events', enabled: true, order: 2 },
-      { id: 'social_counts', enabled: true, order: 3 },
-      { id: 'social_media', enabled: true, order: 4 },
-      { id: 'merchandise', enabled: true, order: 5 },
-      { id: 'connections', enabled: true, order: 6 },
-      { id: 'referral_network', enabled: true, order: 7 },
-      { id: 'links', enabled: true, order: 8 },
-      { id: 'footer', enabled: true, order: 9 },
+      { id: 'social_media', enabled: true, order: 2 },
+      { id: 'links', enabled: true, order: 3 },
+      { id: 'top_friends', enabled: true, order: 4 },
+      { id: 'top_supporters', enabled: true, order: 5 },
+      { id: 'top_streamers', enabled: true, order: 6 },
+      { id: 'merchandise', enabled: true, order: 7 },
+      { id: 'business_info', enabled: true, order: 8 },
+      { id: 'portfolio', enabled: true, order: 9 },
+      { id: 'upcoming_events', enabled: true, order: 10 },
+      { id: 'music_showcase', enabled: true, order: 11 },
+      { id: 'streaming_stats', enabled: true, order: 12 },
+      { id: 'profile_stats', enabled: true, order: 12 },    // Legacy alias for streaming_stats
+      { id: 'connections', enabled: true, order: 13 },
+      { id: 'referral_network', enabled: true, order: 14 },
+      { id: 'footer', enabled: true, order: 15 },
     ],
     quickActions: [
       { id: 'follow', label: 'Follow', icon: 'UserPlus', enabled: true, primary: true },
@@ -220,25 +256,36 @@ export const PROFILE_TYPE_CONFIG: Record<ProfileType, ProfileTypeConfig> = {
       { id: 'feed', label: 'Feed', icon: 'LayoutGrid', enabled: false },
       { id: 'photos', label: 'Gallery', icon: 'Image', enabled: true },
       { id: 'reels', label: 'Vlogs', icon: 'Clapperboard', enabled: false },
+      { id: 'username_tv', label: 'TV', icon: 'Tv', enabled: false },
       { id: 'music_videos', label: 'Music Videos', icon: 'Video', enabled: false },
-      { id: 'music', label: 'Music', icon: 'Music', enabled: false },
       { id: 'podcasts', label: 'Podcasts', icon: 'Mic', enabled: false },
       { id: 'series', label: 'Series', icon: 'Layers', enabled: false },
       { id: 'movies', label: 'Movies', icon: 'Clapperboard', enabled: false },
       { id: 'education', label: 'Education', icon: 'BookOpen', enabled: false },
+      { id: 'comedy', label: 'Comedy', icon: 'Laugh', enabled: false },
+      { id: 'music', label: 'Music', icon: 'Music', enabled: false },
       { id: 'events', label: 'Events', icon: 'Calendar', enabled: false },
       { id: 'products', label: 'Products', icon: 'ShoppingCart', enabled: true },
+      { id: 'playlists', label: 'Playlists', icon: 'ListVideo', enabled: false },
     ],
+    // AUTHORITATIVE ORDER from Brad's notepad
     sections: [
       { id: 'hero', enabled: true, order: 1 },
-      { id: 'business_info', enabled: true, order: 2 },
-      { id: 'portfolio', enabled: true, order: 3 },
-      { id: 'social_counts', enabled: true, order: 4 },
-      { id: 'social_media', enabled: true, order: 5 },
-      { id: 'links', enabled: true, order: 6 },
-      { id: 'connections', enabled: true, order: 7 },
-      { id: 'referral_network', enabled: true, order: 8 },
-      { id: 'footer', enabled: true, order: 9 },
+      { id: 'social_media', enabled: true, order: 2 },
+      { id: 'links', enabled: true, order: 3 },
+      { id: 'top_friends', enabled: true, order: 4 },
+      { id: 'top_supporters', enabled: true, order: 5 },
+      { id: 'top_streamers', enabled: true, order: 6 },
+      { id: 'merchandise', enabled: true, order: 7 },
+      { id: 'business_info', enabled: true, order: 8 },
+      { id: 'portfolio', enabled: true, order: 9 },
+      { id: 'upcoming_events', enabled: true, order: 10 },
+      { id: 'music_showcase', enabled: true, order: 11 },
+      { id: 'streaming_stats', enabled: true, order: 12 },
+      { id: 'profile_stats', enabled: true, order: 12 },    // Legacy alias for streaming_stats
+      { id: 'connections', enabled: true, order: 13 },
+      { id: 'referral_network', enabled: true, order: 14 },
+      { id: 'footer', enabled: true, order: 15 },
     ],
     quickActions: [
       { id: 'follow', label: 'Follow', icon: 'UserPlus', enabled: true, primary: true },
@@ -256,27 +303,38 @@ export const PROFILE_TYPE_CONFIG: Record<ProfileType, ProfileTypeConfig> = {
       { id: 'feed', label: 'Feed', icon: 'LayoutGrid', enabled: true },
       { id: 'photos', label: 'Media', icon: 'Image', enabled: true },
       { id: 'reels', label: 'Vlogs', icon: 'Clapperboard', enabled: true },
+      { id: 'username_tv', label: 'TV', icon: 'Tv', enabled: true },
       { id: 'music_videos', label: 'Music Videos', icon: 'Video', enabled: true },
-      { id: 'music', label: 'Music', icon: 'Music', enabled: false },
       { id: 'podcasts', label: 'Podcasts', icon: 'Mic', enabled: false },
       { id: 'series', label: 'Series', icon: 'Layers', enabled: false },
       { id: 'movies', label: 'Movies', icon: 'Clapperboard', enabled: false },
       { id: 'education', label: 'Education', icon: 'BookOpen', enabled: false },
+      { id: 'comedy', label: 'Comedy', icon: 'Laugh', enabled: false },
+      { id: 'music', label: 'Music', icon: 'Music', enabled: false },
       { id: 'events', label: 'Events', icon: 'Calendar', enabled: false },
       { id: 'products', label: 'Products', icon: 'ShoppingCart', enabled: false },
+      { id: 'playlists', label: 'Playlists', icon: 'ListVideo', enabled: false },
       { id: 'reposts', label: 'Reposts', icon: 'Repeat2', enabled: true },
       { id: 'highlights', label: 'Highlights', icon: 'Bookmark', enabled: true },
     ],
+    // AUTHORITATIVE ORDER from Brad's notepad
     sections: [
       { id: 'hero', enabled: true, order: 1 },
-      { id: 'social_counts', enabled: true, order: 2 },
-      { id: 'social_media', enabled: true, order: 3 },
-      { id: 'portfolio', enabled: true, order: 4 },
-      { id: 'connections', enabled: true, order: 5 },
-      { id: 'referral_network', enabled: true, order: 6 },
-      { id: 'links', enabled: true, order: 7 },
-      { id: 'profile_stats', enabled: true, order: 8 },
-      { id: 'footer', enabled: true, order: 9 },
+      { id: 'social_media', enabled: true, order: 2 },
+      { id: 'links', enabled: true, order: 3 },
+      { id: 'top_friends', enabled: true, order: 4 },
+      { id: 'top_supporters', enabled: true, order: 5 },
+      { id: 'top_streamers', enabled: true, order: 6 },
+      { id: 'merchandise', enabled: true, order: 7 },
+      { id: 'business_info', enabled: true, order: 8 },
+      { id: 'portfolio', enabled: true, order: 9 },
+      { id: 'upcoming_events', enabled: true, order: 10 },
+      { id: 'music_showcase', enabled: true, order: 11 },
+      { id: 'streaming_stats', enabled: true, order: 12 },
+      { id: 'profile_stats', enabled: true, order: 12 },    // Legacy alias for streaming_stats
+      { id: 'connections', enabled: true, order: 13 },
+      { id: 'referral_network', enabled: true, order: 14 },
+      { id: 'footer', enabled: true, order: 15 },
     ],
     quickActions: [
       { id: 'follow', label: 'Follow', icon: 'UserPlus', enabled: true, primary: true },
@@ -310,6 +368,13 @@ export function getProfileTypeConfig(profileType?: ProfileType): ProfileTypeConf
  * Get enabled tabs for a profile type
  * If customEnabledTabs is provided, use that instead of profile_type defaults
  */
+// Canonical tab order - used to maintain consistent ordering
+const TAB_ORDER: ProfileTab[] = [
+  'info', 'feed', 'photos', 'reels', 'username_tv', 'music_videos',
+  'podcasts', 'series', 'movies', 'education', 'comedy', 'music',
+  'events', 'products', 'playlists', 'reposts', 'highlights'
+];
+
 export function getEnabledTabs(
   profileType?: ProfileType,
   customEnabledTabs?: ProfileTab[] | null
@@ -327,6 +392,10 @@ export function getEnabledTabs(
     });
     const allowed = new Set<ProfileTab>(['info', ...mappedTabs]);
     
+    console.log('[getEnabledTabs] customEnabledTabs:', customEnabledTabs);
+    console.log('[getEnabledTabs] mappedTabs:', mappedTabs);
+    console.log('[getEnabledTabs] allowed set:', Array.from(allowed));
+    
     // Build master tab list from ALL profile types to support cross-type tab selection
     const allTabs = new Map<ProfileTab, TabConfig>();
     Object.values(PROFILE_TYPE_CONFIG).forEach(ptConfig => {
@@ -337,8 +406,15 @@ export function getEnabledTabs(
       });
     });
     
-    // Return tabs that user has enabled, using master list for config
-    return Array.from(allTabs.values()).filter(tab => allowed.has(tab.id));
+    console.log('[getEnabledTabs] allTabs keys:', Array.from(allTabs.keys()));
+    
+    // Return tabs in canonical order, filtered to only those user has enabled
+    const result = TAB_ORDER
+      .filter(tabId => allowed.has(tabId) && allTabs.has(tabId))
+      .map(tabId => allTabs.get(tabId)!);
+    
+    console.log('[getEnabledTabs] result tabs:', result.map(t => t.id));
+    return result;
   }
   
   // Otherwise use profile_type defaults

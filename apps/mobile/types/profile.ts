@@ -85,6 +85,10 @@ export interface ProfileData {
     
     // Gifting Stats
     lifetime_coins_gifted?: number | null;
+    
+    // Channel Banner (for [username]TV)
+    channel_banner_url?: string | null;
+    channel_banner_updated_at?: string | null;
   };
   
   // Gifter Status Mapping

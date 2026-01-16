@@ -56,10 +56,11 @@ export default function CreatorStudioLayout({ children }: { children: ReactNode 
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
-        <div className="flex flex-col lg:flex-row gap-6">
+      {/* Wide mode: at 2xl+ expands container, below 2xl stays max-w-7xl */}
+      <div className="max-w-7xl 2xl:max-w-[1600px] mx-auto px-4 sm:px-6 2xl:px-10 py-6">
+        <div className="flex flex-col lg:flex-row gap-6 2xl:gap-8">
           {/* Sidebar Navigation */}
-          <aside className="lg:w-56 flex-shrink-0">
+          <aside className="lg:w-56 2xl:w-64 flex-shrink-0">
             <div className="sticky top-24">
               <h1 className="text-xl font-bold text-foreground mb-4 flex items-center gap-2">
                 <Film className="w-6 h-6 text-primary" />

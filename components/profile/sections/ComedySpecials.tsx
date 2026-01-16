@@ -28,6 +28,7 @@ type Props = {
   isOwner: boolean;
   cardStyle?: React.CSSProperties;
   borderRadiusClass?: string;
+  buttonColor?: string;
 };
 
 function getYoutubeIdFromUrl(url: string): string | null {
@@ -55,7 +56,7 @@ async function uploadSpecialVideo(profileId: string, specialId: string, file: Fi
   return uploadProfileMedia(profileId, relPath, file, { upsert: true });
 }
 
-export default function ComedySpecials({ profileId, isOwner, cardStyle, borderRadiusClass = 'rounded-2xl' }: Props) {
+export default function ComedySpecials({ profileId, isOwner, cardStyle, borderRadiusClass = 'rounded-2xl', buttonColor = '#DB2777' }: Props) {
   const supabase = useMemo(() => createClient(), []);
 
   const [loading, setLoading] = useState(true);
@@ -135,7 +136,7 @@ export default function ComedySpecials({ profileId, isOwner, cardStyle, borderRa
     <>
       {loading ? (
         <div
-          className={`backdrop-blur-sm ${borderRadiusClass} p-6 border border-gray-200/50 dark:border-gray-700/50 shadow-lg mb-6`}
+          className={`${borderRadiusClass} p-6 border border-gray-200/50 dark:border-gray-700/50 shadow-lg mb-6 bg-white/80 dark:bg-gray-800/80`}
           style={cardStyle}
         >
           <div className="py-10 text-center text-gray-600 dark:text-gray-400">Loading specials…</div>
@@ -279,7 +280,8 @@ export default function ComedySpecials({ profileId, isOwner, cardStyle, borderRa
                   Cancel
                 </button>
                 <button
-                  className="px-4 py-2 rounded-lg text-sm font-bold bg-purple-600 hover:bg-purple-700 text-white disabled:opacity-60"
+                  className="px-4 py-2 rounded-lg text-sm font-bold text-white disabled:opacity-60 transition-opacity hover:opacity-80"
+                  style={{ backgroundColor: buttonColor }}
                   disabled={saving}
                   onClick={async () => {
                     const title = formTitle.trim();

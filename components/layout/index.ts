@@ -54,5 +54,17 @@ export {
   type ProfileStat,
 } from './patterns';
 
+// Wide Layout (Desktop 2xl+ only)
+export {
+  WideLayout,
+  WideContainer,
+  WideText,
+  RightRailSection,
+  type WideLayoutProps,
+  type WideContainerProps,
+  type WideTextProps,
+  type RightRailSectionProps,
+} from './WideLayout';
+
 // NOTE: Skeleton components are in @/components/ui
 // Import from: import { Skeleton, SkeletonCard, ... } from '@/components/ui';

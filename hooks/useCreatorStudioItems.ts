@@ -48,6 +48,8 @@ export interface CreatorStudioItem {
   duration_seconds: number | null;
   likes_count: number;
   created_at: string;
+  tags?: string[] | null;
+  category?: string | null;
 }
 
 interface UseCreatorStudioItemsOptions {

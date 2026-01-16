@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, Image, Pressable, ActivityIndicator } from 'react-native';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { View, Text, StyleSheet, Image, Pressable, ActivityIndicator, ScrollView } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import YoutubePlayer from 'react-native-youtube-iframe';
 import { MusicVideo } from '../../types/profile';
@@ -17,64 +17,6 @@ interface MusicVideosSectionProps {
   };
 }
 
-interface VideoCardProps {
-  video: MusicVideo;
-  isPlaying: boolean;
-  onPress: () => void;
-  colors: any;
-}
-
-function VideoCard({ video, isPlaying, onPress, colors }: VideoCardProps) {
-  const isYouTube = video.video_type === 'youtube' || video.youtube_id;
-
-  return (
-    <View style={styles.videoCardContainer}>
-      <Text style={[styles.videoTitle, { color: colors.text }]} numberOfLines={2}>
-        {video.title}
-      </Text>
-      <View style={styles.videoWrapper}>
-        {isYouTube && video.youtube_id ? (
-          <>
-            <View style={[styles.playerContainer, { opacity: isPlaying ? 1 : 0, zIndex: isPlaying ? 1 : -1 }]}>
-              <YoutubePlayer
-                height={220}
-                play={isPlaying}
-                videoId={video.youtube_id}
-                initialPlayerParams={{
-                  preventFullScreen: false,
-                  modestbranding: true,
-                }}
-                webViewProps={{
-                  androidLayerType: 'hardware',
-                }}
-              />
-            </View>
-            {!isPlaying && (
-              <Pressable onPress={onPress} style={styles.thumbnailContainer}>
-                <Image
-                  source={{ uri: `https://img.youtube.com/vi/${video.youtube_id}/hqdefault.jpg` }}
-                  style={styles.thumbnail}
-                />
-                <View style={styles.playOverlay}>
-                  <View style={[styles.playIconCircle, { backgroundColor: colors.primary }]}>
-                    <Feather name="play" size={32} color="#fff" />
-                  </View>
-                </View>
-              </Pressable>
-            )}
-          </>
-        ) : (
-          <View style={styles.videoPlayer}>
-            <Text style={[styles.errorText, { color: colors.mutedText }]}>
-              Video playback not supported for this format
-            </Text>
-          </View>
-        )}
-      </View>
-    </View>
-  );
-}
-
 export default function MusicVideosSection({
   profileId,
   isOwnProfile,
@@ -87,7 +29,10 @@ export default function MusicVideosSection({
   const textColor = cardStyle?.textColor || colors.text;
   const [videos, setVideos] = useState<MusicVideo[]>([]);
   const [loading, setLoading] = useState(true);
-  const [playingVideoId, setPlayingVideoId] = useState<string | null>(null);
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [playerReady, setPlayerReady] = useState(false);
+  const playerRef = useRef<any>(null);
 
   useEffect(() => {
     loadVideos();
@@ -123,24 +68,47 @@ export default function MusicVideosSection({
     }
   };
 
-  const handleVideoPress = (videoId: string) => {
-    if (playingVideoId === videoId) {
-      setPlayingVideoId(null);
-    } else {
-      setPlayingVideoId(videoId);
+  const currentVideo = videos[currentIndex];
+
+  const handlePrevious = () => {
+    setIsPlaying(false);
+    setPlayerReady(false);
+    setCurrentIndex((prev) => (prev === 0 ? videos.length - 1 : prev - 1));
+  };
+
+  const handleNext = () => {
+    setIsPlaying(false);
+    setPlayerReady(false);
+    setCurrentIndex((prev) => (prev === videos.length - 1 ? 0 : prev + 1));
+  };
+
+  const handlePlayPause = () => {
+    setIsPlaying(prev => !prev);
+  };
+
+  // Sync with YouTube player state changes
+  const onStateChange = useCallback((state: string) => {
+    if (state === 'ended') {
+      setIsPlaying(false);
+      handleNext();
+    } else if (state === 'paused') {
+      setIsPlaying(false);
+    } else if (state === 'playing') {
+      setIsPlaying(true);
     }
+  }, []);
+
+  const handleSelectVideo = (index: number) => {
+    setIsPlaying(false);
+    setCurrentIndex(index);
   };
 
   if (loading) {
     return (
-      <View style={[styles.container, { backgroundColor: colors.surface }]}>
+      <View style={[styles.container, { backgroundColor: cardBg, borderRadius: cardRadius }]}>
         <ActivityIndicator size="small" color={colors.primary} />
       </View>
     );
-  }
-
-  if (videos.length === 0 && !isOwnProfile) {
-    return null;
   }
 
   return (
@@ -153,29 +121,125 @@ export default function MusicVideosSection({
         {isOwnProfile && onEdit && (
           <Pressable onPress={onEdit} style={styles.editButton}>
             <Feather name="plus" size={18} color={colors.primary} />
-            <Text style={[styles.editText, { color: colors.primary }]}>Add Video</Text>
+            <Text style={[styles.editText, { color: colors.primary }]}>Creator Studio</Text>
           </Pressable>
         )}
       </View>
 
       {videos.length === 0 ? (
-        <Text style={[styles.emptyText, { color: colors.mutedText }]}>
-          No music videos yet
-        </Text>
+        <View style={styles.emptyState}>
+          <Feather name="video" size={32} color={colors.mutedText} />
+          <Text style={[styles.emptyText, { color: colors.mutedText }]}>
+            No music videos yet
+          </Text>
+          {isOwnProfile && (
+            <Pressable onPress={onEdit} style={[styles.creatorStudioBtn, { backgroundColor: colors.primary }]}>
+              <Feather name="plus" size={16} color="#fff" />
+              <Text style={styles.creatorStudioBtnText}>Creator Studio</Text>
+            </Pressable>
+          )}
+        </View>
       ) : (
-        <View style={styles.videosList}>
-          {videos.map((video) => {
-            const isPlaying = playingVideoId === video.id;
-            return (
-              <VideoCard
-                key={video.id}
-                video={video}
-                isPlaying={isPlaying}
-                onPress={() => handleVideoPress(video.id)}
-                colors={colors}
-              />
-            );
-          })}
+        <View style={styles.playerSection}>
+          {/* Main Video Player */}
+          <View style={styles.videoWrapper}>
+            {currentVideo?.youtube_id ? (
+              <View style={styles.playerContainer}>
+                <YoutubePlayer
+                  ref={playerRef}
+                  height={200}
+                  play={isPlaying}
+                  videoId={currentVideo.youtube_id}
+                  onChangeState={onStateChange}
+                  onReady={() => setPlayerReady(true)}
+                  forceAndroidAutoplay={true}
+                  initialPlayerParams={{
+                    preventFullScreen: false,
+                    modestbranding: true,
+                    controls: true,
+                  }}
+                  webViewProps={{
+                    androidLayerType: 'hardware',
+                  }}
+                />
+              </View>
+            ) : (
+              <View style={styles.noVideoPlaceholder}>
+                <Feather name="video-off" size={32} color={colors.mutedText} />
+              </View>
+            )}
+          </View>
+
+          {/* Video Title */}
+          <Text style={[styles.currentVideoTitle, { color: textColor }]} numberOfLines={2}>
+            {currentVideo?.title || 'No title'}
+          </Text>
+
+          {/* Playback Controls */}
+          <View style={styles.controls}>
+            <Pressable onPress={handlePrevious} style={[styles.controlBtn, { backgroundColor: colors.surface }]}>
+              <Feather name="skip-back" size={20} color={colors.text} />
+            </Pressable>
+            <Pressable 
+              onPress={currentVideo?.youtube_id ? undefined : handlePlayPause} 
+              style={[
+                styles.playBtn, 
+                { backgroundColor: currentVideo?.youtube_id ? colors.mutedText : colors.primary }
+              ]}
+              disabled={!!currentVideo?.youtube_id}
+            >
+              <Feather name={isPlaying ? 'pause' : 'play'} size={24} color="#fff" />
+            </Pressable>
+            <Pressable onPress={handleNext} style={[styles.controlBtn, { backgroundColor: colors.surface }]}>
+              <Feather name="skip-forward" size={20} color={colors.text} />
+            </Pressable>
+          </View>
+          
+          {/* YouTube hint */}
+          {currentVideo?.youtube_id && (
+            <Text style={[styles.youtubeHint, { color: colors.mutedText }]}>
+              Tap the video above to play/pause
+            </Text>
+          )}
+
+          {/* Video Counter */}
+          <Text style={[styles.videoCounter, { color: colors.mutedText }]}>
+            {currentIndex + 1} / {videos.length}
+          </Text>
+
+          {/* Horizontal Thumbnail List */}
+          {videos.length > 1 && (
+            <ScrollView 
+              horizontal 
+              showsHorizontalScrollIndicator={false} 
+              style={styles.thumbnailList}
+              contentContainerStyle={styles.thumbnailListContent}
+            >
+              {videos.map((video, index) => (
+                <Pressable
+                  key={video.id}
+                  onPress={() => handleSelectVideo(index)}
+                  style={[
+                    styles.thumbnailItem,
+                    index === currentIndex && { borderColor: colors.primary, borderWidth: 2 },
+                  ]}
+                >
+                  <Image
+                    source={{ uri: video.youtube_id 
+                      ? `https://img.youtube.com/vi/${video.youtube_id}/default.jpg`
+                      : video.thumbnail_url || undefined
+                    }}
+                    style={styles.thumbnailSmall}
+                  />
+                  {index === currentIndex && isPlaying && (
+                    <View style={styles.playingIndicator}>
+                      <Feather name="volume-2" size={12} color="#fff" />
+                    </View>
+                  )}
+                </Pressable>
+              ))}
+            </ScrollView>
+          )}
         </View>
       )}
     </View>
@@ -185,13 +249,13 @@ export default function MusicVideosSection({
 const styles = StyleSheet.create({
   container: {
     marginBottom: 16,
+    padding: 16,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 16,
-    paddingHorizontal: 16,
   },
   headerLeft: {
     flexDirection: 'row',
@@ -206,57 +270,51 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
   },
   editText: {
     fontSize: 14,
     fontWeight: '600',
   },
+  emptyState: {
+    alignItems: 'center',
+    paddingVertical: 24,
+    gap: 8,
+  },
   emptyText: {
     fontSize: 14,
     textAlign: 'center',
-    paddingVertical: 20,
+  },
+  creatorStudioBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
     paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 20,
+    marginTop: 8,
   },
-  videosList: {
-    gap: 20,
-  },
-  videoCardContainer: {
-    width: '100%',
-    marginBottom: 8,
-  },
-  videoTitle: {
-    fontSize: 16,
+  creatorStudioBtnText: {
+    color: '#fff',
+    fontSize: 14,
     fontWeight: '600',
-    marginBottom: 8,
-    paddingHorizontal: 16,
+  },
+  playerSection: {
+    alignItems: 'center',
   },
   videoWrapper: {
     width: '100%',
     aspectRatio: 16 / 9,
     overflow: 'hidden',
     backgroundColor: '#000',
+    borderRadius: 12,
     position: 'relative',
   },
   playerContainer: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-  },
-  thumbnailContainer: {
     width: '100%',
     height: '100%',
     position: 'relative',
   },
-  thumbnail: {
-    width: '100%',
-    height: '100%',
-    backgroundColor: '#333',
-  },
-  playOverlay: {
+  videoTapOverlay: {
     position: 'absolute',
     top: 0,
     left: 0,
@@ -264,12 +322,15 @@ const styles = StyleSheet.create({
     bottom: 0,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(0,0,0,0.4)',
+    backgroundColor: 'transparent',
+  },
+  videoTapOverlayPaused: {
+    backgroundColor: 'rgba(0,0,0,0.35)',
   },
   playIconCircle: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
+    width: 64,
+    height: 64,
+    borderRadius: 32,
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#000',
@@ -278,23 +339,76 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 5,
   },
-  videoPlayer: {
+  noVideoPlaceholder: {
     width: '100%',
     height: '100%',
-  },
-  loadingOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(0,0,0,0.7)',
+    backgroundColor: '#222',
   },
-  errorText: {
-    fontSize: 14,
+  currentVideoTitle: {
+    fontSize: 15,
+    fontWeight: '600',
     textAlign: 'center',
-    padding: 20,
+    marginTop: 12,
+    marginBottom: 12,
+    paddingHorizontal: 8,
+  },
+  controls: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+    marginBottom: 8,
+  },
+  controlBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  playBtn: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  videoCounter: {
+    fontSize: 12,
+    marginBottom: 12,
+  },
+  youtubeHint: {
+    fontSize: 11,
+    fontStyle: 'italic',
+    textAlign: 'center',
+    marginBottom: 4,
+  },
+  thumbnailList: {
+    maxHeight: 60,
+  },
+  thumbnailListContent: {
+    gap: 8,
+    paddingHorizontal: 4,
+  },
+  thumbnailItem: {
+    width: 80,
+    height: 50,
+    borderRadius: 6,
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  thumbnailSmall: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: '#333',
+  },
+  playingIndicator: {
+    position: 'absolute',
+    bottom: 4,
+    right: 4,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    borderRadius: 4,
+    padding: 2,
   },
 });

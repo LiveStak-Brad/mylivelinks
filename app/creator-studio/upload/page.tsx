@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useRef } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useRef, useEffect, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import {
   Upload,
   Film,
@@ -46,7 +46,16 @@ const ITEM_TYPES: TypeOption[] = [
 const AUDIO_TYPES: ItemType[] = ['music', 'podcast'];
 
 export default function UploadPage() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center min-h-screen"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div></div>}>
+      <UploadPageContent />
+    </Suspense>
+  );
+}
+
+function UploadPageContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [step, setStep] = useState<'rights' | 'details' | 'upload'>('rights');
@@ -54,6 +63,14 @@ export default function UploadPage() {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [selectedType, setSelectedType] = useState<ItemType | null>(null);
+
+  // Auto-select content type from URL query parameter
+  useEffect(() => {
+    const typeParam = searchParams?.get('type');
+    if (typeParam && ITEM_TYPES.some(t => t.id === typeParam)) {
+      setSelectedType(typeParam as ItemType);
+    }
+  }, [searchParams]);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -141,9 +158,12 @@ export default function UploadPage() {
         .from('uploads')
         .getPublicUrl(storagePath);
 
+      // Update media URL and publish the item (set status='ready' and visibility='public')
       await supabase.rpc('update_creator_studio_item', {
         p_item_id: itemId,
         p_media_url: publicUrlData?.publicUrl || null,
+        p_status: 'ready',
+        p_visibility: 'public',
       });
 
       router.push('/creator-studio/content');

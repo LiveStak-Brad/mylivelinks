@@ -21,12 +21,33 @@ export async function POST(request: NextRequest) {
       ? body.visibility 
       : 'public';
     const feelingId = typeof body?.feeling_id === 'number' ? body.feeling_id : null;
+    const targetProfileId = typeof body?.target_profile_id === 'string' ? body.target_profile_id : null;
 
     if (!textContent && !(mediaUrl && mediaUrl.length) && !feelingId) {
       return NextResponse.json({ error: 'text_content, media_url, or feeling is required' }, { status: 400 });
     }
 
     const supabase = createAuthedRouteHandlerClient(request);
+
+    // Check if posting to own page or someone else's page
+    const isOwnPage = !targetProfileId || targetProfileId === user.id;
+    
+    // Determine approval status
+    let approvalStatus = 'approved'; // Default for own posts
+    
+    if (!isOwnPage) {
+      // Check if user is auto-approved for this page
+      const { data: autoApproved } = await supabase
+        .from('auto_approved_users')
+        .select('id')
+        .eq('page_owner_id', targetProfileId)
+        .eq('approved_user_id', user.id)
+        .maybeSingle();
+      
+      if (!autoApproved) {
+        approvalStatus = 'pending';
+      }
+    }
 
     const { data, error } = await supabase
       .from('posts')
@@ -36,15 +57,20 @@ export async function POST(request: NextRequest) {
         media_url: mediaUrl && mediaUrl.length ? mediaUrl : null,
         visibility: visibility,
         feeling_id: feelingId,
+        target_profile_id: isOwnPage ? null : targetProfileId,
+        approval_status: approvalStatus,
       })
-      .select('id, author_id, text_content, media_url, visibility, feeling_id, created_at')
+      .select('id, author_id, text_content, media_url, visibility, feeling_id, target_profile_id, approval_status, created_at')
       .single();
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
 
-    return NextResponse.json({ post: data }, { status: 200 });
+    return NextResponse.json({ 
+      post: data,
+      requires_approval: approvalStatus === 'pending',
+    }, { status: 200 });
   } catch (err) {
     console.error('POST /api/posts error:', err);
     return NextResponse.json({ error: 'Failed to create post' }, { status: 500 });

@@ -30,7 +30,8 @@ export default function FeedPage() {
       id="main"
       className="min-h-[calc(100vh-7rem)] bg-background pb-20 md:pb-8"
     >
-      <div className="max-w-2xl mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-5">
+      {/* Wide mode: at 2xl+ expands to wider container, below 2xl stays max-w-2xl */}
+      <div className="max-w-2xl 2xl:max-w-6xl mx-auto px-4 sm:px-6 2xl:px-10 py-6 sm:py-8 space-y-5">
         
         {/* Page header with icon */}
         <header className="mb-4 animate-fade-in">

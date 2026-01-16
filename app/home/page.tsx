@@ -281,15 +281,16 @@ export default function LandingPage() {
   return (
     <main id="main" tabIndex={-1} className="min-h-screen bg-gradient-to-br from-primary via-accent to-primary pb-20 md:pb-8">
       {/* MLL PRO Hero */}
-      <div className="container mx-auto px-4 pt-6">
-        <div className="max-w-4xl mx-auto">
+      {/* Wide mode: at 2xl+ expands container, below 2xl stays max-w-4xl */}
+      <div className="container mx-auto px-4 2xl:px-10 pt-6">
+        <div className="max-w-4xl 2xl:max-w-6xl mx-auto">
           <MllProHero />
         </div>
       </div>
 
       {/* Section 1: Teams Banner (Compact + Exciting) */}
-      <div className="container mx-auto px-4 pt-3 pb-3">
-        <div className="max-w-4xl mx-auto">
+      <div className="container mx-auto px-4 2xl:px-10 pt-3 pb-3">
+        <div className="max-w-4xl 2xl:max-w-6xl mx-auto">
           <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 border border-white/10 shadow-xl">
             {/* Animated gradient accent */}
             <div className="absolute inset-0">
@@ -340,8 +341,8 @@ export default function LandingPage() {
         </div>
       </div>
 
-      <div className="container mx-auto px-4 pb-3">
-        <div className="max-w-4xl mx-auto">
+      <div className="container mx-auto px-4 2xl:px-10 pb-3">
+        <div className="max-w-4xl 2xl:max-w-6xl mx-auto">
           <div className="flex items-center justify-between mb-2">
             <p className="text-xs font-semibold text-white/70 uppercase tracking-wide">New Teams</p>
           </div>
@@ -537,16 +538,16 @@ export default function LandingPage() {
 
       {/* Section 2: Referral Network */}
       {currentUser && (
-        <div className="container mx-auto px-4 py-3">
-          <div className="max-w-4xl mx-auto">
+        <div className="container mx-auto px-4 2xl:px-10 py-3">
+          <div className="max-w-4xl 2xl:max-w-6xl mx-auto">
             <ReferralCard />
           </div>
         </div>
       )}
 
       {/* Main Content Section */}
-      <div className="container mx-auto px-4 py-4">
-        <div className="max-w-4xl mx-auto space-y-6">
+      <div className="container mx-auto px-4 2xl:px-10 py-4">
+        <div className="max-w-4xl 2xl:max-w-6xl mx-auto space-y-6">
 
           {/* Recommended Profiles Carousel */}
           <Card className="border-border/50 shadow-xl">

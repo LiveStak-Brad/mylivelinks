@@ -15,6 +15,11 @@ interface ModuleEmptyStateProps {
     mutedText?: string;
     primary: string;
   };
+  cardStyle?: {
+    backgroundColor: string;
+    borderRadius: number;
+    textColor?: string;
+  };
 }
 
 /**
@@ -30,9 +35,11 @@ export default function ModuleEmptyState({
   onCtaPress,
   comingSoon = false,
   colors,
+  cardStyle,
 }: ModuleEmptyStateProps) {
+  const cardBg = cardStyle?.backgroundColor || colors.surface;
   return (
-    <View style={[styles.container, { backgroundColor: colors.surface }]}>
+    <View style={[styles.container, { backgroundColor: cardBg }]}>
       <View style={[styles.iconContainer, { backgroundColor: `${colors.primary}15` }]}>
         <Feather name={icon} size={32} color={colors.primary} />
       </View>

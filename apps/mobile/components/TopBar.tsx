@@ -37,6 +37,16 @@ export default function TopBar() {
           <Ionicons name="menu" size={22} color={colors.icon} />
         </Pressable>
 
+        {/* Replay (popcorn icon) */}
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Replay"
+          onPress={() => navigation.navigate('ReplayScreen')}
+          style={({ pressed }) => [styles.iconButton, pressed && styles.pressed]}
+        >
+          <Text style={{ fontSize: 20 }}>🍿</Text>
+        </Pressable>
+
         {/* Search bar */}
         <Pressable
           accessibilityRole="search"
@@ -50,7 +60,7 @@ export default function TopBar() {
         >
           <Ionicons name="search" size={18} color={colors.mutedText} />
           <Text style={[styles.searchPlaceholder, { color: colors.mutedText }]}>
-            Search MyLiveLinks
+            MyLiveLinks
           </Text>
         </Pressable>
 

@@ -1371,43 +1371,58 @@ export default function SettingsProfileScreen() {
   const [tabsModalOpen, setTabsModalOpen] = useState(false);
 
   // Module definitions with toggle handlers (matching web OPTIONAL_MODULES for parity)
+  // AUTHORITATIVE ORDER from Brad's notepad (1-15):
+  // 1. Social Links, 2. Custom Links, 3. Top Friends, 4. Tab Bar (not a module),
+  // 5. Info/About (always on, profile_stats inside), 6. Top Supporters, 7. Top Streamers,
+  // 8. Merchandise, 9. Business Info, 10. Products, 11. Events, 12. Music Tracks,
+  // 13. Music Videos/Streaming Stats, 14. Connections, 15. Referral Network
+  // NOTE: social_counts belongs in TOP BANNER (not in module list)
+  // NOTE: profile_stats is included inside Info/About (not a separate module position)
   const MODULE_DEFINITIONS: { id: ProfileSection; label: string; description: string }[] = [
-    // Profile modules
-    { id: 'social_counts', label: 'Social Counts', description: 'Follower/following/friends counts' },
-    { id: 'social_media', label: 'Social Media Links', description: 'Instagram, Twitter, TikTok icons' },
+    // 1. Social Links
+    { id: 'social_media', label: 'Social Links', description: 'Instagram, Twitter, TikTok icons' },
+    // 2. Custom Links
     { id: 'links', label: 'Custom Links', description: 'Your Linktree-style link section' },
-    { id: 'connections', label: 'Connections', description: 'Friends and followers display' },
-    // Community
-    { id: 'referral_network', label: 'Referral Network', description: 'Your referral connections' },
+    // 3. Top Friends
     { id: 'top_friends', label: 'Top Friends', description: 'Your favorite people' },
-    // Content
-    { id: 'music_showcase', label: 'Music Tracks', description: 'Your music library' },
-    { id: 'upcoming_events', label: 'Events / Shows', description: 'Your event schedule' },
-    // Stats
-    { id: 'streaming_stats', label: 'Streaming Stats', description: 'Live hours, viewer counts' },
-    { id: 'profile_stats', label: 'Profile Stats', description: 'Account age, join date' },
+    // 5. Info/About is always shown (profile_stats included inside)
+    // 6. Top Supporters
     { id: 'top_supporters', label: 'Top Supporters', description: 'Users who gifted you' },
+    // 7. Top Streamers
     { id: 'top_streamers', label: 'Top Streamers', description: 'Streamers you support' },
-    // Business
+    // 8. Merchandise
     { id: 'merchandise', label: 'Merchandise', description: 'Your merch store' },
-    { id: 'portfolio', label: 'Portfolio / Products', description: 'Your work showcase' },
+    // 9. Business Info
     { id: 'business_info', label: 'Business Info', description: 'Hours, location, contact' },
+    // 10. Products
+    { id: 'portfolio', label: 'Products', description: 'Your work showcase' },
+    // 11. Events
+    { id: 'upcoming_events', label: 'Events', description: 'Your event schedule' },
+    // 12. Music Tracks
+    { id: 'music_showcase', label: 'Music Tracks', description: 'Your music library' },
+    // 13. Streaming Stats (placed after Music Videos per note)
+    { id: 'streaming_stats', label: 'Streaming Stats', description: 'Live hours, viewer counts' },
+    // 15. Referral Network
+    { id: 'referral_network', label: 'Referral Network', description: 'Your referral connections' },
   ];
 
   // Tab definitions
   const TAB_DEFINITIONS: { id: ProfileTab; label: string; description: string; core?: boolean }[] = [
     { id: 'info', label: 'Info', description: 'Core tab (always on)', core: true },
     { id: 'feed', label: 'Feed', description: 'Photo/video feed grid' },
-    { id: 'reels', label: 'Reels', description: 'Short-form video content' },
+    { id: 'reels', label: 'Vlogs', description: 'Short videos throughout your day to keep your fans updated.' },
     { id: 'media', label: 'Media', description: 'Photos & videos gallery' },
+    { id: 'username_tv', label: '[Username]TV', description: 'All long-form video content hub' },
     { id: 'music_videos', label: 'Music Videos', description: 'Music video gallery' },
+    { id: 'podcasts', label: 'Podcasts', description: 'Podcast episodes & shows' },
+    { id: 'series', label: 'Series', description: 'Episodic content & shows' },
+    { id: 'movies', label: 'Movies', description: 'Films & long-form content' },
+    { id: 'education', label: 'Education', description: 'Tutorials & courses' },
+    { id: 'comedy', label: 'Comedy', description: 'Stand-up specials & comedy clips' },
     { id: 'music', label: 'Music', description: 'Music tracks & playlists' },
     { id: 'events', label: 'Events', description: 'Shows & performances' },
     { id: 'products', label: 'Products', description: 'Merchandise & portfolio' },
-    { id: 'podcasts', label: 'Podcasts', description: 'Podcast episodes & shows' },
-    { id: 'movies', label: 'Movies', description: 'Films & long-form content' },
-    { id: 'series', label: 'Series', description: 'Episodic content & shows' },
-    { id: 'education', label: 'Education', description: 'Tutorials & courses' },
+    { id: 'playlists', label: 'Playlists', description: 'Curated YouTube video playlists' },
   ];
 
   // Check if a module is enabled (uses profile type defaults if enabledModules is null)
@@ -2268,6 +2283,167 @@ export default function SettingsProfileScreen() {
               </View>
             </View>
           </View>
+
+          {/* Color Presets */}
+          <View style={{ marginTop: 16, paddingTop: 16, borderTopWidth: 1, borderTopColor: themed.border }}>
+            <Text style={[styles.fieldLabel, { color: themed.text }]}>🎨 Quick Color Presets</Text>
+            <Text style={[styles.fieldHelper, { color: themed.muted, marginBottom: 12 }]}>
+              Tap a preset to apply. Tap the same preset again to return to standard colors.
+            </Text>
+            
+            {/* Return to Standard */}
+            <Pressable
+              onPress={() => {
+                setButtonColor(null);
+                setContentTextColor(null);
+                setUiTextColor(null);
+                setLinkColor(null);
+                setAccentColor('#3B82F6');
+              }}
+              disabled={saving}
+              style={({ pressed }) => [
+                styles.presetBtn,
+                { backgroundColor: themed.card2, borderColor: themed.border },
+                pressed && { opacity: 0.7 },
+              ]}
+            >
+              <Text style={[styles.presetBtnText, { color: themed.text }]}>↩️ Return to Standard</Text>
+            </Pressable>
+
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
+              {/* Classic Blue */}
+              <Pressable
+                onPress={() => {
+                  if (buttonColor === '#3B82F6' && accentColor === '#3B82F6') {
+                    setButtonColor(null); setContentTextColor(null); setUiTextColor(null); setLinkColor(null); setAccentColor('#3B82F6');
+                  } else {
+                    setButtonColor('#3B82F6'); setContentTextColor('#1F2937'); setUiTextColor('#374151'); setLinkColor('#2563EB'); setAccentColor('#3B82F6');
+                  }
+                }}
+                disabled={saving}
+                style={({ pressed }) => [
+                  styles.presetBtn,
+                  buttonColor === '#3B82F6' && accentColor === '#3B82F6'
+                    ? { backgroundColor: '#3B82F6', borderColor: '#2563EB' }
+                    : { backgroundColor: '#DBEAFE', borderColor: '#93C5FD' },
+                  pressed && { opacity: 0.7 },
+                  { flex: 1, minWidth: '45%' },
+                ]}
+              >
+                <Text style={[styles.presetBtnText, buttonColor === '#3B82F6' && accentColor === '#3B82F6' ? { color: '#FFFFFF' } : { color: '#1E40AF' }]}>💙 Classic Blue</Text>
+              </Pressable>
+
+              {/* Purple Dream */}
+              <Pressable
+                onPress={() => {
+                  if (buttonColor === '#8B5CF6' && accentColor === '#8B5CF6') {
+                    setButtonColor(null); setContentTextColor(null); setUiTextColor(null); setLinkColor(null); setAccentColor('#3B82F6');
+                  } else {
+                    setButtonColor('#8B5CF6'); setContentTextColor('#1F2937'); setUiTextColor('#374151'); setLinkColor('#7C3AED'); setAccentColor('#8B5CF6');
+                  }
+                }}
+                disabled={saving}
+                style={({ pressed }) => [
+                  styles.presetBtn,
+                  buttonColor === '#8B5CF6' && accentColor === '#8B5CF6'
+                    ? { backgroundColor: '#8B5CF6', borderColor: '#7C3AED' }
+                    : { backgroundColor: '#EDE9FE', borderColor: '#C4B5FD' },
+                  pressed && { opacity: 0.7 },
+                  { flex: 1, minWidth: '45%' },
+                ]}
+              >
+                <Text style={[styles.presetBtnText, buttonColor === '#8B5CF6' && accentColor === '#8B5CF6' ? { color: '#FFFFFF' } : { color: '#5B21B6' }]}>💜 Purple Dream</Text>
+              </Pressable>
+
+              {/* Hot Pink */}
+              <Pressable
+                onPress={() => {
+                  if (buttonColor === '#EC4899' && accentColor === '#EC4899') {
+                    setButtonColor(null); setContentTextColor(null); setUiTextColor(null); setLinkColor(null); setAccentColor('#3B82F6');
+                  } else {
+                    setButtonColor('#EC4899'); setContentTextColor('#1F2937'); setUiTextColor('#374151'); setLinkColor('#DB2777'); setAccentColor('#EC4899');
+                  }
+                }}
+                disabled={saving}
+                style={({ pressed }) => [
+                  styles.presetBtn,
+                  buttonColor === '#EC4899' && accentColor === '#EC4899'
+                    ? { backgroundColor: '#EC4899', borderColor: '#DB2777' }
+                    : { backgroundColor: '#FCE7F3', borderColor: '#F9A8D4' },
+                  pressed && { opacity: 0.7 },
+                  { flex: 1, minWidth: '45%' },
+                ]}
+              >
+                <Text style={[styles.presetBtnText, buttonColor === '#EC4899' && accentColor === '#EC4899' ? { color: '#FFFFFF' } : { color: '#9D174D' }]}>💗 Hot Pink</Text>
+              </Pressable>
+
+              {/* Fresh Green */}
+              <Pressable
+                onPress={() => {
+                  if (buttonColor === '#10B981' && accentColor === '#10B981') {
+                    setButtonColor(null); setContentTextColor(null); setUiTextColor(null); setLinkColor(null); setAccentColor('#3B82F6');
+                  } else {
+                    setButtonColor('#10B981'); setContentTextColor('#1F2937'); setUiTextColor('#374151'); setLinkColor('#059669'); setAccentColor('#10B981');
+                  }
+                }}
+                disabled={saving}
+                style={({ pressed }) => [
+                  styles.presetBtn,
+                  buttonColor === '#10B981' && accentColor === '#10B981'
+                    ? { backgroundColor: '#10B981', borderColor: '#059669' }
+                    : { backgroundColor: '#D1FAE5', borderColor: '#6EE7B7' },
+                  pressed && { opacity: 0.7 },
+                  { flex: 1, minWidth: '45%' },
+                ]}
+              >
+                <Text style={[styles.presetBtnText, buttonColor === '#10B981' && accentColor === '#10B981' ? { color: '#FFFFFF' } : { color: '#047857' }]}>💚 Fresh Green</Text>
+              </Pressable>
+
+              {/* Warm Amber */}
+              <Pressable
+                onPress={() => {
+                  if (buttonColor === '#F59E0B' && accentColor === '#F59E0B') {
+                    setButtonColor(null); setContentTextColor(null); setUiTextColor(null); setLinkColor(null); setAccentColor('#3B82F6');
+                  } else {
+                    setButtonColor('#F59E0B'); setContentTextColor('#1F2937'); setUiTextColor('#374151'); setLinkColor('#D97706'); setAccentColor('#F59E0B');
+                  }
+                }}
+                disabled={saving}
+                style={({ pressed }) => [
+                  styles.presetBtn,
+                  buttonColor === '#F59E0B' && accentColor === '#F59E0B'
+                    ? { backgroundColor: '#F59E0B', borderColor: '#D97706' }
+                    : { backgroundColor: '#FEF3C7', borderColor: '#FCD34D' },
+                  pressed && { opacity: 0.7 },
+                  { flex: 1, minWidth: '45%' },
+                ]}
+              >
+                <Text style={[styles.presetBtnText, buttonColor === '#F59E0B' && accentColor === '#F59E0B' ? { color: '#FFFFFF' } : { color: '#B45309' }]}>🧡 Warm Amber</Text>
+              </Pressable>
+
+              {/* Dark Mode */}
+              <Pressable
+                onPress={() => {
+                  if (buttonColor === '#1F2937' && accentColor === '#1F2937') {
+                    setButtonColor(null); setContentTextColor(null); setUiTextColor(null); setLinkColor(null); setAccentColor('#3B82F6');
+                  } else {
+                    setButtonColor('#1F2937'); setContentTextColor('#111827'); setUiTextColor('#374151'); setLinkColor('#1F2937'); setAccentColor('#1F2937');
+                  }
+                }}
+                disabled={saving}
+                style={({ pressed }) => [
+                  styles.presetBtn,
+                  buttonColor === '#1F2937' && accentColor === '#1F2937'
+                    ? { backgroundColor: '#1F2937', borderColor: '#111827' }
+                    : { backgroundColor: '#F3F4F6', borderColor: '#D1D5DB' },
+                  pressed && { opacity: 0.7 },
+                  { flex: 1, minWidth: '45%' },
+                ]}
+              >
+                <Text style={[styles.presetBtnText, buttonColor === '#1F2937' && accentColor === '#1F2937' ? { color: '#FFFFFF' } : { color: '#374151' }]}>🖤 Dark Mode</Text>
+              </Pressable>
+            </View>
+          </View>
         </Card>
 
         <Card title="Links Section" icon={<Ionicons name="link-outline" size={18} color={themed.blue600} />}>
@@ -2771,6 +2947,15 @@ const styles = StyleSheet.create({
     borderColor: COLORS.border,
   },
   presetGrid: { marginTop: 10, flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  presetBtn: {
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  presetBtnText: { fontSize: 13, fontWeight: '700' },
 
   previewNote: {
     borderRadius: 16,

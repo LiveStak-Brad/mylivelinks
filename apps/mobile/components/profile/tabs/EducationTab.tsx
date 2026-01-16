@@ -1,7 +1,16 @@
+/**
+ * EducationTab - Education Content Profile Tab (Mobile)
+ * 
+ * Displays tutorials, courses, and educational content.
+ * 
+ * REAL DATA: Fetches from creator_studio_items via get_public_creator_studio_items RPC
+ */
+
 import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
+import { supabase } from '../../../lib/supabase';
 
 type EducationItem = {
   id: string;
@@ -10,17 +19,28 @@ type EducationItem = {
   duration: string;
   category: string;
   publishedAt: string;
+  tags?: string[];
+  topic?: string;
 };
 
 interface EducationTabProps {
   profileId: string;
   colors: any;
   isOwnProfile?: boolean;
+  cardStyle?: {
+    backgroundColor: string;
+    borderRadius: number;
+    textColor?: string;
+  };
 }
 
-export default function EducationTab({ profileId, colors, isOwnProfile = false }: EducationTabProps) {
+export default function EducationTab({ profileId, colors, isOwnProfile = false, cardStyle }: EducationTabProps) {
   const navigation = useNavigation<any>();
   const [loading, setLoading] = useState(true);
+  
+  // Apply card style
+  const cardBg = cardStyle?.backgroundColor || colors.surface;
+  const cardRadius = cardStyle?.borderRadius || 12;
   const [error, setError] = useState<string | null>(null);
   const [content, setContent] = useState<EducationItem[]>([]);
 
@@ -28,11 +48,48 @@ export default function EducationTab({ profileId, colors, isOwnProfile = false }
     setLoading(true);
     setError(null);
     try {
-      // API endpoint: GET /api/profile/:profileId/education
-      // Will be implemented by web team
-      setContent([]);
+      const { data, error: rpcError } = await supabase.rpc('get_public_creator_studio_items', {
+        p_profile_id: profileId,
+        p_item_type: 'education',
+        p_limit: 50,
+        p_offset: 0,
+      });
+      
+      if (rpcError) {
+        console.error('Error fetching education content:', rpcError);
+        setContent([]);
+        return;
+      }
+      
+      if (!data || data.length === 0) {
+        setContent([]);
+        return;
+      }
+      
+      const formatDuration = (seconds: number): string => {
+        if (!seconds || seconds <= 0) return '0:00';
+        const hours = Math.floor(seconds / 3600);
+        const minutes = Math.floor((seconds % 3600) / 60);
+        if (hours > 0) {
+          return `${hours}h ${minutes}m`;
+        }
+        return `${minutes}m`;
+      };
+      
+      const transformedContent: EducationItem[] = data.map((item: any) => ({
+        id: item.id,
+        title: item.title || 'Untitled',
+        description: item.description || '',
+        duration: formatDuration(item.duration_seconds || 0),
+        category: item.category || 'Tutorial',
+        publishedAt: item.created_at,
+        tags: item.tags || [],
+      }));
+      
+      setContent(transformedContent);
     } catch (e: any) {
       setError(e?.message || 'Failed to load education content');
+      setContent([]);
     } finally {
       setLoading(false);
     }
@@ -43,12 +100,9 @@ export default function EducationTab({ profileId, colors, isOwnProfile = false }
   }, [fetchContent]);
 
   const handleItemPress = useCallback((item: EducationItem) => {
-    navigation.navigate('LongFormPlayerScreen', {
-      contentId: item.id,
-      contentType: 'education',
-      title: item.title,
-    });
-  }, [navigation]);
+    // TODO: Implement modal player like PlaylistsTab
+    console.log('Education item pressed:', item.id);
+  }, []);
 
   if (loading) {
     return (
@@ -76,9 +130,9 @@ export default function EducationTab({ profileId, colors, isOwnProfile = false }
 
   if (content.length === 0) {
     return (
-      <View style={[styles.centered, { backgroundColor: colors.bg }]}>
-        <View style={[styles.emptyIcon, { backgroundColor: 'rgba(59,130,246,0.1)' }]}>
-          <Ionicons name="school-outline" size={32} color="#3B82F6" />
+      <View style={[styles.centered, { backgroundColor: cardBg, borderRadius: cardRadius }]}>
+        <View style={[styles.emptyIcon, { backgroundColor: `${colors.primary}15` }]}>
+          <Ionicons name="school-outline" size={32} color={colors.primary} />
         </View>
         <Text style={[styles.emptyTitle, { color: colors.text }]}>No Education Content Yet</Text>
         <Text style={[styles.emptySubtitle, { color: colors.mutedText }]}>
@@ -88,10 +142,10 @@ export default function EducationTab({ profileId, colors, isOwnProfile = false }
           <Pressable
             accessibilityRole="button"
             onPress={() => navigation.navigate('CreatorStudioUploadScreen', { defaultType: 'education' })}
-            style={({ pressed }) => [styles.addBtn, pressed && styles.pressed]}
+            style={({ pressed }) => [styles.addBtn, { backgroundColor: colors.primary }, pressed && styles.pressed]}
           >
             <Ionicons name="add" size={18} color="#FFFFFF" />
-            <Text style={styles.addBtnText}>Add Education</Text>
+            <Text style={styles.addBtnText}>Creator Studio</Text>
           </Pressable>
         )}
       </View>
@@ -109,7 +163,7 @@ export default function EducationTab({ profileId, colors, isOwnProfile = false }
           onPress={() => handleItemPress(item)}
           style={({ pressed }) => [
             styles.itemCard,
-            { backgroundColor: colors.surface, borderColor: colors.border },
+            { backgroundColor: cardBg, borderColor: colors.border, borderRadius: cardRadius },
             pressed && styles.pressed,
           ]}
         >
@@ -123,6 +177,19 @@ export default function EducationTab({ profileId, colors, isOwnProfile = false }
             <Text style={[styles.itemMeta, { color: colors.mutedText }]}>
               {item.duration} • {item.category}
             </Text>
+            {/* Topics/Tags */}
+            {item.tags && item.tags.length > 0 && (
+              <View style={styles.tagsRow}>
+                {item.tags.slice(0, 2).map((tag, idx) => (
+                  <View key={idx} style={styles.tagBadge}>
+                    <Text style={styles.tagText}>#{tag}</Text>
+                  </View>
+                ))}
+                {item.tags.length > 2 && (
+                  <Text style={[styles.tagMore, { color: colors.mutedText }]}>+{item.tags.length - 2}</Text>
+                )}
+              </View>
+            )}
           </View>
           <Ionicons name="play-circle-outline" size={28} color={colors.mutedText} />
         </Pressable>
@@ -203,6 +270,27 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '500',
   },
+  tagsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 4,
+    marginTop: 4,
+  },
+  tagBadge: {
+    backgroundColor: 'rgba(59, 130, 246, 0.15)',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 8,
+  },
+  tagText: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#3B82F6',
+  },
+  tagMore: {
+    fontSize: 10,
+    fontWeight: '500',
+  },
 
   pressed: { opacity: 0.85 },
 
@@ -211,10 +299,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 6,
     marginTop: 16,
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 12,
-    backgroundColor: '#3B82F6',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
   },
   addBtnText: {
     fontSize: 14,

@@ -120,7 +120,8 @@ function MessagesPageContent() {
       id="main"
       className="h-[calc(100dvh-4rem-4rem)] md:h-[calc(100dvh-5rem)] bg-background overflow-hidden fixed top-16 bottom-16 inset-x-0 md:relative md:inset-auto md:top-auto md:bottom-auto"
     >
-      <div className="h-full grid grid-cols-1 md:grid-cols-[480px_1fr]">
+      {/* Wide mode: at 2xl+ expands conversation list width, below 2xl stays 480px */}
+      <div className="h-full grid grid-cols-1 md:grid-cols-[480px_1fr] 2xl:grid-cols-[560px_1fr]">
         {/* Conversations List - Left Panel */}
         <div
           className={`

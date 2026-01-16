@@ -5,7 +5,13 @@
   "installCommand": "npm install",
   "framework": "nextjs",
   "regions": ["iad1"],
-  "public": true
+  "public": true,
+  "crons": [
+    {
+      "path": "/api/cron/event-reminders",
+      "schedule": "0 9 * * *"
+    }
+  ]
 }
 
 

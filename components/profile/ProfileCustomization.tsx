@@ -425,88 +425,101 @@ export default function ProfileCustomization({
             <label className="block text-sm font-semibold mb-3">
               🎨 Quick Color Presets
             </label>
+            <p className="text-xs text-gray-500 mb-3">
+              Click a preset to apply. Click the same preset again to return to standard colors.
+            </p>
             <div className="grid grid-cols-2 gap-2">
+              {/* Return to Standard - always visible */}
               <button
                 type="button"
                 onClick={() => setSettings({
                   ...settings,
-                  button_color: '#3B82F6',
-                  content_text_color: '#1F2937',
-                  ui_text_color: '#374151',
-                  link_color: '#2563EB',
+                  button_color: '',
+                  content_text_color: '',
+                  ui_text_color: '',
+                  link_color: '',
                   accent_color: '#3B82F6'
                 })}
-                className="px-3 py-2 bg-blue-100 text-blue-800 rounded-lg hover:bg-blue-200 transition text-sm font-medium"
+                className="col-span-2 px-3 py-2 bg-gray-50 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 transition text-sm font-medium border border-gray-300 dark:border-gray-600"
+              >
+                ↩️ Return to Standard
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  // Toggle: if already this preset, reset to standard
+                  if (settings.button_color === '#3B82F6' && settings.accent_color === '#3B82F6') {
+                    setSettings({ ...settings, button_color: '', content_text_color: '', ui_text_color: '', link_color: '', accent_color: '#3B82F6' });
+                  } else {
+                    setSettings({ ...settings, button_color: '#3B82F6', content_text_color: '#1F2937', ui_text_color: '#374151', link_color: '#2563EB', accent_color: '#3B82F6' });
+                  }
+                }}
+                className={`px-3 py-2 rounded-lg transition text-sm font-medium ${settings.button_color === '#3B82F6' && settings.accent_color === '#3B82F6' ? 'bg-blue-500 text-white ring-2 ring-blue-600' : 'bg-blue-100 text-blue-800 hover:bg-blue-200'}`}
               >
                 💙 Classic Blue
               </button>
               <button
                 type="button"
-                onClick={() => setSettings({
-                  ...settings,
-                  button_color: '#8B5CF6',
-                  content_text_color: '#1F2937',
-                  ui_text_color: '#374151',
-                  link_color: '#7C3AED',
-                  accent_color: '#8B5CF6'
-                })}
-                className="px-3 py-2 bg-purple-100 text-purple-800 rounded-lg hover:bg-purple-200 transition text-sm font-medium"
+                onClick={() => {
+                  if (settings.button_color === '#8B5CF6' && settings.accent_color === '#8B5CF6') {
+                    setSettings({ ...settings, button_color: '', content_text_color: '', ui_text_color: '', link_color: '', accent_color: '#3B82F6' });
+                  } else {
+                    setSettings({ ...settings, button_color: '#8B5CF6', content_text_color: '#1F2937', ui_text_color: '#374151', link_color: '#7C3AED', accent_color: '#8B5CF6' });
+                  }
+                }}
+                className={`px-3 py-2 rounded-lg transition text-sm font-medium ${settings.button_color === '#8B5CF6' && settings.accent_color === '#8B5CF6' ? 'bg-purple-500 text-white ring-2 ring-purple-600' : 'bg-purple-100 text-purple-800 hover:bg-purple-200'}`}
               >
                 💜 Purple Dream
               </button>
               <button
                 type="button"
-                onClick={() => setSettings({
-                  ...settings,
-                  button_color: '#EC4899',
-                  content_text_color: '#1F2937',
-                  ui_text_color: '#374151',
-                  link_color: '#DB2777',
-                  accent_color: '#EC4899'
-                })}
-                className="px-3 py-2 bg-pink-100 text-pink-800 rounded-lg hover:bg-pink-200 transition text-sm font-medium"
+                onClick={() => {
+                  if (settings.button_color === '#EC4899' && settings.accent_color === '#EC4899') {
+                    setSettings({ ...settings, button_color: '', content_text_color: '', ui_text_color: '', link_color: '', accent_color: '#3B82F6' });
+                  } else {
+                    setSettings({ ...settings, button_color: '#EC4899', content_text_color: '#1F2937', ui_text_color: '#374151', link_color: '#DB2777', accent_color: '#EC4899' });
+                  }
+                }}
+                className={`px-3 py-2 rounded-lg transition text-sm font-medium ${settings.button_color === '#EC4899' && settings.accent_color === '#EC4899' ? 'bg-pink-500 text-white ring-2 ring-pink-600' : 'bg-pink-100 text-pink-800 hover:bg-pink-200'}`}
               >
                 💗 Hot Pink
               </button>
               <button
                 type="button"
-                onClick={() => setSettings({
-                  ...settings,
-                  button_color: '#10B981',
-                  content_text_color: '#1F2937',
-                  ui_text_color: '#374151',
-                  link_color: '#059669',
-                  accent_color: '#10B981'
-                })}
-                className="px-3 py-2 bg-green-100 text-green-800 rounded-lg hover:bg-green-200 transition text-sm font-medium"
+                onClick={() => {
+                  if (settings.button_color === '#10B981' && settings.accent_color === '#10B981') {
+                    setSettings({ ...settings, button_color: '', content_text_color: '', ui_text_color: '', link_color: '', accent_color: '#3B82F6' });
+                  } else {
+                    setSettings({ ...settings, button_color: '#10B981', content_text_color: '#1F2937', ui_text_color: '#374151', link_color: '#059669', accent_color: '#10B981' });
+                  }
+                }}
+                className={`px-3 py-2 rounded-lg transition text-sm font-medium ${settings.button_color === '#10B981' && settings.accent_color === '#10B981' ? 'bg-green-500 text-white ring-2 ring-green-600' : 'bg-green-100 text-green-800 hover:bg-green-200'}`}
               >
                 💚 Fresh Green
               </button>
               <button
                 type="button"
-                onClick={() => setSettings({
-                  ...settings,
-                  button_color: '#F59E0B',
-                  content_text_color: '#1F2937',
-                  ui_text_color: '#374151',
-                  link_color: '#D97706',
-                  accent_color: '#F59E0B'
-                })}
-                className="px-3 py-2 bg-amber-100 text-amber-800 rounded-lg hover:bg-amber-200 transition text-sm font-medium"
+                onClick={() => {
+                  if (settings.button_color === '#F59E0B' && settings.accent_color === '#F59E0B') {
+                    setSettings({ ...settings, button_color: '', content_text_color: '', ui_text_color: '', link_color: '', accent_color: '#3B82F6' });
+                  } else {
+                    setSettings({ ...settings, button_color: '#F59E0B', content_text_color: '#1F2937', ui_text_color: '#374151', link_color: '#D97706', accent_color: '#F59E0B' });
+                  }
+                }}
+                className={`px-3 py-2 rounded-lg transition text-sm font-medium ${settings.button_color === '#F59E0B' && settings.accent_color === '#F59E0B' ? 'bg-amber-500 text-white ring-2 ring-amber-600' : 'bg-amber-100 text-amber-800 hover:bg-amber-200'}`}
               >
                 🧡 Warm Amber
               </button>
               <button
                 type="button"
-                onClick={() => setSettings({
-                  ...settings,
-                  button_color: '#1F2937',
-                  content_text_color: '#111827',
-                  ui_text_color: '#374151',
-                  link_color: '#1F2937',
-                  accent_color: '#1F2937'
-                })}
-                className="px-3 py-2 bg-gray-100 text-gray-800 rounded-lg hover:bg-gray-200 transition text-sm font-medium"
+                onClick={() => {
+                  if (settings.button_color === '#1F2937' && settings.accent_color === '#1F2937') {
+                    setSettings({ ...settings, button_color: '', content_text_color: '', ui_text_color: '', link_color: '', accent_color: '#3B82F6' });
+                  } else {
+                    setSettings({ ...settings, button_color: '#1F2937', content_text_color: '#111827', ui_text_color: '#374151', link_color: '#1F2937', accent_color: '#1F2937' });
+                  }
+                }}
+                className={`px-3 py-2 rounded-lg transition text-sm font-medium ${settings.button_color === '#1F2937' && settings.accent_color === '#1F2937' ? 'bg-gray-700 text-white ring-2 ring-gray-800' : 'bg-gray-100 text-gray-800 hover:bg-gray-200'}`}
               >
                 🖤 Dark Mode
               </button>

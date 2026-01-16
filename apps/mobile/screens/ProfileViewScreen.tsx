@@ -18,11 +18,14 @@ import MusicVideosTab from '../components/profile/tabs/MusicVideosTab';
 import MusicTab from '../components/profile/tabs/MusicTab';
 import EventsTab from '../components/profile/tabs/EventsTab';
 import ProductsTab from '../components/profile/tabs/ProductsTab';
-import ReelsTab from '../components/profile/tabs/ReelsTab';
+import VlogsTab from '../components/profile/tabs/VlogsTab';
 import PodcastsTab from '../components/profile/tabs/PodcastsTab';
 import MoviesTab from '../components/profile/tabs/MoviesTab';
 import SeriesTab from '../components/profile/tabs/SeriesTab';
 import EducationTab from '../components/profile/tabs/EducationTab';
+import UsernameTVTab from '../components/profile/tabs/UsernameTVTab';
+import ComedyTab from '../components/profile/tabs/ComedyTab';
+import PlaylistsTab from '../components/profile/tabs/PlaylistsTab';
 import TopFriendsSection from '../components/profile/TopFriendsSection';
 import TopFriendsManager from '../components/profile/TopFriendsManager';
 import PortfolioManager from '../components/profile/PortfolioManager';
@@ -42,6 +45,7 @@ import LiveIndicatorBanner from '../components/profile/LiveIndicatorBanner';
 import MllProBadge from '../components/shared/MllProBadge';
 import ShareModal from '../components/ShareModal';
 import ReportModal from '../components/ReportModal';
+import ConnectionsModal from '../components/profile/ConnectionsModal';
 
 const API_BASE_URL = 'https://www.mylivelinks.com';
 
@@ -79,6 +83,8 @@ export default function ProfileViewScreen({ routeParams }: ProfileViewScreenProp
   const [topFriendsReloadKey, setTopFriendsReloadKey] = useState(0);
   const [showPortfolioManager, setShowPortfolioManager] = useState(false);
   const [portfolioReloadKey, setPortfolioReloadKey] = useState(0);
+  const [showConnectionsModal, setShowConnectionsModal] = useState(false);
+  const [connectionsInitialTab, setConnectionsInitialTab] = useState<'followers' | 'following' | 'friends'>('followers');
 
   const loadingRef = useRef(false);
   const mountedRef = useRef(true);
@@ -125,6 +131,16 @@ export default function ProfileViewScreen({ routeParams }: ProfileViewScreenProp
     const cardBorderRadius = profile?.card_border_radius || 'medium';
     const accentColor = profile?.accent_color || stylesVars.primary;
     
+    // Font preset mapping (matches web)
+    const fontPresetMap: Record<string, { fontFamily?: string; fontWeight?: string }> = {
+      'modern': { fontFamily: undefined }, // System default sans-serif
+      'classic': { fontFamily: 'serif' },
+      'bold': { fontWeight: '800' },
+      'minimal': { fontWeight: '300' },
+    };
+    const fontPreset = profile?.font_preset || 'modern';
+    const fontStyle = fontPresetMap[fontPreset] || {};
+
     return {
       cardBg: hexToRgba(cardColor, cardOpacity),
       cardRadius: radiusMap[cardBorderRadius] ?? 16,
@@ -132,9 +148,11 @@ export default function ProfileViewScreen({ routeParams }: ProfileViewScreenProp
       // Text colors from profile customization
       contentTextColor: profile?.content_text_color || stylesVars.text,
       uiTextColor: profile?.ui_text_color || stylesVars.text,
-      // Additional fields for future use (low-risk, already in payload)
+      // Additional fields
       buttonColor: profile?.button_color || null,
       linkColor: profile?.link_color || accentColor,
+      fontPreset,
+      fontStyle,
     };
   }, [profileData?.profile, stylesVars.primary, stylesVars.text]);
 
@@ -146,26 +164,22 @@ export default function ProfileViewScreen({ routeParams }: ProfileViewScreenProp
   const enabledSections = useMemo(() => {
     if (!profileData?.profile) return [];
     const rawModules = profileData.profile.enabled_modules;
-    console.log('[ProfileViewScreen] RAW enabled_modules from DB:', JSON.stringify(rawModules));
-    console.log('[ProfileViewScreen] typeof enabled_modules:', typeof rawModules);
-    console.log('[ProfileViewScreen] Array.isArray:', Array.isArray(rawModules));
-    console.log('[ProfileViewScreen] length:', rawModules?.length);
-    console.log('[ProfileViewScreen] profile_type:', profileData.profile.profile_type);
-    
-    const sections = getEnabledSections(profileData.profile.profile_type, rawModules);
-    console.log('[ProfileViewScreen] FINAL enabledSections:', sections.map(s => s.id));
-    return sections;
+    return getEnabledSections(profileData.profile.profile_type, rawModules);
   }, [profileData?.profile]);
 
   const enabledTabs = useMemo(() => {
     if (!profileData?.profile) return [];
-    return getEnabledTabs(profileData.profile.profile_type, profileData.profile.enabled_tabs);
+    const tabs = getEnabledTabs(profileData.profile.profile_type, profileData.profile.enabled_tabs);
+    // Replace username_tv label with dynamic {username}TV
+    return tabs.map(tab => 
+      tab.id === 'username_tv' 
+        ? { ...tab, label: `${profileData.profile.username}TV` }
+        : tab
+    );
   }, [profileData?.profile]);
 
   const shouldShowSection = useCallback((sectionId: string) => {
-    const result = enabledSections.some(s => s.id === sectionId);
-    console.log(`[shouldShowSection] ${sectionId}: ${result}`);
-    return result;
+    return enabledSections.some(s => s.id === sectionId);
   }, [enabledSections]);
 
   const navigateToProfile = useCallback((profileId: string, username: string) => {
@@ -340,6 +354,9 @@ export default function ProfileViewScreen({ routeParams }: ProfileViewScreenProp
   const getFollowButtonConfig = useCallback(() => {
     if (!profileData) return null;
 
+    // Use saved button_color for Follow button, fallback to accent_color then primary
+    const savedButtonColor = effectiveCustomization.buttonColor || effectiveCustomization.accent || stylesVars.primary;
+
     switch (profileData.relationship) {
       case 'friends':
         return {
@@ -357,10 +374,10 @@ export default function ProfileViewScreen({ routeParams }: ProfileViewScreenProp
         return {
           icon: 'user-plus' as const,
           text: 'Follow',
-          color: stylesVars.primary,
+          color: savedButtonColor,
         };
     }
-  }, [profileData, stylesVars.primary]);
+  }, [profileData, stylesVars.primary, effectiveCustomization.buttonColor, effectiveCustomization.accent]);
 
   const followBtnConfig = getFollowButtonConfig();
 
@@ -645,21 +662,21 @@ export default function ProfileViewScreen({ routeParams }: ProfileViewScreenProp
             <View style={[styles.divider, { backgroundColor: stylesVars.border }]} />
 
             <View style={styles.countsRow}>
-              <Pressable style={styles.countChip} onPress={() => showComingSoon('Followers list')}>
+              <Pressable style={styles.countChip} onPress={() => { setConnectionsInitialTab('followers'); setShowConnectionsModal(true); }}>
                 <Text style={[styles.countValue, { color: effectiveCustomization.accent }]}>
                   {profileData.follower_count.toLocaleString()}
                 </Text>
                 <Text style={[styles.countLabel, { color: stylesVars.mutedText }]}>Followers</Text>
               </Pressable>
 
-              <Pressable style={styles.countChip} onPress={() => showComingSoon('Following list')}>
+              <Pressable style={styles.countChip} onPress={() => { setConnectionsInitialTab('following'); setShowConnectionsModal(true); }}>
                 <Text style={[styles.countValue, { color: effectiveCustomization.accent }]}>
                   {profileData.following_count.toLocaleString()}
                 </Text>
                 <Text style={[styles.countLabel, { color: stylesVars.mutedText }]}>Following</Text>
               </Pressable>
 
-              <Pressable style={styles.countChip} onPress={() => showComingSoon('Friends list')}>
+              <Pressable style={styles.countChip} onPress={() => { setConnectionsInitialTab('friends'); setShowConnectionsModal(true); }}>
                 <Text style={[styles.countValue, { color: effectiveCustomization.accent }]}>
                   {profileData.friends_count.toLocaleString()}
                 </Text>
@@ -738,6 +755,25 @@ export default function ProfileViewScreen({ routeParams }: ProfileViewScreenProp
             ) : null
           )}
 
+          {/* Top Friends - Right under Links (matching web layout) */}
+          {shouldShowSection('top_friends') && profile.show_top_friends !== false && (
+            <TopFriendsSection
+              key={topFriendsReloadKey}
+              profileId={profile.id}
+              isOwnProfile={isOwnProfile}
+              title={profile.top_friends_title}
+              avatarStyle={profile.top_friends_avatar_style}
+              maxCount={profile.top_friends_max_count}
+              onManage={() => setShowTopFriendsManager(true)}
+              colors={stylesVars}
+              cardStyle={{
+                backgroundColor: effectiveCustomization.cardBg,
+                borderRadius: effectiveCustomization.cardRadius,
+                textColor: effectiveCustomization.contentTextColor,
+              }}
+            />
+          )}
+
           {enabledTabs.length > 1 && (
             <ProfileTabBar
               tabs={enabledTabs}
@@ -763,7 +799,12 @@ export default function ProfileViewScreen({ routeParams }: ProfileViewScreenProp
                 textColor: effectiveCustomization.contentTextColor,
               }}
             >
-              {/* DEBUG: Force render Top Supporters for testing */}
+              {/* AUTHORITATIVE ORDER from Brad's notepad:
+                 6. Top Supporters, 7. Top Streamers, 8. Merchandise, 9. Business Info,
+                 10. Products, 11. Events, 12. Music Tracks, 13. Streaming Stats,
+                 14. Connections, 15. Referral Network */}
+
+              {/* 6. Top Supporters */}
               {(profileData.top_supporters && profileData.top_supporters.length > 0) ? (
                 <TopSupportersSection
                   supporters={profileData.top_supporters}
@@ -790,7 +831,7 @@ export default function ProfileViewScreen({ routeParams }: ProfileViewScreenProp
                 </View>
               ) : null}
 
-              {/* DEBUG: Force render Top Streamers for testing */}
+              {/* 7. Top Streamers */}
               {(profileData.top_streamers && profileData.top_streamers.length > 0) ? (
                 <TopStreamersSection
                   streamers={profileData.top_streamers}
@@ -816,15 +857,12 @@ export default function ProfileViewScreen({ routeParams }: ProfileViewScreenProp
                 </View>
               ) : null}
 
-              {shouldShowSection('top_friends') && profile.show_top_friends !== false && (
-                <TopFriendsSection
-                  key={topFriendsReloadKey}
+              {/* 8. Merchandise */}
+              {shouldShowSection('merchandise') && (
+                <MerchandiseSection
                   profileId={profile.id}
                   isOwnProfile={isOwnProfile}
-                  title={profile.top_friends_title}
-                  avatarStyle={profile.top_friends_avatar_style}
-                  maxCount={profile.top_friends_max_count}
-                  onManage={() => setShowTopFriendsManager(true)}
+                  onAddItem={() => {}}
                   colors={stylesVars}
                   cardStyle={{
                     backgroundColor: effectiveCustomization.cardBg,
@@ -834,6 +872,96 @@ export default function ProfileViewScreen({ routeParams }: ProfileViewScreenProp
                 />
               )}
 
+              {/* 9. Business Info */}
+              {shouldShowSection('business_info') && (
+                <BusinessInfoSection
+                  profileId={profile.id}
+                  isOwnProfile={isOwnProfile}
+                  onEdit={() => navigation.navigate('CreatorStudioUploadScreen', { defaultType: 'business' })}
+                  colors={stylesVars}
+                  cardStyle={{
+                    backgroundColor: effectiveCustomization.cardBg,
+                    borderRadius: effectiveCustomization.cardRadius,
+                    textColor: effectiveCustomization.contentTextColor,
+                  }}
+                />
+              )}
+
+              {/* 10. Products (portfolio) */}
+              {shouldShowSection('portfolio') && (
+                <PortfolioSection
+                  profileId={profile.id}
+                  isOwnProfile={isOwnProfile}
+                  onAddItem={() => setShowPortfolioManager(true)}
+                  colors={stylesVars}
+                  cardStyle={{
+                    backgroundColor: effectiveCustomization.cardBg,
+                    borderRadius: effectiveCustomization.cardRadius,
+                    textColor: effectiveCustomization.contentTextColor,
+                  }}
+                />
+              )}
+
+              {/* 11. Events (upcoming_events) */}
+              {shouldShowSection('upcoming_events') && (
+                <UpcomingEventsSection
+                  profileId={profile.id}
+                  isOwnProfile={isOwnProfile}
+                  onAddEvent={() => {}}
+                  colors={stylesVars}
+                  cardStyle={{
+                    backgroundColor: effectiveCustomization.cardBg,
+                    borderRadius: effectiveCustomization.cardRadius,
+                    textColor: effectiveCustomization.contentTextColor,
+                  }}
+                />
+              )}
+
+              {/* 12. Music Tracks (music_showcase) */}
+              {shouldShowSection('music_showcase') && (
+                <MusicShowcaseSection
+                  profileId={profile.id}
+                  isOwnProfile={isOwnProfile}
+                  onEdit={() => {}}
+                  colors={stylesVars}
+                  cardStyle={{
+                    backgroundColor: effectiveCustomization.cardBg,
+                    borderRadius: effectiveCustomization.cardRadius,
+                    textColor: effectiveCustomization.contentTextColor,
+                  }}
+                />
+              )}
+
+              {/* Music Videos */}
+              {shouldShowSection('music_videos') && (
+                <MusicVideosSection
+                  profileId={profile.id}
+                  isOwnProfile={isOwnProfile}
+                  onEdit={() => navigation.navigate('CreatorStudioUploadScreen', { defaultType: 'music_video' })}
+                  colors={stylesVars}
+                  cardStyle={{
+                    backgroundColor: effectiveCustomization.cardBg,
+                    borderRadius: effectiveCustomization.cardRadius,
+                    textColor: effectiveCustomization.contentTextColor,
+                  }}
+                />
+              )}
+
+              {/* 13. Streaming Stats - show if module enabled OR if user has stream data */}
+              {!profile.hide_streaming_stats && (
+                <StreamingStatsSection
+                  stats={profileData.stream_stats}
+                  isOwnProfile={isOwnProfile}
+                  colors={stylesVars}
+                  cardStyle={{
+                    backgroundColor: effectiveCustomization.cardBg,
+                    borderRadius: effectiveCustomization.cardRadius,
+                    textColor: effectiveCustomization.contentTextColor,
+                  }}
+                />
+              )}
+
+              {/* 15. Referral Network - LAST in Info tab */}
               {shouldShowSection('referral_network') && isOwnProfile && (
                 <ReferralNetworkSection
                   profileId={profile.id}
@@ -845,134 +973,173 @@ export default function ProfileViewScreen({ routeParams }: ProfileViewScreenProp
                   }}
                 />
               )}
-
-              {/* DEBUG: Force render all sections without shouldShowSection checks */}
-              <MusicShowcaseSection
-                profileId={profile.id}
-                isOwnProfile={isOwnProfile}
-                onEdit={() => {}}
-                colors={stylesVars}
-                cardStyle={{
-                  backgroundColor: effectiveCustomization.cardBg,
-                  borderRadius: effectiveCustomization.cardRadius,
-                  textColor: effectiveCustomization.contentTextColor,
-                }}
-              />
-
-              <MusicVideosSection
-                profileId={profile.id}
-                isOwnProfile={isOwnProfile}
-                onEdit={() => {}}
-                colors={stylesVars}
-                cardStyle={{
-                  backgroundColor: effectiveCustomization.cardBg,
-                  borderRadius: effectiveCustomization.cardRadius,
-                  textColor: effectiveCustomization.contentTextColor,
-                }}
-              />
-
-              <UpcomingEventsSection
-                profileId={profile.id}
-                isOwnProfile={isOwnProfile}
-                onAddEvent={() => {}}
-                colors={stylesVars}
-                cardStyle={{
-                  backgroundColor: effectiveCustomization.cardBg,
-                  borderRadius: effectiveCustomization.cardRadius,
-                  textColor: effectiveCustomization.contentTextColor,
-                }}
-              />
-
-              <PortfolioSection
-                profileId={profile.id}
-                isOwnProfile={isOwnProfile}
-                onAddItem={() => setShowPortfolioManager(true)}
-                colors={stylesVars}
-                cardStyle={{
-                  backgroundColor: effectiveCustomization.cardBg,
-                  borderRadius: effectiveCustomization.cardRadius,
-                  textColor: effectiveCustomization.contentTextColor,
-                }}
-              />
-
-              <StreamingStatsSection
-                stats={profileData.stream_stats}
-                isOwnProfile={isOwnProfile}
-                colors={stylesVars}
-                cardStyle={{
-                  backgroundColor: effectiveCustomization.cardBg,
-                  borderRadius: effectiveCustomization.cardRadius,
-                  textColor: effectiveCustomization.contentTextColor,
-                }}
-              />
-
-              <MerchandiseSection
-                profileId={profile.id}
-                isOwnProfile={isOwnProfile}
-                onAddItem={() => {}}
-                colors={stylesVars}
-                cardStyle={{
-                  backgroundColor: effectiveCustomization.cardBg,
-                  borderRadius: effectiveCustomization.cardRadius,
-                  textColor: effectiveCustomization.contentTextColor,
-                }}
-              />
-
-              <BusinessInfoSection
-                profileId={profile.id}
-                isOwnProfile={isOwnProfile}
-                onEdit={() => navigation.navigate('SettingsProfileScreen')}
-                colors={stylesVars}
-                cardStyle={{
-                  backgroundColor: effectiveCustomization.cardBg,
-                  borderRadius: effectiveCustomization.cardRadius,
-                  textColor: effectiveCustomization.contentTextColor,
-                }}
-              />
             </InfoTab>
       ) : activeTab === 'feed' ? (
         <FeedTab 
           profileId={profile.id} 
           isOwnProfile={isOwnProfile}
-          colors={stylesVars} 
+          colors={stylesVars}
+          cardStyle={{
+            backgroundColor: effectiveCustomization.cardBg,
+            borderRadius: effectiveCustomization.cardRadius,
+            textColor: effectiveCustomization.contentTextColor,
+          }}
         />
       ) : activeTab === 'media' ? (
         <MediaTab 
           profileId={profile.id} 
           isOwnProfile={isOwnProfile}
-          colors={stylesVars} 
+          colors={stylesVars}
+          cardStyle={{
+            backgroundColor: effectiveCustomization.cardBg,
+            borderRadius: effectiveCustomization.cardRadius,
+            textColor: effectiveCustomization.contentTextColor,
+          }}
         />
       ) : activeTab === 'music_videos' ? (
-        <MusicVideosTab profileId={profile.id} colors={stylesVars} />
+        <MusicVideosTab 
+          profileId={profile.id} 
+          colors={stylesVars}
+          isOwner={isOwnProfile}
+          cardStyle={{
+            backgroundColor: effectiveCustomization.cardBg,
+            borderRadius: effectiveCustomization.cardRadius,
+            textColor: effectiveCustomization.contentTextColor,
+          }}
+        />
       ) : activeTab === 'music' ? (
-        <MusicTab profileId={profile.id} colors={stylesVars} />
+        <MusicTab 
+          profileId={profile.id} 
+          colors={stylesVars}
+          isOwnProfile={isOwnProfile}
+          cardStyle={{
+            backgroundColor: effectiveCustomization.cardBg,
+            borderRadius: effectiveCustomization.cardRadius,
+            textColor: effectiveCustomization.contentTextColor,
+          }}
+        />
       ) : activeTab === 'events' ? (
         <EventsTab 
           profileId={profile.id} 
           isOwnProfile={isOwnProfile}
-          colors={stylesVars} 
+          colors={stylesVars}
+          cardStyle={{
+            backgroundColor: effectiveCustomization.cardBg,
+            borderRadius: effectiveCustomization.cardRadius,
+            textColor: effectiveCustomization.contentTextColor,
+          }}
         />
       ) : activeTab === 'products' ? (
         <ProductsTab 
           profileId={profile.id} 
           isOwnProfile={isOwnProfile}
           onAddItem={() => setShowPortfolioManager(true)}
-          colors={stylesVars} 
+          colors={stylesVars}
+          cardStyle={{
+            backgroundColor: effectiveCustomization.cardBg,
+            borderRadius: effectiveCustomization.cardRadius,
+            textColor: effectiveCustomization.contentTextColor,
+          }}
         />
       ) : activeTab === 'reels' ? (
-        <ReelsTab 
+        <VlogsTab 
           profileId={profile.id} 
           isOwnProfile={isOwnProfile}
+          onAddVlog={() => navigation.navigate('CreatorStudioUploadScreen', { defaultType: 'vlog' })}
+          colors={stylesVars}
+          cardStyle={{
+            backgroundColor: effectiveCustomization.cardBg,
+            borderRadius: effectiveCustomization.cardRadius,
+            textColor: effectiveCustomization.contentTextColor,
+          }}
+        />
+      ) : activeTab === 'username_tv' ? (
+        <UsernameTVTab 
+          profileId={profile.id} 
+          username={profile.username} 
+          displayName={profile.display_name}
+          channelBannerUrl={profile.channel_banner_url}
           colors={stylesVars} 
+          isOwnProfile={isOwnProfile}
+          cardStyle={{
+            backgroundColor: effectiveCustomization.cardBg,
+            borderRadius: effectiveCustomization.cardRadius,
+            textColor: effectiveCustomization.contentTextColor,
+          }}
+          onBannerUpdate={(newUrl) => {
+            setProfileData(prev => prev ? {
+              ...prev,
+              profile: { ...prev.profile, channel_banner_url: newUrl }
+            } : prev);
+          }}
         />
       ) : activeTab === 'podcasts' ? (
-        <PodcastsTab profileId={profile.id} colors={stylesVars} isOwnProfile={isOwnProfile} />
+        <PodcastsTab 
+          profileId={profile.id} 
+          colors={stylesVars} 
+          isOwnProfile={isOwnProfile}
+          cardStyle={{
+            backgroundColor: effectiveCustomization.cardBg,
+            borderRadius: effectiveCustomization.cardRadius,
+            textColor: effectiveCustomization.contentTextColor,
+          }}
+        />
       ) : activeTab === 'movies' ? (
-        <MoviesTab profileId={profile.id} colors={stylesVars} isOwnProfile={isOwnProfile} />
+        <MoviesTab 
+          profileId={profile.id} 
+          colors={stylesVars} 
+          isOwnProfile={isOwnProfile}
+          cardStyle={{
+            backgroundColor: effectiveCustomization.cardBg,
+            borderRadius: effectiveCustomization.cardRadius,
+            textColor: effectiveCustomization.contentTextColor,
+          }}
+        />
       ) : activeTab === 'series' ? (
-        <SeriesTab profileId={profile.id} colors={stylesVars} isOwnProfile={isOwnProfile} />
+        <SeriesTab 
+          profileId={profile.id} 
+          colors={stylesVars} 
+          isOwnProfile={isOwnProfile}
+          cardStyle={{
+            backgroundColor: effectiveCustomization.cardBg,
+            borderRadius: effectiveCustomization.cardRadius,
+            textColor: effectiveCustomization.contentTextColor,
+          }}
+        />
       ) : activeTab === 'education' ? (
-        <EducationTab profileId={profile.id} colors={stylesVars} isOwnProfile={isOwnProfile} />
+        <EducationTab 
+          profileId={profile.id} 
+          colors={stylesVars} 
+          isOwnProfile={isOwnProfile}
+          cardStyle={{
+            backgroundColor: effectiveCustomization.cardBg,
+            borderRadius: effectiveCustomization.cardRadius,
+            textColor: effectiveCustomization.contentTextColor,
+          }}
+        />
+      ) : activeTab === 'comedy' ? (
+        <ComedyTab 
+          profileId={profile.id} 
+          colors={stylesVars} 
+          isOwnProfile={isOwnProfile}
+          cardStyle={{
+            backgroundColor: effectiveCustomization.cardBg,
+            borderRadius: effectiveCustomization.cardRadius,
+            textColor: effectiveCustomization.contentTextColor,
+          }}
+        />
+      ) : activeTab === 'playlists' ? (
+        <PlaylistsTab 
+          profileId={profile.id}
+          username={profile.username}
+          colors={stylesVars} 
+          isOwnProfile={isOwnProfile}
+          cardStyle={{
+            backgroundColor: effectiveCustomization.cardBg,
+            borderRadius: effectiveCustomization.cardRadius,
+            textColor: effectiveCustomization.contentTextColor,
+          }}
+        />
       ) : null}
       </View>
     </ScrollView>
@@ -1061,6 +1228,19 @@ export default function ProfileViewScreen({ routeParams }: ProfileViewScreenProp
         reportedUserId={profile.id}
         reportedUsername={profile.username}
         contextDetails={`Profile page for @${profile.username}`}
+      />
+
+      {/* Connections Modal (Followers/Following/Friends with tab switcher) */}
+      <ConnectionsModal
+        visible={showConnectionsModal}
+        onClose={() => setShowConnectionsModal(false)}
+        profileId={profile.id}
+        initialTab={connectionsInitialTab}
+        followerCount={profileData.follower_count}
+        followingCount={profileData.following_count}
+        friendsCount={profileData.friends_count}
+        onNavigateToProfile={navigateToProfile}
+        colors={stylesVars}
       />
 
       {/* Top Friends Manager Modal */}

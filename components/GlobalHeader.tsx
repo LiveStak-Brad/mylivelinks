@@ -355,6 +355,15 @@ export default function GlobalHeader() {
               <Menu className="h-5 w-5" />
             </IconButton>
 
+            {/* Replay (popcorn icon) */}
+            <Link
+              href="/replay"
+              className="flex-shrink-0 p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors"
+              title="Replay"
+            >
+              <span className="global-header-icon flex items-center justify-center text-[length:var(--global-header-icon-size)]">🍿</span>
+            </Link>
+
             {/* Search bar - takes remaining space */}
             <div className="flex-1 min-w-0">
               <GlobalSearchTrigger className="w-full" mobileVariant="none" />
@@ -378,6 +387,18 @@ export default function GlobalHeader() {
             </div>
 
             <div className="flex flex-none items-center justify-center gap-2 lg:gap-3 px-2">
+              {/* Replay (popcorn icon) */}
+              <Link
+                href="/replay"
+                className="group relative nav-icon-button"
+                title="Replay"
+              >
+                <span className="global-header-icon flex items-center justify-center text-[length:var(--global-header-icon-size)]">🍿</span>
+                <span className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-1.5 bg-gray-900 text-white text-sm font-medium rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-[100] hidden md:block">
+                  Replay
+                </span>
+              </Link>
+
               <nav
                 className="flex items-center gap-1 xl:gap-2"
                 role="navigation"

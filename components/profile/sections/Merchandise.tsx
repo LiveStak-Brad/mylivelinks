@@ -32,6 +32,7 @@ interface MerchandiseProps {
   isOwner?: boolean;
   cardStyle?: React.CSSProperties;
   borderRadiusClass?: string;
+  buttonColor?: string;
 }
 
 type DbMerchRow = {
@@ -74,12 +75,58 @@ function parsePriceToCents(input: unknown): number | null {
   return dollars * 100 + cents;
 }
 
+// Trusted merchandise providers
+const TRUSTED_PROVIDERS = [
+  { domain: 'spri.ng', name: 'Spring' },
+  { domain: 'spring.com', name: 'Spring' },
+  { domain: 'teespring.com', name: 'Spring' },
+  { domain: 'shopify.com', name: 'Shopify' },
+  { domain: 'myshopify.com', name: 'Shopify' },
+  { domain: 'etsy.com', name: 'Etsy' },
+  { domain: 'redbubble.com', name: 'Redbubble' },
+  { domain: 'teepublic.com', name: 'TeePublic' },
+  { domain: 'printful.com', name: 'Printful' },
+  { domain: 'printify.com', name: 'Printify' },
+  { domain: 'bonfire.com', name: 'Bonfire' },
+  { domain: 'merchbar.com', name: 'Merchbar' },
+  { domain: 'bigcartel.com', name: 'Big Cartel' },
+  { domain: 'squarespace.com', name: 'Squarespace' },
+  { domain: 'gumroad.com', name: 'Gumroad' },
+  { domain: 'amazon.com', name: 'Amazon' },
+  { domain: 'ebay.com', name: 'eBay' },
+];
+
+function isValidMerchUrl(url: string): { valid: boolean; provider?: string; error?: string } {
+  if (!url || !url.trim()) {
+    return { valid: true }; // URL is optional
+  }
+
+  try {
+    const parsed = new URL(url.trim().toLowerCase());
+    const hostname = parsed.hostname.replace(/^www\./, '');
+
+    for (const provider of TRUSTED_PROVIDERS) {
+      if (hostname === provider.domain || hostname.endsWith('.' + provider.domain)) {
+        return { valid: true, provider: provider.name };
+      }
+    }
+
+    return {
+      valid: false,
+      error: 'Please use a trusted merchandise provider (Spring, Shopify, Etsy, Redbubble, etc.)',
+    };
+  } catch {
+    return { valid: false, error: 'Please enter a valid URL' };
+  }
+}
+
 export default function Merchandise({
   profileId,
   profileType,
   isOwner = false,
   cardStyle,
   borderRadiusClass = 'rounded-2xl',
+  buttonColor = '#DB2777',
 }: MerchandiseProps) {
   const emptyState = useMemo(() => {
     // Keep this local to avoid any confusion with "mock data" providers.
@@ -165,6 +212,15 @@ export default function Merchandise({
 
     const priceCents = parsePriceToCents(values.price);
     const buyUrl = String(values.buy_url ?? '').trim() || null;
+    
+    // Validate URL is from a trusted merchandise provider
+    if (buyUrl) {
+      const urlValidation = isValidMerchUrl(buyUrl);
+      if (!urlValidation.valid) {
+        throw new Error(urlValidation.error || 'Please use a trusted merchandise provider');
+      }
+    }
+    
     const imageUrl = String(values.image_url ?? '').trim() || null;
     const description = String(values.description ?? '').trim() || null;
     const isFeatured = values.is_featured === true;
@@ -217,7 +273,7 @@ export default function Merchandise({
     if (!isOwner) return null;
     return (
       <div
-        className={`backdrop-blur-sm ${borderRadiusClass} p-6 border border-gray-200/50 dark:border-gray-700/50 shadow-lg mb-6`}
+        className={`${borderRadiusClass} p-6 border border-gray-200/50 dark:border-gray-700/50 shadow-lg mb-6 bg-white/80 dark:bg-gray-800/80`}
         style={cardStyle}
       >
         <div className="flex items-center justify-between mb-4">
@@ -227,17 +283,75 @@ export default function Merchandise({
           </h2>
         </div>
 
-        <div className="text-center py-12">
+        <div className="text-center py-8">
           <ShoppingBag className="w-16 h-16 text-gray-400 dark:text-gray-600 mx-auto mb-4" />
           <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2">{emptyState.title}</h3>
-          <p className="text-gray-600 dark:text-gray-400 mb-4">{emptyState.text}</p>
+          <p className="text-gray-600 dark:text-gray-400 mb-2">{emptyState.text}</p>
+          
+          {/* Helper text */}
+          <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+            Merchandise is sold through third-party platforms. Create your merch externally and link it here.
+          </p>
+          
           <button
             onClick={openAdd}
-            className="px-6 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold transition-colors disabled:opacity-60"
+            className="inline-flex items-center gap-1.5 px-5 py-2.5 text-sm font-semibold rounded-full text-white transition-opacity hover:opacity-80 disabled:opacity-60 mb-6"
+            style={{ backgroundColor: buttonColor }}
             disabled={loading}
           >
-            {loading ? 'Loading…' : emptyState.ownerCTA || 'Add Product'}
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+            {loading ? 'Loading…' : 'Add Merch'}
           </button>
+          
+          {/* Recommended Providers */}
+          <div className="border-t border-gray-200 dark:border-gray-700 pt-6 mt-2">
+            <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-4">Recommended Providers</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-lg mx-auto">
+              {/* Spring (Teespring) */}
+              <div className="p-4 bg-gray-50 dark:bg-gray-800/50 rounded-xl border border-gray-200 dark:border-gray-700 text-left">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="w-8 h-8 bg-gradient-to-br from-pink-500 to-purple-600 rounded-lg flex items-center justify-center">
+                    <span className="text-white text-xs font-bold">S</span>
+                  </div>
+                  <span className="font-bold text-gray-900 dark:text-white">Spring</span>
+                </div>
+                <p className="text-xs text-gray-600 dark:text-gray-400 mb-3">
+                  Best for creators · No upfront cost · Handles production & shipping
+                </p>
+                <a
+                  href="https://www.spri.ng"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 text-sm font-semibold text-green-600 hover:text-green-700 dark:text-green-400"
+                >
+                  Set up on Spring
+                  <ExternalLink className="w-3 h-3" />
+                </a>
+              </div>
+              
+              {/* Shopify */}
+              <div className="p-4 bg-gray-50 dark:bg-gray-800/50 rounded-xl border border-gray-200 dark:border-gray-700 text-left">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="w-8 h-8 bg-gradient-to-br from-green-500 to-green-700 rounded-lg flex items-center justify-center">
+                    <span className="text-white text-xs font-bold">S</span>
+                  </div>
+                  <span className="font-bold text-gray-900 dark:text-white">Shopify</span>
+                </div>
+                <p className="text-xs text-gray-600 dark:text-gray-400 mb-3">
+                  Best for full brand stores · Requires setup · Maximum control
+                </p>
+                <a
+                  href="https://www.shopify.com"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 text-sm font-semibold text-green-600 hover:text-green-700 dark:text-green-400"
+                >
+                  Set up on Shopify
+                  <ExternalLink className="w-3 h-3" />
+                </a>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     );
@@ -245,7 +359,7 @@ export default function Merchandise({
 
   return (
     <div
-      className={`backdrop-blur-sm ${borderRadiusClass} p-6 border border-gray-200/50 dark:border-gray-700/50 shadow-lg mb-6`}
+      className={`${borderRadiusClass} p-6 border border-gray-200/50 dark:border-gray-700/50 shadow-lg mb-6 bg-white/80 dark:bg-gray-800/80`}
       style={cardStyle}
     >
       <div className="flex items-center justify-between mb-4">
@@ -256,9 +370,11 @@ export default function Merchandise({
         {isOwner && (
           <button
             onClick={openAdd}
-            className="text-sm font-semibold text-green-600 hover:text-green-700 dark:text-green-400 dark:hover:text-green-300"
+            className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-semibold rounded-full text-white transition-opacity hover:opacity-80"
+            style={{ backgroundColor: buttonColor }}
           >
-            + Add
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+            Add Merch
           </button>
         )}
       </div>
@@ -330,13 +446,18 @@ export default function Merchandise({
                 rel="noopener noreferrer"
                 className="w-full inline-flex items-center justify-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold transition-colors text-sm"
               >
-                Buy
+                View Product
                 <ExternalLink className="w-4 h-4" />
               </a>
             ) : null}
           </div>
         ))}
       </div>
+
+      {/* Disclaimer footer - shown once */}
+      <p className="text-xs text-gray-500 dark:text-gray-400 text-center mt-4 pt-4 border-t border-gray-200/50 dark:border-gray-700/50">
+        Merchandise is sold by third-party providers. MyLiveLinks does not handle payments, shipping, or customer support.
+      </p>
 
       {isOwner && (
         <SectionEditModal
@@ -356,9 +477,9 @@ export default function Merchandise({
           }}
           fields={[
             { key: 'name', label: 'Product Name', type: 'text', required: true },
-            { key: 'price', label: 'Price', type: 'text', placeholder: '29.99' },
+            { key: 'price', label: 'Price (Display Only)', type: 'text', placeholder: '29.99', helpText: 'For display only. Actual price is set on your store.' },
             { key: 'image_url', label: 'Image URL', type: 'url', placeholder: 'https://.../image.jpg' },
-            { key: 'buy_url', label: 'Purchase URL', type: 'url', placeholder: 'https://shop...' },
+            { key: 'buy_url', label: 'Product URL', type: 'url', placeholder: 'https://spri.ng/your-product', required: true, helpText: 'Supported: Spring, Shopify, Etsy, Redbubble, TeePublic, Printful, Printify, Bonfire, Merchbar, Big Cartel, Gumroad, Amazon, eBay' },
             { key: 'description', label: 'Description', type: 'textarea' },
             { key: 'is_featured', label: 'Featured', type: 'checkbox', checkboxLabel: 'Show this item as featured.' },
           ]}

@@ -23,8 +23,6 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     
     // Allowed customization fields
-    // Note: New color fields commented out until migration is applied
-    // Uncomment after running: 20251229_add_granular_color_customization.sql
     const allowedFields = [
       'profile_bg_url',
       'profile_bg_overlay',
@@ -33,10 +31,10 @@ export async function POST(request: NextRequest) {
       'card_border_radius',
       'font_preset',
       'accent_color',
-      // 'button_color',
-      // 'content_text_color',
-      // 'ui_text_color',
-      // 'link_color',
+      'button_color',
+      'content_text_color',
+      'ui_text_color',
+      'link_color',
       'links_section_title'
     ];
     

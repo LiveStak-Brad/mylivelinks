@@ -92,9 +92,9 @@ export default function TopFriendsDisplay({
     if (count === 1) return 'grid-cols-1 max-w-[200px] mx-auto';
     if (count === 2) return 'grid-cols-2 max-w-[400px] mx-auto';
     if (count === 3) return 'grid-cols-3 max-w-[600px] mx-auto';
-    if (count <= 4) return 'grid-cols-2 sm:grid-cols-4 max-w-[800px] mx-auto';
+    if (count <= 4) return 'grid-cols-4 max-w-[800px] mx-auto';
     if (count <= 6) return 'grid-cols-3 sm:grid-cols-3';
-    return 'grid-cols-2 sm:grid-cols-4'; // 7-8 friends
+    return 'grid-cols-4'; // 7-8 friends: 4 on top of 4 (matching mobile app)
   };
 
   // Avatar shape classes

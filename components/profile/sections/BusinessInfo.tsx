@@ -32,6 +32,7 @@ interface BusinessInfoProps {
   isOwner?: boolean;
   cardStyle?: React.CSSProperties;
   borderRadiusClass?: string;
+  buttonColor?: string;
 }
 
 export default function BusinessInfo({
@@ -40,6 +41,7 @@ export default function BusinessInfo({
   isOwner = false,
   cardStyle,
   borderRadiusClass = 'rounded-2xl',
+  buttonColor = '#DB2777',
 }: BusinessInfoProps) {
   const supabase = useMemo(() => createClient(), []);
   const [loading, setLoading] = useState(true);
@@ -126,30 +128,25 @@ export default function BusinessInfo({
   if (!hasAnyBusinessInfo && !loading && isOwner) {
     return (
       <div
-        className={`backdrop-blur-sm ${borderRadiusClass} p-6 border border-gray-200/50 dark:border-gray-700/50 shadow-lg mb-6`}
+        className={`${borderRadiusClass} p-6 border border-gray-200/50 dark:border-gray-700/50 shadow-lg mb-6 bg-white/80 dark:bg-gray-800/80`}
         style={cardStyle}
       >
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-xl font-extrabold text-gray-900 dark:text-white flex items-center gap-2">
             <Briefcase className="w-5 h-5 text-blue-500" />
-            💼 Business Info
+            💼 Business
           </h2>
         </div>
 
-        <div className="space-y-2">
+        <div className="text-center py-4">
+          <p className="text-gray-500 dark:text-gray-400 mb-4">Add your business details for visitors to see</p>
           <button
             onClick={() => setEditOpen(true)}
-            className="w-full text-left px-4 py-3 rounded-xl bg-muted/40 hover:bg-muted/60 transition-colors"
+            className="inline-flex items-center gap-1.5 px-5 py-2.5 text-sm font-semibold rounded-full text-white transition-opacity hover:opacity-80"
+            style={{ backgroundColor: buttonColor }}
           >
-            <span className="text-sm font-semibold text-foreground">Add Business Description (Edit)</span>
-          </button>
-          <button
-            onClick={() => setEditOpen(true)}
-            className="w-full text-left px-4 py-3 rounded-xl bg-muted/40 hover:bg-muted/60 transition-colors"
-          >
-            <span className="text-sm font-semibold text-foreground">
-              Add Website / Email / Phone / Location/Service Area
-            </span>
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+            Add Business
           </button>
         </div>
 
@@ -184,7 +181,7 @@ export default function BusinessInfo({
   if (loading && isOwner) {
     return (
       <div
-        className={`backdrop-blur-sm ${borderRadiusClass} p-6 border border-gray-200/50 dark:border-gray-700/50 shadow-lg mb-6`}
+        className={`${borderRadiusClass} p-6 border border-gray-200/50 dark:border-gray-700/50 shadow-lg mb-6 bg-white/80 dark:bg-gray-800/80`}
         style={cardStyle}
       >
         <div className="animate-pulse space-y-3">
@@ -199,19 +196,21 @@ export default function BusinessInfo({
   // Normal state
   return (
     <div
-      className={`backdrop-blur-sm ${borderRadiusClass} p-6 border border-gray-200/50 dark:border-gray-700/50 shadow-lg mb-6`}
+      className={`${borderRadiusClass} p-6 border border-gray-200/50 dark:border-gray-700/50 shadow-lg mb-6 bg-white/80 dark:bg-gray-800/80`}
       style={cardStyle}
     >
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-xl font-extrabold text-gray-900 dark:text-white flex items-center gap-2">
           <Briefcase className="w-5 h-5 text-blue-500" />
-          💼 Business Info
+          💼 Business
         </h2>
         {isOwner && (
           <button
             onClick={() => setEditOpen(true)}
-            className="text-sm font-semibold text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+            className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-semibold rounded-full text-white transition-opacity hover:opacity-80"
+            style={{ backgroundColor: buttonColor }}
           >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
             Edit
           </button>
         )}

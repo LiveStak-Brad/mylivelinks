@@ -1,20 +1,25 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, Image, Pressable, ActivityIndicator, Dimensions, Modal, ScrollView, Linking } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Feather, Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '../../../lib/supabase';
 import ModuleEmptyState from '../ModuleEmptyState';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
-const GRID_SPACING = 2;
+const GRID_SPACING = 0;
 const NUM_COLUMNS = 3;
-const ITEM_SIZE = (SCREEN_WIDTH - (NUM_COLUMNS + 1) * GRID_SPACING) / NUM_COLUMNS;
+const ITEM_SIZE = SCREEN_WIDTH / NUM_COLUMNS;
 
 interface MediaTabProps {
   profileId: string;
   isOwnProfile?: boolean;
   onAddMedia?: () => void;
   colors: any;
+  cardStyle?: {
+    backgroundColor: string;
+    borderRadius: number;
+    textColor?: string;
+  };
 }
 
 interface MediaItem {
@@ -24,14 +29,21 @@ interface MediaItem {
   thumbnail_url?: string;
   text_content?: string;
   created_at: string;
+  views_count?: number;
+  like_count?: number;
+  comment_count?: number;
 }
 
-export default function MediaTab({ profileId, isOwnProfile = false, onAddMedia, colors }: MediaTabProps) {
+export default function MediaTab({ profileId, isOwnProfile = false, onAddMedia, colors, cardStyle }: MediaTabProps) {
   const insets = useSafeAreaInsets();
   const [media, setMedia] = useState<MediaItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedMedia, setSelectedMedia] = useState<MediaItem | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
+  
+  // Apply card style
+  const cardBg = cardStyle?.backgroundColor || colors.surface;
+  const cardRadius = cardStyle?.borderRadius || 8;
 
   useEffect(() => {
     loadMedia();
@@ -60,7 +72,10 @@ export default function MediaTab({ profileId, isOwnProfile = false, onAddMedia, 
           media_type,
           thumbnail_url,
           text_content,
-          created_at
+          created_at,
+          views_count,
+          like_count,
+          comment_count
         `)
         .eq('author_id', profileId)
         .not('media_url', 'is', null)
@@ -82,7 +97,7 @@ export default function MediaTab({ profileId, isOwnProfile = false, onAddMedia, 
           const isVideo = /(\.mp4|\.mov|\.webm|\.mkv|\.avi)(\?|$)/i.test(url);
           return {
             ...item,
-            media_type: isVideo ? 'video' : 'image'
+            media_type: isVideo ? 'video' : 'image',
           };
         });
       
@@ -112,20 +127,42 @@ export default function MediaTab({ profileId, isOwnProfile = false, onAddMedia, 
       : item.media_url;
     
     return (
-      <Pressable style={styles.mediaItem} onPress={() => handleMediaPress(item)}>
-        <Image
-          source={{ uri: displayUrl }}
-          style={styles.mediaThumbnail}
-          resizeMode="cover"
-        />
-        {item.media_type === 'video' && (
-          <View style={styles.playOverlay}>
-            <View style={[styles.playButton, { backgroundColor: colors.primary }]}>
-              <Feather name="play" size={16} color="#fff" />
-            </View>
+      <View style={[styles.mediaItem, { borderWidth: 1, borderColor: cardBg }]}>
+        <Pressable style={{ flex: 1 }} onPress={() => handleMediaPress(item)}>
+          <Image
+            source={{ uri: displayUrl }}
+            style={styles.mediaThumbnail}
+            resizeMode="cover"
+          />
+          {/* Top left - reactions */}
+          <View style={styles.overlayTopLeft}>
+            <Ionicons name="heart" size={10} color="#fff" />
+            <Text style={styles.overlayText}>{item.like_count ?? 0}</Text>
           </View>
-        )}
-      </Pressable>
+          {/* Top right - views */}
+          <View style={styles.overlayTopRight}>
+            <Ionicons name="eye" size={10} color="#fff" />
+            <Text style={styles.overlayText}>{item.views_count ?? 0}</Text>
+          </View>
+          {/* Bottom left - comments */}
+          <View style={styles.overlayBottomLeft}>
+            <Ionicons name="chatbubble" size={10} color="#fff" />
+            <Text style={styles.overlayText}>{item.comment_count ?? 0}</Text>
+          </View>
+          {/* Bottom right - title */}
+          {item.text_content && (
+            <View style={styles.overlayBottomRight}>
+              <Text style={styles.overlayTitle} numberOfLines={1}>{item.text_content}</Text>
+            </View>
+          )}
+          {/* Play icon for videos */}
+          {item.media_type === 'video' && (
+            <View style={styles.playOverlay}>
+              <Ionicons name="play" size={24} color="#EC4899" />
+            </View>
+          )}
+        </Pressable>
+      </View>
     );
   };
 
@@ -140,7 +177,7 @@ export default function MediaTab({ profileId, isOwnProfile = false, onAddMedia, 
   if (media.length === 0) {
     if (!isOwnProfile) {
       return (
-        <View style={[styles.emptyContainer, { backgroundColor: colors.surface }]}>
+        <View style={[styles.emptyContainer, { backgroundColor: cardBg, borderRadius: cardRadius }]}>
           <Feather name="image" size={48} color={colors.mutedText} />
           <Text style={[styles.emptyText, { color: colors.mutedText }]}>
             No media yet
@@ -157,6 +194,7 @@ export default function MediaTab({ profileId, isOwnProfile = false, onAddMedia, 
         ctaLabel="Add Media"
         onCtaPress={onAddMedia}
         colors={colors}
+        cardStyle={cardStyle}
       />
     );
   }
@@ -282,6 +320,63 @@ const styles = StyleSheet.create({
   mediaItem: {
     width: ITEM_SIZE,
     height: ITEM_SIZE,
+    position: 'relative',
+  },
+  overlayTopLeft: {
+    position: 'absolute',
+    top: 4,
+    left: 4,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    paddingHorizontal: 4,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  overlayTopRight: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    paddingHorizontal: 4,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  overlayBottomLeft: {
+    position: 'absolute',
+    bottom: 4,
+    left: 4,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    paddingHorizontal: 4,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  overlayBottomRight: {
+    position: 'absolute',
+    bottom: 4,
+    right: 4,
+    maxWidth: '60%',
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    paddingHorizontal: 4,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  overlayText: {
+    color: '#fff',
+    fontSize: 9,
+    fontWeight: '600',
+  },
+  overlayTitle: {
+    color: '#fff',
+    fontSize: 9,
+    fontWeight: '500',
     position: 'relative',
   },
   mediaThumbnail: {
