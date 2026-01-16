@@ -95,14 +95,19 @@ function formatTimeAgo(dateString: string): string {
   return `${Math.floor(diffDays / 365)} years ago`;
 }
 
-function VideoCard({ item }: { item: ReplayItem }) {
+function VideoCard({ item, allItems }: { item: ReplayItem; allItems?: ReplayItem[] }) {
   const [imageError, setImageError] = useState(false);
   const youtubeId = item.media_url ? extractYoutubeId(item.media_url) : null;
   const thumbnail = item.thumb_url || item.artwork_url || (youtubeId ? getYoutubeThumbnail(youtubeId) : null);
+  
+  // Build queue parameter from all items for prev/next navigation
+  const queueParam = allItems && allItems.length > 1 
+    ? `?queue=${allItems.map(i => i.id).join(',')}`
+    : '';
 
   return (
     <Link 
-      href={`/replay/${item.owner_username}/${item.id}`}
+      href={`/replay/${item.owner_username}/${item.id}${queueParam}`}
       className="group block"
     >
       <div className="relative aspect-video rounded-xl overflow-hidden bg-gray-200 dark:bg-gray-800 shadow-md group-hover:shadow-xl transition-shadow">
@@ -352,7 +357,7 @@ export default function ReplayHomePage() {
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4">
               {displayItems.map((item) => (
-                <VideoCard key={item.id} item={item} />
+                <VideoCard key={item.id} item={item} allItems={displayItems} />
               ))}
             </div>
           )}

@@ -77,12 +77,17 @@ function formatTimeAgo(dateString: string): string {
   return `${Math.floor(diffDays / 365)} years ago`;
 }
 
-function VideoCard({ video, username, showSeriesInfo = true }: { video: TVVideoItem; username: string; showSeriesInfo?: boolean }) {
+function VideoCard({ video, username, showSeriesInfo = true, allVideos }: { video: TVVideoItem; username: string; showSeriesInfo?: boolean; allVideos?: TVVideoItem[] }) {
   const [imageError, setImageError] = useState(false);
+  
+  // Build queue parameter from all videos for prev/next navigation
+  const queueParam = allVideos && allVideos.length > 1 
+    ? `?queue=${allVideos.map(v => v.id).join(',')}`
+    : '';
 
   return (
     <Link 
-      href={`/replay/${username}/${video.id}`}
+      href={`/replay/${username}/${video.id}${queueParam}`}
       className="group cursor-pointer"
     >
       {/* Thumbnail */}
@@ -568,7 +573,7 @@ export default function TVPage() {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-6">
             {filteredVideos.map((video) => (
-              <VideoCard key={video.id} video={video} username={username} />
+              <VideoCard key={video.id} video={video} username={username} allVideos={filteredVideos} />
             ))}
           </div>
         )}

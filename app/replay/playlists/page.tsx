@@ -95,9 +95,9 @@ function PRPVideoCard({ item }: { item: PRPItem }) {
 
   return (
     <div className="group">
-      {/* Video link - opens in curator mode (no gifting) */}
+      {/* Video link - opens with playlist context for prev/next */}
       <Link 
-        href={`/replay/${item.curator_username}/${item.item_id}?curator=true`}
+        href={`/replay/${item.curator_username}/${item.youtube_video_id || item.item_id}?playlist=${item.playlist_id}`}
         className="block"
       >
         <div className="relative aspect-video rounded-xl overflow-hidden bg-gray-200 dark:bg-gray-800">
@@ -148,7 +148,7 @@ function PRPVideoCard({ item }: { item: PRPItem }) {
         
         <div className="flex-1 min-w-0">
           <Link 
-            href={`/replay/${item.curator_username}/${item.item_id}?curator=true`}
+            href={`/replay/${item.curator_username}/${item.youtube_video_id || item.item_id}?playlist=${item.playlist_id}`}
             className="block"
           >
             <h3 className="text-sm font-medium text-gray-900 dark:text-white line-clamp-2 group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors">

@@ -53,6 +53,7 @@ interface RelatedVideosProps {
   contentType: string;
   username: string;
   playlistId?: string | null;
+  videoQueue?: string[]; // Queue of video IDs for prev/next navigation
   onVideoChange?: (youtubeVideoId: string) => void;
   onAutoNextReady?: (autoNextFn: () => void) => void;
   currentUserId?: string | null;
@@ -228,10 +229,11 @@ function PlaylistVideoCard({
   );
 }
 
-export default function RelatedVideos({ currentVideoId, contentType, username, playlistId, onVideoChange, onAutoNextReady, currentUserId, onAddSong }: RelatedVideosProps) {
+export default function RelatedVideos({ currentVideoId, contentType, username, playlistId, videoQueue, onVideoChange, onAutoNextReady, currentUserId, onAddSong }: RelatedVideosProps) {
   const [videos, setVideos] = useState<TVVideoItem[]>([]);
   const [playlistInfo, setPlaylistInfo] = useState<PlaylistInfo | null>(null);
   const [playlistVideos, setPlaylistVideos] = useState<PlaylistVideoItem[]>([]);
+  const [queueVideos, setQueueVideos] = useState<TVVideoItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -239,6 +241,48 @@ export default function RelatedVideos({ currentVideoId, contentType, username, p
       setIsLoading(true);
       try {
         const supabase = createClient();
+        
+        // If video queue provided (from /replay feed), load those videos
+        if (videoQueue && videoQueue.length > 0) {
+          // Fetch video details for all queue IDs
+          const { data: queueData } = await supabase
+            .from('creator_studio_items')
+            .select('*, profiles:owner_profile_id(id, username, display_name, avatar_url)')
+            .in('id', videoQueue);
+          
+          if (queueData && queueData.length > 0) {
+            const transformed: TVVideoItem[] = queueData.map((item: any) => {
+              const youtubeId = item.media_url ? extractYoutubeId(item.media_url) : null;
+              return {
+                id: item.id,
+                title: item.title,
+                description: item.description || '',
+                thumbnail_url: item.thumb_url || item.artwork_url || (youtubeId ? getYoutubeThumbnail(youtubeId) : ''),
+                video_url: item.media_url || '',
+                duration: '',
+                duration_seconds: item.duration_seconds || 0,
+                views: 0,
+                likes: 0,
+                published_at: item.created_at,
+                content_type: item.item_type || 'other',
+                creator: {
+                  id: item.profiles?.id || '',
+                  username: item.profiles?.username || '',
+                  display_name: item.profiles?.display_name || item.profiles?.username || '',
+                  avatar_url: item.profiles?.avatar_url || '',
+                  subscriber_count: 0,
+                },
+              };
+            });
+            // Sort by original queue order
+            const sortedVideos = videoQueue
+              .map(id => transformed.find(v => v.id === id))
+              .filter((v): v is TVVideoItem => v !== undefined);
+            setQueueVideos(sortedVideos);
+          }
+          setIsLoading(false);
+          return;
+        }
         
         // If playlist ID provided, load playlist info and videos
         if (playlistId) {
@@ -338,7 +382,15 @@ export default function RelatedVideos({ currentVideoId, contentType, username, p
     };
 
     loadContent();
-  }, [currentVideoId, contentType, username, playlistId]);
+  }, [currentVideoId, contentType, username, playlistId, videoQueue]);
+
+  // Find current video index for queue navigation
+  const queueCurrentIndex = useMemo(() => {
+    return queueVideos.findIndex(v => v.id === currentVideoId);
+  }, [queueVideos, currentVideoId]);
+
+  const queuePrevVideo = queueCurrentIndex > 0 ? queueVideos[queueCurrentIndex - 1] : null;
+  const queueNextVideo = queueCurrentIndex < queueVideos.length - 1 ? queueVideos[queueCurrentIndex + 1] : null;
 
   // Find current video index and prev/next videos for playlist navigation
   const currentIndex = useMemo(() => {
@@ -384,6 +436,122 @@ export default function RelatedVideos({ currentVideoId, contentType, username, p
       onAutoNextReady(() => autoNextFn);
     }
   }, [onAutoNextReady, playlistId]);
+
+  // Queue mode (from /replay feed)
+  if (videoQueue && videoQueue.length > 0 && queueVideos.length > 0) {
+    const handleQueuePrev = () => {
+      if (queuePrevVideo && onVideoChange) {
+        const youtubeId = extractYoutubeId(queuePrevVideo.video_url);
+        if (youtubeId) onVideoChange(youtubeId);
+      }
+    };
+
+    const handleQueueNext = () => {
+      if (queueNextVideo && onVideoChange) {
+        const youtubeId = extractYoutubeId(queueNextVideo.video_url);
+        if (youtubeId) onVideoChange(youtubeId);
+      }
+    };
+
+    return (
+      <div>
+        {/* Queue header - same style as playlist */}
+        <div className="mb-4 p-3 bg-gray-100 dark:bg-gray-800 rounded-lg">
+          <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">
+            Up Next
+          </p>
+          <h2 className="text-base font-bold text-gray-900 dark:text-white">
+            Replay Feed
+          </h2>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+            {queueVideos.length} videos • {queueCurrentIndex + 1} of {queueVideos.length}
+          </p>
+          
+          {/* Previous / Next buttons */}
+          <div className="flex items-center gap-2 mt-3">
+            <button
+              onClick={handleQueuePrev}
+              disabled={!queuePrevVideo}
+              className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                queuePrevVideo
+                  ? 'bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-white hover:bg-gray-300 dark:hover:bg-gray-600'
+                  : 'bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-600 cursor-not-allowed'
+              }`}
+            >
+              <SkipBack className="w-4 h-4" />
+              Previous
+            </button>
+            <button
+              onClick={handleQueueNext}
+              disabled={!queueNextVideo}
+              className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                queueNextVideo
+                  ? 'bg-purple-600 text-white hover:bg-purple-700'
+                  : 'bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-600 cursor-not-allowed'
+              }`}
+            >
+              Next
+              <SkipForward className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+        
+        {/* Queue videos - horizontal on mobile, vertical on desktop */}
+        {isLoading ? (
+          <RelatedVideosSkeleton />
+        ) : (
+          <>
+            {/* Mobile: Horizontal scroll */}
+            <div className="lg:hidden overflow-x-auto scrollbar-hide -mx-4 px-4">
+              <div className="flex gap-3 pb-2" style={{ width: 'max-content' }}>
+                {queueVideos.map((video, index) => {
+                  const youtubeId = extractYoutubeId(video.video_url);
+                  const isCurrent = video.id === currentVideoId;
+                  return (
+                    <button
+                      key={video.id}
+                      onClick={() => youtubeId && onVideoChange?.(youtubeId)}
+                      className={`flex-shrink-0 w-36 text-left transition-opacity ${
+                        isCurrent ? 'opacity-100' : 'opacity-80 hover:opacity-100'
+                      }`}
+                    >
+                      <div className="relative aspect-video rounded-lg overflow-hidden bg-gray-200 dark:bg-gray-700 mb-2">
+                        <Image
+                          src={video.thumbnail_url || (youtubeId ? `https://img.youtube.com/vi/${youtubeId}/hqdefault.jpg` : '')}
+                          alt={video.title}
+                          fill
+                          className="object-cover"
+                        />
+                        {isCurrent && (
+                          <div className="absolute inset-0 bg-purple-600/30 flex items-center justify-center">
+                            <Play className="w-6 h-6 text-white fill-white" />
+                          </div>
+                        )}
+                      </div>
+                      <h4 className={`text-xs font-medium line-clamp-2 ${
+                        isCurrent 
+                          ? 'text-purple-600 dark:text-purple-400' 
+                          : 'text-gray-900 dark:text-white'
+                      }`}>
+                        {video.title}
+                      </h4>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+            
+            {/* Desktop: Vertical list */}
+            <div className="hidden lg:block space-y-3">
+              {queueVideos.map(video => (
+                <RelatedVideoCard key={video.id} video={video} username={video.creator.username} />
+              ))}
+            </div>
+          </>
+        )}
+      </div>
+    );
+  }
 
   // Playlist mode
   if (playlistId && playlistInfo) {

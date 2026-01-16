@@ -60,6 +60,10 @@ export default function ReplayPlayerPage() {
   const username = params?.username ?? '';
   const initialVideoId = params?.id ?? '';
   const playlistId = searchParams?.get('playlist') ?? null;
+  const queueParam = searchParams?.get('queue') ?? null;
+  
+  // Parse queue parameter into array of video IDs
+  const videoQueue = queueParam ? queueParam.split(',') : [];
   
   // Track current video ID in state for smooth transitions
   const [currentVideoId, setCurrentVideoId] = useState(initialVideoId);
@@ -430,6 +434,7 @@ export default function ReplayPlayerPage() {
               contentType={video.content_type}
               username={username}
               playlistId={playlistId}
+              videoQueue={videoQueue}
               onVideoChange={handleVideoChange}
               onAutoNextReady={setAutoNextFn}
               currentUserId={currentUserId}
