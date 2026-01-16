@@ -60,13 +60,35 @@ export function useCallSessionWeb(options: UseCallSessionWebOptions = {}) {
   const [status, setStatus] = useState<CallStatus>('idle');
   const [activeCall, setActiveCall] = useState<ActiveCall | null>(null);
   const [incomingCall, setIncomingCall] = useState<IncomingCall | null>(null);
+  
+  // Keep a ref to the current call ID for reliable access in callbacks
+  const currentCallIdRef = useRef<string | null>(null);
   const [error, setError] = useState<Error | null>(null);
+  
+  // Refs for callbacks to avoid stale closures in useEffect
+  const onIncomingCallRef = useRef(onIncomingCall);
+  const onCallEndedRef = useRef(onCallEnded);
+  const onErrorRef = useRef(onError);
+  const activeCallRef = useRef(activeCall);
+  
+  // Keep refs updated
+  useEffect(() => { onIncomingCallRef.current = onIncomingCall; }, [onIncomingCall]);
+  useEffect(() => { onCallEndedRef.current = onCallEnded; }, [onCallEnded]);
+  useEffect(() => { onErrorRef.current = onError; }, [onError]);
+  useEffect(() => { activeCallRef.current = activeCall; }, [activeCall]);
   
   // RTC state
   const [room, setRoom] = useState<Room | null>(null);
   const [isAudioEnabled, setIsAudioEnabled] = useState(true);
   const [isVideoEnabled, setIsVideoEnabled] = useState(true);
+  const [isSpeakerEnabled, setIsSpeakerEnabled] = useState(true);
   const [remoteParticipant, setRemoteParticipant] = useState<RemoteParticipant | null>(null);
+  
+  // Ref to store remote audio elements for speaker mute
+  const remoteAudioElementsRef = useRef<HTMLAudioElement[]>([]);
+  
+  // State to store remote video track for UI attachment
+  const [remoteVideoTrack, setRemoteVideoTrack] = useState<any>(null);
   
   // Refs for cleanup
   const roomRef = useRef<Room | null>(null);
@@ -196,6 +218,7 @@ export function useCallSessionWeb(options: UseCallSessionWebOptions = {}) {
       newRoom.on(RoomEvent.ParticipantConnected, (participant) => {
         if (participant instanceof RemoteParticipant) {
           console.log('[CALL] Remote participant connected:', participant.identity);
+          console.log('[CALL] Remote participant tracks:', Array.from(participant.trackPublications.values()).map(t => ({ kind: t.kind, subscribed: t.isSubscribed })));
           setRemoteParticipant(participant);
         }
       });
@@ -211,6 +234,34 @@ export function useCallSessionWeb(options: UseCallSessionWebOptions = {}) {
         console.log('[CALL] Room disconnected');
       });
       
+      // Track subscription events - crucial for audio/video
+      newRoom.on(RoomEvent.TrackSubscribed, (track, publication, participant) => {
+        console.log('[CALL] Track subscribed:', track.kind, 'from', participant.identity);
+        if (track.kind === 'audio') {
+          // Attach audio track to play it
+          const audioElement = track.attach();
+          audioElement.play().catch(e => console.error('[CALL] Audio play error:', e));
+          // Store reference for speaker mute control
+          remoteAudioElementsRef.current.push(audioElement);
+          console.log('[CALL] Audio track attached and playing');
+        } else if (track.kind === 'video') {
+          console.log('[CALL] Video track received, storing for UI');
+          // Store the track so UI can attach it
+          setRemoteVideoTrack(track);
+          // Also store on window for immediate access
+          (window as any).__livekitRemoteVideoTrack = track;
+        }
+      });
+      
+      newRoom.on(RoomEvent.TrackUnsubscribed, (track, publication, participant) => {
+        console.log('[CALL] Track unsubscribed:', track.kind, 'from', participant.identity);
+        track.detach();
+      });
+      
+      newRoom.on(RoomEvent.TrackPublished, (publication, participant) => {
+        console.log('[CALL] Track published by remote:', publication.kind, 'from', participant.identity, 'subscribed:', publication.isSubscribed);
+      });
+      
       // Connect
       await newRoom.connect(url, token);
       console.log('[CALL] Connected to room');
@@ -218,25 +269,59 @@ export function useCallSessionWeb(options: UseCallSessionWebOptions = {}) {
       roomRef.current = newRoom;
       setRoom(newRoom);
       
-      // Check for existing remote participants
+      // Check for existing remote participants and their tracks
       const existingParticipants = Array.from(newRoom.remoteParticipants.values());
+      console.log('[CALL] Existing remote participants:', existingParticipants.length);
       if (existingParticipants.length > 0) {
-        setRemoteParticipant(existingParticipants[0]);
+        const remoteP = existingParticipants[0];
+        setRemoteParticipant(remoteP);
+        console.log('[CALL] Existing remote participant:', remoteP.identity);
+        
+        // Subscribe to existing tracks
+        remoteP.trackPublications.forEach((publication) => {
+          console.log('[CALL] Existing track publication:', publication.kind, 'subscribed:', publication.isSubscribed);
+          if (publication.track && publication.kind === 'audio') {
+            const audioElement = publication.track.attach();
+            audioElement.play().catch(e => console.error('[CALL] Audio play error:', e));
+            console.log('[CALL] Attached existing audio track');
+          }
+        });
       }
       
-      // Create and publish local tracks
+      // Create and publish local tracks - handle video failure gracefully
       const { createLocalTracks: createTracks } = await import('livekit-client');
-      const tracks = await createTracks({
-        audio: true,
-        video: callType === 'video',
-      });
+      let tracks: LocalTrack[] = [];
+      
+      try {
+        // Try to create both audio and video tracks
+        tracks = await createTracks({
+          audio: true,
+          video: callType === 'video',
+        });
+      } catch (trackErr: any) {
+        console.warn('[CALL] Error creating tracks with video, falling back to audio only:', trackErr.message);
+        // Fall back to audio only if video fails
+        try {
+          tracks = await createTracks({
+            audio: true,
+            video: false,
+          });
+        } catch (audioErr: any) {
+          console.error('[CALL] Error creating audio track:', audioErr);
+          throw audioErr;
+        }
+      }
       
       localTracksRef.current = tracks;
       
       // Publish tracks
       for (const track of tracks) {
-        await newRoom.localParticipant.publishTrack(track);
-        console.log('[CALL] Published track:', track.kind);
+        try {
+          await newRoom.localParticipant.publishTrack(track);
+          console.log('[CALL] Published track:', track.kind);
+        } catch (pubErr: any) {
+          console.warn('[CALL] Error publishing track:', track.kind, pubErr.message);
+        }
       }
       
       return newRoom;
@@ -314,6 +399,7 @@ export function useCallSessionWeb(options: UseCallSessionWebOptions = {}) {
         .eq('id', calleeId)
         .single();
       
+      currentCallIdRef.current = callId;
       setActiveCall({
         callId,
         roomName,
@@ -440,9 +526,17 @@ export function useCallSessionWeb(options: UseCallSessionWebOptions = {}) {
 
   // End the current call
   const endCall = useCallback(async (reason: string = 'hangup'): Promise<boolean> => {
-    const callId = activeCall?.callId || incomingCall?.callId;
+    // Use ref first, then fall back to state
+    const callId = currentCallIdRef.current || activeCall?.callId || incomingCall?.callId;
+    console.log('[CALL] endCall called, ref:', currentCallIdRef.current, 'activeCall:', activeCall?.callId, 'incomingCall:', incomingCall?.callId);
     
     if (!callId) {
+      console.error('[CALL] No callId found to end');
+      // Force reset state anyway
+      currentCallIdRef.current = null;
+      setActiveCall(null);
+      setIncomingCall(null);
+      setStatus('idle');
       return false;
     }
     
@@ -461,9 +555,16 @@ export function useCallSessionWeb(options: UseCallSessionWebOptions = {}) {
       
       console.log('[CALL] Call ended:', callId, reason);
       
+      currentCallIdRef.current = null;
       setActiveCall(null);
       setIncomingCall(null);
       setRemoteParticipant(null);
+      
+      // Reset audio/video/speaker state for next call
+      setIsAudioEnabled(true);
+      setIsVideoEnabled(true);
+      setIsSpeakerEnabled(true);
+      remoteAudioElementsRef.current = [];
       
       onCallEnded?.(reason);
       
@@ -480,32 +581,63 @@ export function useCallSessionWeb(options: UseCallSessionWebOptions = {}) {
     }
   }, [activeCall, incomingCall, supabase, disconnectRoom, clearRingTimeout, onCallEnded, onError]);
 
-  // Toggle audio
+  // Toggle audio (mute/unmute) - use roomRef for current value
   const toggleAudio = useCallback(async () => {
-    if (!room) return;
+    const currentRoom = roomRef.current;
+    console.log('[CALL] toggleAudio called, room:', !!currentRoom, 'isAudioEnabled:', isAudioEnabled);
+    if (!currentRoom) {
+      console.error('[CALL] No room to toggle audio');
+      return;
+    }
     
-    const audioTrack = localTracksRef.current.find(t => t.kind === 'audio');
-    if (audioTrack) {
+    try {
       if (isAudioEnabled) {
-        await room.localParticipant.setMicrophoneEnabled(false);
+        await currentRoom.localParticipant.setMicrophoneEnabled(false);
+        console.log('[CALL] Microphone disabled (muted)');
       } else {
-        await room.localParticipant.setMicrophoneEnabled(true);
+        await currentRoom.localParticipant.setMicrophoneEnabled(true);
+        console.log('[CALL] Microphone enabled (unmuted)');
       }
       setIsAudioEnabled(!isAudioEnabled);
+    } catch (err) {
+      console.error('[CALL] Error toggling audio:', err);
     }
-  }, [room, isAudioEnabled]);
+  }, [isAudioEnabled]);
 
-  // Toggle video
+  // Toggle video (camera on/off) - use roomRef for current value
   const toggleVideo = useCallback(async () => {
-    if (!room) return;
-    
-    if (isVideoEnabled) {
-      await room.localParticipant.setCameraEnabled(false);
-    } else {
-      await room.localParticipant.setCameraEnabled(true);
+    const currentRoom = roomRef.current;
+    console.log('[CALL] toggleVideo called, room:', !!currentRoom, 'isVideoEnabled:', isVideoEnabled);
+    if (!currentRoom) {
+      console.error('[CALL] No room to toggle video');
+      return;
     }
-    setIsVideoEnabled(!isVideoEnabled);
-  }, [room, isVideoEnabled]);
+    
+    try {
+      if (isVideoEnabled) {
+        await currentRoom.localParticipant.setCameraEnabled(false);
+        console.log('[CALL] Camera disabled');
+      } else {
+        await currentRoom.localParticipant.setCameraEnabled(true);
+        console.log('[CALL] Camera enabled');
+      }
+      setIsVideoEnabled(!isVideoEnabled);
+    } catch (err) {
+      console.error('[CALL] Error toggling video:', err);
+    }
+  }, [isVideoEnabled]);
+
+  // Toggle speaker (mute/unmute incoming audio)
+  const toggleSpeaker = useCallback(() => {
+    console.log('[CALL] toggleSpeaker called, isSpeakerEnabled:', isSpeakerEnabled, 'audioElements:', remoteAudioElementsRef.current.length);
+    
+    const newState = !isSpeakerEnabled;
+    remoteAudioElementsRef.current.forEach(audioEl => {
+      audioEl.muted = !newState; // muted = true means speaker off
+      console.log('[CALL] Set audio element muted:', !newState);
+    });
+    setIsSpeakerEnabled(newState);
+  }, [isSpeakerEnabled]);
 
   // Subscribe to call updates via realtime (using call_sessions table)
   useEffect(() => {
@@ -529,7 +661,9 @@ export function useCallSessionWeb(options: UseCallSessionWebOptions = {}) {
           
           // call_sessions uses 'pending' status, not 'ringing'
           if (payload.eventType === 'INSERT' && call?.status === 'pending') {
-            // Incoming call
+            // Incoming call - clear any activeCall state first
+            setActiveCall(null);
+            
             const { data: callerProfile } = await supabase
               .from('profiles')
               .select('username, avatar_url')
@@ -548,10 +682,11 @@ export function useCallSessionWeb(options: UseCallSessionWebOptions = {}) {
               createdAt: new Date(call.created_at),
             };
             
-            console.log('[CALL] Incoming call:', incoming);
+            console.log('[CALL] Incoming call - setting incomingCall, clearing activeCall:', incoming);
+            currentCallIdRef.current = call.id;
             setIncomingCall(incoming);
             setStatus('ringing');
-            onIncomingCall?.(incoming);
+            onIncomingCallRef.current?.(incoming);
           }
         }
       )
@@ -565,10 +700,10 @@ export function useCallSessionWeb(options: UseCallSessionWebOptions = {}) {
         },
         async (payload: any) => {
           const call = payload.new;
-          console.log('[CALL] Realtime event (caller):', payload.eventType, call?.status);
+          console.log('[CALL] Realtime event (caller):', payload.eventType, call?.status, 'activeCallRef:', activeCallRef.current?.callId, 'call.id:', call?.id);
           
           // Handle call status changes for caller
-          if (call?.status === 'accepted' && activeCall?.callId === call.id) {
+          if (call?.status === 'accepted' && activeCallRef.current?.callId === call.id) {
             // Callee accepted - connect to room
             console.log('[CALL] Call accepted by callee, connecting to room');
             clearRingTimeout();
@@ -582,21 +717,21 @@ export function useCallSessionWeb(options: UseCallSessionWebOptions = {}) {
               console.error('[CALL] Error connecting after accept:', err);
               setError(err);
               setStatus('failed');
-              onError?.(err);
+              onErrorRef.current?.(err);
             }
-          } else if (call?.status === 'declined' && activeCall?.callId === call.id) {
+          } else if (call?.status === 'declined' && activeCallRef.current?.callId === call.id) {
             console.log('[CALL] Call declined by callee');
             clearRingTimeout();
             setStatus('declined');
             setActiveCall(null);
-            onCallEnded?.('declined');
+            onCallEndedRef.current?.('declined');
             setTimeout(() => setStatus('idle'), 2000);
-          } else if (call?.status === 'ended' && activeCall?.callId === call.id) {
+          } else if (call?.status === 'ended' && activeCallRef.current?.callId === call.id) {
             console.log('[CALL] Call ended by other party');
             await disconnectRoom();
             setStatus('ended');
             setActiveCall(null);
-            onCallEnded?.('ended');
+            onCallEndedRef.current?.('ended');
             setTimeout(() => setStatus('idle'), 1000);
           }
         }
@@ -612,7 +747,9 @@ export function useCallSessionWeb(options: UseCallSessionWebOptions = {}) {
       supabase.removeChannel(channel);
       channelRef.current = null;
     };
-  }, [currentUserId, enabled, supabase, activeCall, connectToRoom, disconnectRoom, clearRingTimeout, onIncomingCall, onCallEnded, onError]);
+    // Only re-subscribe when user or enabled changes, not on every state change
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentUserId, enabled]);
 
   // Check for existing active call on mount (query call_sessions directly)
   // Only restore calls that are recent (within last 2 minutes) to avoid stale state
@@ -659,8 +796,10 @@ export function useCallSessionWeb(options: UseCallSessionWebOptions = {}) {
       }
       
       console.log('[CALL] Found existing active call:', data);
+      console.log('[CALL] currentUserId:', currentUserId, 'caller_id:', data.caller_id, 'callee_id:', data.callee_id);
       
       const isCaller = data.caller_id === currentUserId;
+      console.log('[CALL] isCaller:', isCaller);
       const otherUserId = isCaller ? data.callee_id : data.caller_id;
       
       // Get other user's profile
@@ -672,6 +811,7 @@ export function useCallSessionWeb(options: UseCallSessionWebOptions = {}) {
       
       if (data.status === 'accepted' || data.status === 'active') {
         // Both parties should connect to the room
+        currentCallIdRef.current = data.id;
         setActiveCall({
           callId: data.id,
           roomName: data.room_name,
@@ -697,6 +837,9 @@ export function useCallSessionWeb(options: UseCallSessionWebOptions = {}) {
       } else if (data.status === 'pending') {
         if (!isCaller) {
           // We're the callee - this is an INCOMING call, set incomingCall not activeCall
+          // Clear any activeCall that might have been set incorrectly
+          currentCallIdRef.current = data.id;
+          setActiveCall(null);
           console.log('[CALL] Setting as incoming call for callee');
           setIncomingCall({
             callId: data.id,
@@ -710,7 +853,7 @@ export function useCallSessionWeb(options: UseCallSessionWebOptions = {}) {
             createdAt: new Date(data.created_at),
           });
           setStatus('ringing');
-          onIncomingCall?.({
+          onIncomingCallRef.current?.({
             callId: data.id,
             caller: {
               id: otherUserId,
@@ -723,6 +866,7 @@ export function useCallSessionWeb(options: UseCallSessionWebOptions = {}) {
           });
         } else {
           // We're the caller - this is an outgoing call that's still ringing
+          currentCallIdRef.current = data.id;
           setActiveCall({
             callId: data.id,
             roomName: data.room_name,
@@ -741,7 +885,8 @@ export function useCallSessionWeb(options: UseCallSessionWebOptions = {}) {
     };
     
     checkActiveCall();
-  }, [currentUserId, enabled, supabase, connectToRoom]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentUserId, enabled]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -750,6 +895,41 @@ export function useCallSessionWeb(options: UseCallSessionWebOptions = {}) {
       disconnectRoom();
     };
   }, [clearRingTimeout, disconnectRoom]);
+
+  // Attach remote video to a video element
+  const attachRemoteVideo = useCallback((videoElement: HTMLVideoElement | null) => {
+    if (!videoElement) return;
+    
+    // Check if we have a stored remote video track
+    const storedTrack = (window as any).__livekitRemoteVideoTrack || remoteVideoTrack;
+    if (storedTrack) {
+      console.log('[CALL] Attaching stored remote video track to element');
+      storedTrack.attach(videoElement);
+      return;
+    }
+    
+    // Fallback: try to get from remote participant
+    if (!remoteParticipant) return;
+    
+    const videoPublication = Array.from(remoteParticipant.trackPublications.values())
+      .find(pub => pub.kind === 'video' && pub.track);
+    
+    if (videoPublication?.track) {
+      console.log('[CALL] Attaching remote video from publication');
+      videoPublication.track.attach(videoElement);
+    }
+  }, [remoteParticipant, remoteVideoTrack]);
+  
+  // Attach local video to a video element
+  const attachLocalVideo = useCallback((videoElement: HTMLVideoElement | null) => {
+    if (!videoElement) return;
+    
+    const localVideoTrack = localTracksRef.current.find(t => t.kind === 'video');
+    if (localVideoTrack) {
+      console.log('[CALL] Attaching local video to element');
+      localVideoTrack.attach(videoElement);
+    }
+  }, []);
 
   return {
     // State
@@ -761,6 +941,7 @@ export function useCallSessionWeb(options: UseCallSessionWebOptions = {}) {
     remoteParticipant,
     isAudioEnabled,
     isVideoEnabled,
+    isSpeakerEnabled,
     
     // Actions
     initiateCall,
@@ -769,6 +950,9 @@ export function useCallSessionWeb(options: UseCallSessionWebOptions = {}) {
     endCall,
     toggleAudio,
     toggleVideo,
+    toggleSpeaker,
+    attachRemoteVideo,
+    attachLocalVideo,
     
     // Computed
     isInCall: status === 'connected',

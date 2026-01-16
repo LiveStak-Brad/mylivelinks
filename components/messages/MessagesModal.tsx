@@ -31,7 +31,7 @@ export default function MessagesModal({ isOpen, onClose, anchorRef }: MessagesMo
   const [showThread, setShowThread] = useState(false);
   const [modalPosition, setModalPosition] = useState<ModalPosition>({ top: 0, left: 0 });
 
-  // Real call session hook
+  // Call session hook - always enabled to receive incoming calls even when modal is closed
   const callSession = useCallSessionWeb({
     enabled: true,
     onIncomingCall: (call) => {
@@ -40,12 +40,9 @@ export default function MessagesModal({ isOpen, onClose, anchorRef }: MessagesMo
     onCallEnded: (reason) => {
       console.log('[MessagesModal] Call ended:', reason);
     },
-    onError: (err) => {
-      console.error('[MessagesModal] Call error:', err);
-    },
   });
 
-  // Call UI state (for minimized bubble)
+  // Call UI state
   const [isCallMinimized, setIsCallMinimized] = useState(false);
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
@@ -76,14 +73,6 @@ export default function MessagesModal({ isOpen, onClose, anchorRef }: MessagesMo
   const callType: CallType = callSession.activeCall?.callType || callSession.incomingCall?.callType || 'voice';
   const isIncomingCall = !!callSession.incomingCall && !callSession.activeCall;
   
-  // Debug logging
-  console.log('[MessagesModal] Call state:', {
-    status: callSession.status,
-    isCallActive,
-    isIncomingCall,
-    hasActiveCall: !!callSession.activeCall,
-    hasIncomingCall: !!callSession.incomingCall,
-  });
   const callParticipant: CallParticipant | null = callSession.activeCall ? {
     id: callSession.activeCall.otherParticipant.id,
     username: callSession.activeCall.otherParticipant.username,
@@ -247,8 +236,9 @@ export default function MessagesModal({ isOpen, onClose, anchorRef }: MessagesMo
   }, [activeConversation, callSession]);
 
   const handleEndCall = useCallback(async () => {
-    console.log('[MessagesModal] Ending call');
-    await callSession.endCall();
+    console.log('[MessagesModal] Ending call, activeCall:', callSession.activeCall?.callId, 'incomingCall:', callSession.incomingCall?.callId);
+    const result = await callSession.endCall();
+    console.log('[MessagesModal] End call result:', result);
   }, [callSession]);
 
   const handleAcceptCall = useCallback(async () => {
@@ -270,16 +260,19 @@ export default function MessagesModal({ isOpen, onClose, anchorRef }: MessagesMo
   }, []);
 
   const handleToggleMute = useCallback(() => {
+    console.log('[MessagesModal] Toggle mute clicked');
     callSession.toggleAudio();
   }, [callSession]);
 
   const handleToggleVideo = useCallback(() => {
+    console.log('[MessagesModal] Toggle video clicked');
     callSession.toggleVideo();
   }, [callSession]);
 
   const handleToggleSpeaker = useCallback(() => {
-    // Speaker toggle not implemented in web hook yet
-  }, []);
+    console.log('[MessagesModal] Toggle speaker clicked');
+    callSession.toggleSpeaker();
+  }, [callSession]);
 
   // Get current user info for local participant
   const localParticipant: CallParticipant = {
@@ -291,10 +284,60 @@ export default function MessagesModal({ isOpen, onClose, anchorRef }: MessagesMo
   // Derive mute/video state from hook
   const isMuted = !callSession.isAudioEnabled;
   const isVideoOff = !callSession.isVideoEnabled;
-  const isSpeakerOn = true; // Not implemented yet
-  const callDuration = 0; // TODO: Add duration tracking to hook
+  const isSpeakerOn = callSession.isSpeakerEnabled;
+  
+  // Call duration timer
+  const [callDuration, setCallDuration] = useState(0);
+  useEffect(() => {
+    if (callSession.status === 'connected') {
+      const interval = setInterval(() => {
+        setCallDuration(prev => prev + 1);
+      }, 1000);
+      return () => clearInterval(interval);
+    } else {
+      setCallDuration(0);
+    }
+  }, [callSession.status]);
 
-  if (!isOpen || !mounted) return null;
+  // Attach video tracks when refs and remote participant/track are available
+  useEffect(() => {
+    console.log('[MessagesModal] Video attach effect - status:', callSession.status, 'callType:', callType, 'callStatus:', callStatus);
+    console.log('[MessagesModal] remoteVideoRef.current:', !!remoteVideoRef.current, 'localVideoRef.current:', !!localVideoRef.current);
+    
+    if (callSession.status === 'connected') {
+      // Attach local video
+      if (localVideoRef.current) {
+        callSession.attachLocalVideo(localVideoRef.current);
+      }
+      
+      // Attach remote video - try immediately and also when remoteParticipant changes
+      if (remoteVideoRef.current) {
+        console.log('[MessagesModal] Attaching remote video to ref');
+        callSession.attachRemoteVideo(remoteVideoRef.current);
+      } else {
+        console.log('[MessagesModal] remoteVideoRef not available yet');
+      }
+    }
+  }, [callSession.status, callSession.remoteParticipant, callSession, callType, callStatus]);
+  
+  // Retry attaching remote video with delays to handle timing issues
+  useEffect(() => {
+    if (callSession.status === 'connected' && callType === 'video') {
+      // Multiple retries with increasing delays
+      const timers = [100, 500, 1000, 2000].map(delay => 
+        setTimeout(() => {
+          if (remoteVideoRef.current) {
+            console.log('[MessagesModal] Retry attaching remote video after', delay, 'ms');
+            callSession.attachRemoteVideo(remoteVideoRef.current);
+          }
+        }, delay)
+      );
+      return () => timers.forEach(t => clearTimeout(t));
+    }
+  }, [callSession.status, callSession, callType]);
+
+  // Always render call UI even when modal is closed, but only show messages content when open
+  if (!mounted) return null;
 
   // Mobile: Full screen with single pane navigation (PWA-optimized)
   const mobileContent = (
@@ -412,9 +455,10 @@ export default function MessagesModal({ isOpen, onClose, anchorRef }: MessagesMo
   // Use portal to render at body level for proper z-index stacking
   return createPortal(
     <>
-      {isMobile ? mobileContent : desktopContent}
+      {/* Only show messages content when modal is open */}
+      {isOpen && (isMobile ? mobileContent : desktopContent)}
 
-      {/* Call Modal - Full screen when active and not minimized */}
+      {/* Call Modal - Full screen when active and not minimized (shows even when messages modal is closed) */}
       {isCallActive && !isCallMinimized && callParticipant && (
         <CallModal
           isOpen={true}
