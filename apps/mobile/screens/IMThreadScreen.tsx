@@ -177,6 +177,7 @@ export default function IMThreadScreen() {
   const showCallModal = call.callState !== 'idle' && call.callState !== 'ended' && call.callState !== 'incoming_invite';
   const callMode: CallMode = call.callType || 'voice';
   const isCallConnected = call.callState === 'in_call';
+  const isCallConnecting = call.callState === 'connecting' || call.callState === 'outgoing_invite';
   const isMuted = !call.isMicEnabled;
   const isSpeakerOn = call.isSpeakerEnabled;
   const isCameraOn = call.isCameraEnabled;
@@ -1000,9 +1001,11 @@ export default function IMThreadScreen() {
         localAvatarUrl={myAvatarUrl}
         callDuration={call.callDuration}
         isConnected={isCallConnected}
+        isConnecting={isCallConnecting}
         isMuted={isMuted}
         isSpeakerOn={isSpeakerOn}
         isCameraOn={isCameraOn}
+        localVideoTrack={call.localVideoTrack}
         onToggleMute={() => call.toggleMic()}
         onToggleSpeaker={() => call.toggleSpeaker()}
         onToggleCamera={() => call.toggleCam()}

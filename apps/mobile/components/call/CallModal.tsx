@@ -7,10 +7,12 @@ import {
   StyleSheet,
   Image,
   Dimensions,
+  ActivityIndicator,
 } from 'react-native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
-import { useTheme } from '../../theme/useTheme';
+import { VideoView } from '@livekit/react-native';
+import { LocalVideoTrack, RemoteVideoTrack } from 'livekit-client';
 import { brand } from '../../theme/colors';
 import WatchGiftModal from '../watch/WatchGiftModal';
 
@@ -30,9 +32,12 @@ export interface CallModalProps {
   localAvatarUrl: string | null;
   callDuration?: number;
   isConnected?: boolean;
+  isConnecting?: boolean;
   isMuted?: boolean;
   isSpeakerOn?: boolean;
   isCameraOn?: boolean;
+  localVideoTrack?: LocalVideoTrack | null;
+  remoteVideoTrack?: RemoteVideoTrack | null;
   onToggleMute?: () => void;
   onToggleSpeaker?: () => void;
   onToggleCamera?: () => void;
@@ -59,17 +64,23 @@ export default function CallModal({
   localAvatarUrl,
   callDuration = 0,
   isConnected = false,
+  isConnecting = false,
   isMuted = false,
   isSpeakerOn = true,
   isCameraOn = true,
+  localVideoTrack,
+  remoteVideoTrack,
   onToggleMute,
   onToggleSpeaker,
   onToggleCamera,
   onEndCall,
 }: CallModalProps) {
   const insets = useSafeAreaInsets();
-  const { colors } = useTheme();
   const [showGiftModal, setShowGiftModal] = useState(false);
+  
+  const isVideo = callMode === 'video';
+  const hasLocalVideo = isVideo && localVideoTrack && isCameraOn;
+  const hasRemoteVideo = isVideo && remoteVideoTrack;
 
   const handleEndCall = useCallback(() => {
     onEndCall?.();
@@ -91,23 +102,72 @@ export default function CallModal({
       presentationStyle="fullScreen"
       onRequestClose={handleEndCall}
     >
-      <SafeAreaView style={styles.container} edges={['top', 'left', 'right', 'bottom']}>
-        {/* Header */}
-        <View style={[styles.header, { paddingTop: insets.top > 0 ? 8 : 16 }]}>
+      <View style={styles.container}>
+        {/* Full-screen video background */}
+        {hasLocalVideo && !hasRemoteVideo && (
+          <View style={styles.fullScreenVideo}>
+            <VideoView
+              style={styles.videoFill}
+              videoTrack={localVideoTrack}
+              mirror={true}
+            />
+          </View>
+        )}
+        
+        {hasRemoteVideo && (
+          <View style={styles.fullScreenVideo}>
+            <VideoView
+              style={styles.videoFill}
+              videoTrack={remoteVideoTrack}
+              mirror={false}
+            />
+          </View>
+        )}
+        
+        {/* Fallback: show avatar if no video */}
+        {!hasLocalVideo && !hasRemoteVideo && (
+          <View style={styles.avatarBackground}>
+            <Image source={remoteAvatarSource} style={styles.avatarLarge} />
+            <Text style={styles.remoteNameText}>{remoteDisplayName}</Text>
+            <Text style={styles.remoteUsernameText}>@{remoteUsername}</Text>
+          </View>
+        )}
+        
+        {/* Local video PiP (when remote video is showing) */}
+        {hasRemoteVideo && hasLocalVideo && (
+          <View style={[styles.localPip, { top: insets.top + 60 }]}>
+            <VideoView
+              style={styles.pipVideo}
+              videoTrack={localVideoTrack}
+              mirror={true}
+            />
+          </View>
+        )}
+
+        {/* Floating Header */}
+        <View style={[styles.floatingHeader, { paddingTop: insets.top + 8 }]}>
           <View style={styles.headerLeft}>
-            <View style={[styles.callTypeBadge, callMode === 'video' ? styles.videoBadge : styles.voiceBadge]}>
-              <Feather name={callMode === 'video' ? 'video' : 'phone'} size={12} color="#FFFFFF" />
+            <View style={[styles.callTypeBadge, isVideo ? styles.videoBadge : styles.voiceBadge]}>
+              <Feather name={isVideo ? 'video' : 'phone'} size={12} color="#FFFFFF" />
               <Text style={styles.callTypeText}>
-                {callMode === 'video' ? 'Video Call' : 'Voice Call'}
+                {isVideo ? 'Video' : 'Voice'}
               </Text>
             </View>
           </View>
           <View style={styles.headerCenter}>
-            {isConnected && (
-              <Text style={styles.durationText}>{formatDuration(callDuration)}</Text>
-            )}
-            {!isConnected && (
-              <Text style={styles.connectingText}>Connecting...</Text>
+            {isConnected ? (
+              <View style={styles.durationPill}>
+                <Text style={styles.durationText}>{formatDuration(callDuration)}</Text>
+              </View>
+            ) : isConnecting ? (
+              <View style={styles.connectingPill}>
+                <ActivityIndicator size="small" color="#FFFFFF" />
+                <Text style={styles.connectingText}>Connecting...</Text>
+              </View>
+            ) : (
+              <View style={styles.connectingPill}>
+                <Text style={styles.connectingText}>Calling...</Text>
+              </View>
             )}
           </View>
           <View style={styles.headerRight}>
@@ -122,43 +182,8 @@ export default function CallModal({
           </View>
         </View>
 
-        {/* Video Tiles Container */}
-        <View style={styles.tilesContainer}>
-          {/* Top Tile: Local Preview (Self) */}
-          <View style={styles.localTile}>
-            {callMode === 'video' && isCameraOn ? (
-              <View style={styles.videoPlaceholder}>
-                <Image source={localAvatarSource} style={styles.avatarLarge} />
-                <Text style={styles.cameraOffText}>Camera Preview</Text>
-              </View>
-            ) : (
-              <View style={styles.avatarTile}>
-                <Image source={localAvatarSource} style={styles.avatarLarge} />
-                <Text style={styles.youLabel}>You</Text>
-              </View>
-            )}
-          </View>
-
-          {/* Bottom Tile: Remote Video (Other Person) */}
-          <View style={styles.remoteTile}>
-            {callMode === 'video' ? (
-              <View style={styles.videoPlaceholder}>
-                <Image source={remoteAvatarSource} style={styles.avatarLarge} />
-                <Text style={styles.remoteNameText}>{remoteDisplayName}</Text>
-                <Text style={styles.remoteUsernameText}>@{remoteUsername}</Text>
-              </View>
-            ) : (
-              <View style={styles.avatarTile}>
-                <Image source={remoteAvatarSource} style={styles.avatarLarge} />
-                <Text style={styles.remoteNameText}>{remoteDisplayName}</Text>
-                <Text style={styles.remoteUsernameText}>@{remoteUsername}</Text>
-              </View>
-            )}
-          </View>
-        </View>
-
-        {/* Control Row */}
-        <View style={[styles.controlRow, { paddingBottom: insets.bottom > 0 ? insets.bottom : 24 }]}>
+        {/* Floating Controls */}
+        <View style={[styles.floatingControls, { paddingBottom: insets.bottom + 24 }]}>
           {/* Mute Mic */}
           <Pressable
             accessibilityRole="button"
@@ -171,7 +196,6 @@ export default function CallModal({
             ]}
           >
             <Feather name={isMuted ? 'mic-off' : 'mic'} size={24} color="#FFFFFF" />
-            <Text style={styles.controlLabel}>{isMuted ? 'Unmute' : 'Mute'}</Text>
           </Pressable>
 
           {/* Speaker */}
@@ -181,16 +205,15 @@ export default function CallModal({
             onPress={onToggleSpeaker}
             style={({ pressed }) => [
               styles.controlBtn,
-              isSpeakerOn && styles.controlBtnActive,
+              !isSpeakerOn && styles.controlBtnActive,
               pressed && styles.controlBtnPressed,
             ]}
           >
             <Feather name={isSpeakerOn ? 'volume-2' : 'volume-x'} size={24} color="#FFFFFF" />
-            <Text style={styles.controlLabel}>{isSpeakerOn ? 'Speaker' : 'Earpiece'}</Text>
           </Pressable>
 
           {/* Toggle Camera (Video mode only) */}
-          {callMode === 'video' && (
+          {isVideo && (
             <Pressable
               accessibilityRole="button"
               accessibilityLabel={isCameraOn ? 'Turn off camera' : 'Turn on camera'}
@@ -202,7 +225,6 @@ export default function CallModal({
               ]}
             >
               <Feather name={isCameraOn ? 'video' : 'video-off'} size={24} color="#FFFFFF" />
-              <Text style={styles.controlLabel}>{isCameraOn ? 'Cam On' : 'Cam Off'}</Text>
             </Pressable>
           )}
 
@@ -218,7 +240,6 @@ export default function CallModal({
             ]}
           >
             <Feather name="gift" size={24} color="#FFFFFF" />
-            <Text style={styles.controlLabel}>Gift</Text>
           </Pressable>
 
           {/* End Call */}
@@ -233,10 +254,9 @@ export default function CallModal({
             ]}
           >
             <Feather name="phone-off" size={24} color="#FFFFFF" />
-            <Text style={styles.controlLabel}>End</Text>
           </Pressable>
         </View>
-      </SafeAreaView>
+      </View>
 
       {/* Gift Modal - uses existing WatchGiftModal */}
       <WatchGiftModal
@@ -257,7 +277,41 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#0B0B0F',
   },
-  header: {
+  fullScreenVideo: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    width: SCREEN_WIDTH,
+    height: SCREEN_HEIGHT,
+  },
+  videoFill: {
+    width: '100%',
+    height: '100%',
+  },
+  avatarBackground: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  localPip: {
+    position: 'absolute',
+    right: 16,
+    width: 120,
+    height: 160,
+    borderRadius: 12,
+    overflow: 'hidden',
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.3)',
+  },
+  pipVideo: {
+    width: '100%',
+    height: '100%',
+  },
+  floatingHeader: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -295,87 +349,66 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#FFFFFF',
   },
+  durationPill: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
   durationText: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '700',
     color: '#FFFFFF',
   },
+  connectingPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
   connectingText: {
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: '600',
-    color: 'rgba(255,255,255,0.7)',
+    color: 'rgba(255,255,255,0.8)',
   },
   headerBtn: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.15)',
+    backgroundColor: 'rgba(0,0,0,0.5)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   headerBtnPressed: {
     opacity: 0.7,
   },
-  tilesContainer: {
-    flex: 1,
-    paddingHorizontal: 16,
-    gap: 12,
-  },
-  localTile: {
-    flex: 1,
-    borderRadius: 20,
-    backgroundColor: '#1F2937',
-    overflow: 'hidden',
-  },
-  remoteTile: {
-    flex: 1,
-    borderRadius: 20,
-    backgroundColor: '#1F2937',
-    overflow: 'hidden',
-  },
-  videoPlaceholder: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#111827',
-  },
-  avatarTile: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   avatarLarge: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
+    width: 120,
+    height: 120,
+    borderRadius: 60,
     borderWidth: 3,
     borderColor: 'rgba(255,255,255,0.2)',
   },
-  youLabel: {
-    marginTop: 12,
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#FFFFFF',
-  },
-  cameraOffText: {
-    marginTop: 12,
-    fontSize: 14,
-    fontWeight: '600',
-    color: 'rgba(255,255,255,0.5)',
-  },
   remoteNameText: {
-    marginTop: 12,
-    fontSize: 18,
+    marginTop: 16,
+    fontSize: 24,
     fontWeight: '800',
     color: '#FFFFFF',
   },
   remoteUsernameText: {
     marginTop: 4,
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '600',
     color: 'rgba(255,255,255,0.6)',
   },
-  controlRow: {
+  floatingControls: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -386,22 +419,16 @@ const styles = StyleSheet.create({
   controlBtn: {
     alignItems: 'center',
     justifyContent: 'center',
-    width: 60,
-    height: 70,
-    borderRadius: 16,
-    backgroundColor: 'rgba(255,255,255,0.15)',
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: 'rgba(0,0,0,0.5)',
   },
   controlBtnActive: {
     backgroundColor: 'rgba(255,255,255,0.3)',
   },
   controlBtnPressed: {
     opacity: 0.7,
-  },
-  controlLabel: {
-    marginTop: 4,
-    fontSize: 10,
-    fontWeight: '600',
-    color: '#FFFFFF',
   },
   giftBtn: {
     backgroundColor: brand.primary,

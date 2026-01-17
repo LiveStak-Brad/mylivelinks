@@ -554,8 +554,25 @@ export function useCallSession(): UseCallSessionReturn {
     setError(null);
     setCallState('outgoing_invite');
     setCallType('video');
+    setIsCameraEnabled(true);
 
     try {
+      // Create local video track immediately for preview
+      console.log('[CallSession] Creating local video preview...');
+      const tracks = await createLocalTracks({
+        audio: false,
+        video: {
+          facingMode: 'user',
+          resolution: VideoPresets.h720.resolution,
+        },
+      });
+
+      for (const track of tracks) {
+        if (track.kind === 'video' && mountedRef.current) {
+          setLocalVideoTrack(track as LocalVideoTrack);
+        }
+      }
+
       // Pre-generate UUID so we can set room_name in single insert
       const callId = generateUUID();
       const roomName = generateCallRoomName(callId);
