@@ -566,39 +566,37 @@ export default function LandingPage() {
             </CardContent>
           </Card>
 
-          {/* Quick Actions */}
-          <Card className="border-border/50 shadow-xl">
-            <CardContent className="p-5 sm:p-6 text-center">
-              <h2 className="text-lg font-bold text-foreground mb-4">
-                Ready to Get Started?
+          {/* Explore Panel */}
+          <Card className="border-border/50 shadow-xl bg-gradient-to-r from-cyan-500/10 via-purple-500/10 to-pink-500/10">
+            <CardContent className="p-5 sm:p-6">
+              <h2 className="text-lg font-bold text-foreground mb-4 text-center">
+                Explore MyLiveLinks
               </h2>
-              <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                {currentUser?.username ? (
-                  <Link href={`/${currentUser.username}`}>
-                    <Button size="md" className="w-full sm:w-auto">
-                      View My Profile
-                    </Button>
-                  </Link>
-                ) : (
-                  <Link href="/settings/profile">
-                    <Button size="md" className="w-full sm:w-auto">
-                      Complete Your Profile
-                    </Button>
-                  </Link>
-                )}
-                {canOpenLive ? (
-                  <Link href="/room/live-central">
-                    <Button variant="outline" size="md" className="w-full sm:w-auto">
-                      🔴 Go Live
-                    </Button>
-                  </Link>
-                ) : (
-                  <Link href="/liveTV">
-                    <Button variant="outline" size="md" className="w-full sm:w-auto">
-                      Browse Live Streams
-                    </Button>
-                  </Link>
-                )}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <Link href="/liveTV" className="group">
+                  <div className="flex flex-col items-center p-4 rounded-xl bg-background/50 hover:bg-background/80 border border-border/50 hover:border-pink-500/50 transition-all">
+                    <span className="text-2xl mb-2">📺</span>
+                    <span className="text-sm font-medium text-foreground group-hover:text-pink-500 transition-colors">Live TV</span>
+                  </div>
+                </Link>
+                <Link href="/feed" className="group">
+                  <div className="flex flex-col items-center p-4 rounded-xl bg-background/50 hover:bg-background/80 border border-border/50 hover:border-cyan-500/50 transition-all">
+                    <span className="text-2xl mb-2">📰</span>
+                    <span className="text-sm font-medium text-foreground group-hover:text-cyan-500 transition-colors">Feed</span>
+                  </div>
+                </Link>
+                <Link href="/replay" className="group">
+                  <div className="flex flex-col items-center p-4 rounded-xl bg-background/50 hover:bg-background/80 border border-border/50 hover:border-purple-500/50 transition-all">
+                    <span className="text-2xl mb-2">🎬</span>
+                    <span className="text-sm font-medium text-foreground group-hover:text-purple-500 transition-colors">Replay</span>
+                  </div>
+                </Link>
+                <Link href="/leaderboard" className="group">
+                  <div className="flex flex-col items-center p-4 rounded-xl bg-background/50 hover:bg-background/80 border border-border/50 hover:border-yellow-500/50 transition-all">
+                    <span className="text-2xl mb-2">🏆</span>
+                    <span className="text-sm font-medium text-foreground group-hover:text-yellow-500 transition-colors">Leaderboard</span>
+                  </div>
+                </Link>
               </div>
             </CardContent>
           </Card>
