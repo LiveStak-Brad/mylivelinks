@@ -8,7 +8,12 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { 
   Users, 
-  Sparkles
+  Sparkles,
+  Link2,
+  Tv,
+  Rss,
+  Play,
+  X
 } from 'lucide-react';
 import ProfileCarousel from '@/components/ProfileCarousel';
 import { RoomsCarousel } from '@/components/rooms';
@@ -28,6 +33,134 @@ const LIVE_REACTIONS = [
   { emoji: '😢', label: 'Sad' },
   { emoji: '🔥', label: 'Fire' },
 ];
+
+// Explore panel feature definitions
+const EXPLORE_FEATURES = [
+  {
+    id: 'link',
+    label: 'Link',
+    href: '/settings/profile',
+    icon: Link2,
+    iconColor: 'text-pink-500',
+    borderColor: 'hover:border-pink-500/50',
+    description: 'Create your personalized link page with all your social links, content, and more in one place.',
+  },
+  {
+    id: 'livetv',
+    label: 'LiveTV',
+    href: '/liveTV',
+    icon: Tv,
+    iconColor: 'text-rose-500',
+    borderColor: 'hover:border-rose-500/50',
+    description: 'Watch live streams from creators around the world. Discover new content and interact in real-time.',
+  },
+  {
+    id: 'feed',
+    label: 'Feed',
+    href: '/feed',
+    icon: Rss,
+    iconColor: 'text-orange-500',
+    borderColor: 'hover:border-orange-500/50',
+    description: 'Stay updated with posts from people you follow. Like, comment, and share content.',
+  },
+  {
+    id: 'watch',
+    label: 'Watch',
+    href: '/watch',
+    icon: Play,
+    iconColor: 'text-purple-500',
+    borderColor: 'hover:border-purple-500/50',
+    description: 'Discover short-form videos in a TikTok-style vertical feed. Swipe through endless content.',
+  },
+  {
+    id: 'teams',
+    label: 'Teams',
+    href: '/teams',
+    icon: Users,
+    iconColor: 'text-cyan-500',
+    borderColor: 'hover:border-cyan-500/50',
+    description: 'Join or create teams to collaborate with others. Build communities around shared interests.',
+  },
+];
+
+// Explore Panel Component
+function ExplorePanel() {
+  const router = useRouter();
+  const [selectedFeature, setSelectedFeature] = useState<typeof EXPLORE_FEATURES[0] | null>(null);
+
+  return (
+    <>
+      <Card className="border-border/50 shadow-xl bg-gradient-to-r from-cyan-500/10 via-purple-500/10 to-pink-500/10">
+        <CardContent className="p-5 sm:p-6">
+          <h2 className="text-lg font-bold text-foreground mb-4 text-center">
+            Explore MyLiveLinks
+          </h2>
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+            {EXPLORE_FEATURES.map((feature) => {
+              const Icon = feature.icon;
+              return (
+                <button
+                  key={feature.id}
+                  onClick={() => setSelectedFeature(feature)}
+                  className="group text-left"
+                >
+                  <div className={`flex flex-col items-center p-4 rounded-xl bg-background/50 hover:bg-background/80 border border-border/50 ${feature.borderColor} transition-all`}>
+                    <Icon className={`w-6 h-6 mb-2 ${feature.iconColor}`} />
+                    <span className={`text-sm font-medium text-foreground group-hover:${feature.iconColor} transition-colors`}>
+                      {feature.label}
+                    </span>
+                    <span className="text-xs text-muted-foreground mt-1">Learn more...</span>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Feature Modal */}
+      {selectedFeature && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div className="bg-background border border-border rounded-2xl shadow-2xl max-w-sm w-full p-6 relative animate-in fade-in zoom-in-95 duration-200">
+            <button
+              onClick={() => setSelectedFeature(null)}
+              className="absolute top-4 right-4 p-1 hover:bg-muted rounded-full transition-colors"
+            >
+              <X className="w-5 h-5 text-muted-foreground" />
+            </button>
+            
+            <div className="flex flex-col items-center text-center">
+              <div className={`p-4 rounded-full bg-muted mb-4`}>
+                <selectedFeature.icon className={`w-8 h-8 ${selectedFeature.iconColor}`} />
+              </div>
+              <h3 className="text-xl font-bold text-foreground mb-2">{selectedFeature.label}</h3>
+              <p className="text-muted-foreground text-sm mb-6">{selectedFeature.description}</p>
+              
+              <div className="flex gap-3 w-full">
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() => setSelectedFeature(null)}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  className="flex-1"
+                  onClick={() => {
+                    router.push(selectedFeature.href);
+                    setSelectedFeature(null);
+                  }}
+                >
+                  Go To {selectedFeature.label}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
 
 export default function LandingPage() {
   const router = useRouter();
@@ -567,39 +700,7 @@ export default function LandingPage() {
           </Card>
 
           {/* Explore Panel */}
-          <Card className="border-border/50 shadow-xl bg-gradient-to-r from-cyan-500/10 via-purple-500/10 to-pink-500/10">
-            <CardContent className="p-5 sm:p-6">
-              <h2 className="text-lg font-bold text-foreground mb-4 text-center">
-                Explore MyLiveLinks
-              </h2>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <Link href="/liveTV" className="group">
-                  <div className="flex flex-col items-center p-4 rounded-xl bg-background/50 hover:bg-background/80 border border-border/50 hover:border-pink-500/50 transition-all">
-                    <span className="text-2xl mb-2">📺</span>
-                    <span className="text-sm font-medium text-foreground group-hover:text-pink-500 transition-colors">Live TV</span>
-                  </div>
-                </Link>
-                <Link href="/feed" className="group">
-                  <div className="flex flex-col items-center p-4 rounded-xl bg-background/50 hover:bg-background/80 border border-border/50 hover:border-cyan-500/50 transition-all">
-                    <span className="text-2xl mb-2">📰</span>
-                    <span className="text-sm font-medium text-foreground group-hover:text-cyan-500 transition-colors">Feed</span>
-                  </div>
-                </Link>
-                <Link href="/replay" className="group">
-                  <div className="flex flex-col items-center p-4 rounded-xl bg-background/50 hover:bg-background/80 border border-border/50 hover:border-purple-500/50 transition-all">
-                    <span className="text-2xl mb-2">🎬</span>
-                    <span className="text-sm font-medium text-foreground group-hover:text-purple-500 transition-colors">Replay</span>
-                  </div>
-                </Link>
-                <Link href="/leaderboard" className="group">
-                  <div className="flex flex-col items-center p-4 rounded-xl bg-background/50 hover:bg-background/80 border border-border/50 hover:border-yellow-500/50 transition-all">
-                    <span className="text-2xl mb-2">🏆</span>
-                    <span className="text-sm font-medium text-foreground group-hover:text-yellow-500 transition-colors">Leaderboard</span>
-                  </div>
-                </Link>
-              </div>
-            </CardContent>
-          </Card>
+          <ExplorePanel />
 
           {/* Coming Soon Email Signup */}
           <div className="flex justify-center py-4">
