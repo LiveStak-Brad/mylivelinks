@@ -39,11 +39,11 @@ const EXPLORE_FEATURES = [
   {
     id: 'link',
     label: 'Link',
-    href: '/settings/profile',
-    icon: Link2,
-    iconColor: 'text-pink-500',
-    borderColor: 'hover:border-pink-500/50',
-    description: 'Create your personalized link page with all your social links, content, and more in one place.',
+    href: '/link',
+    iconColor: 'text-blue-500',
+    borderColor: 'hover:border-purple-500/50',
+    description: 'Grow your follows, discover new people, and connect through dating and social discovery.',
+    useGradientIcon: true,
   },
   {
     id: 'livetv',
@@ -70,7 +70,7 @@ const EXPLORE_FEATURES = [
     icon: Play,
     iconColor: 'text-purple-500',
     borderColor: 'hover:border-purple-500/50',
-    description: 'Discover short-form videos in a TikTok-style vertical feed. Swipe through endless content.',
+    description: 'Discover short-form videos in a vertical feed. Swipe through endless content from creators.',
   },
   {
     id: 'teams',
@@ -83,10 +83,39 @@ const EXPLORE_FEATURES = [
   },
 ];
 
+// Link gradient icon component (matches GlobalHeader)
+function LinkGradientIcon({ className = 'w-6 h-6' }: { className?: string }) {
+  const gradientId = `link-gradient-${Math.random().toString(36).substr(2, 9)}`;
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke={`url(#${gradientId})`}>
+      <defs>
+        <linearGradient id={gradientId} x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="rgb(37, 99, 235)" />
+          <stop offset="100%" stopColor="rgb(168, 85, 247)" />
+        </linearGradient>
+      </defs>
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"
+      />
+    </svg>
+  );
+}
+
 // Explore Panel Component
 function ExplorePanel() {
   const router = useRouter();
   const [selectedFeature, setSelectedFeature] = useState<typeof EXPLORE_FEATURES[0] | null>(null);
+
+  const renderIcon = (feature: typeof EXPLORE_FEATURES[0], size: string = 'w-6 h-6') => {
+    if (feature.useGradientIcon) {
+      return <LinkGradientIcon className={size} />;
+    }
+    const Icon = feature.icon;
+    return Icon ? <Icon className={`${size} ${feature.iconColor}`} /> : null;
+  };
 
   return (
     <>
@@ -97,7 +126,6 @@ function ExplorePanel() {
           </h2>
           <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
             {EXPLORE_FEATURES.map((feature) => {
-              const Icon = feature.icon;
               return (
                 <button
                   key={feature.id}
@@ -105,8 +133,8 @@ function ExplorePanel() {
                   className="group text-left"
                 >
                   <div className={`flex flex-col items-center p-4 rounded-xl bg-background/50 hover:bg-background/80 border border-border/50 ${feature.borderColor} transition-all`}>
-                    <Icon className={`w-6 h-6 mb-2 ${feature.iconColor}`} />
-                    <span className={`text-sm font-medium text-foreground group-hover:${feature.iconColor} transition-colors`}>
+                    <div className="mb-2">{renderIcon(feature)}</div>
+                    <span className="text-sm font-medium text-foreground transition-colors">
                       {feature.label}
                     </span>
                     <span className="text-xs text-muted-foreground mt-1">Learn more...</span>
@@ -130,8 +158,8 @@ function ExplorePanel() {
             </button>
             
             <div className="flex flex-col items-center text-center">
-              <div className={`p-4 rounded-full bg-muted mb-4`}>
-                <selectedFeature.icon className={`w-8 h-8 ${selectedFeature.iconColor}`} />
+              <div className="p-4 rounded-full bg-muted mb-4">
+                {renderIcon(selectedFeature, 'w-8 h-8')}
               </div>
               <h3 className="text-xl font-bold text-foreground mb-2">{selectedFeature.label}</h3>
               <p className="text-muted-foreground text-sm mb-6">{selectedFeature.description}</p>
