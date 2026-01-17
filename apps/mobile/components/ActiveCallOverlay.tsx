@@ -2,13 +2,14 @@
  * ActiveCallOverlay - Full-screen overlay for active/connecting call
  */
 
-import React from 'react';
+import React, { useState } from 'react';
 import { ActivityIndicator, Dimensions, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { VideoView } from '@livekit/react-native';
 import { LocalVideoTrack } from 'livekit-client';
 import { CallParticipant, CallState, CallType } from '../hooks/useCallSession';
+import WatchGiftModal from './watch/WatchGiftModal';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const NO_PROFILE_PIC = require('../assets/no-profile-pic.png');
@@ -45,6 +46,7 @@ export default function ActiveCallOverlay({
   onEndCall,
 }: ActiveCallOverlayProps) {
   const insets = useSafeAreaInsets();
+  const [showGiftModal, setShowGiftModal] = useState(false);
 
   const formatDuration = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -137,6 +139,14 @@ export default function ActiveCallOverlay({
               />
             </Pressable>
           )}
+
+          {/* Gift */}
+          <Pressable
+            style={[styles.controlButton, styles.giftButton]}
+            onPress={() => setShowGiftModal(true)}
+          >
+            <Feather name="gift" size={24} color="#FFFFFF" />
+          </Pressable>
         </View>
 
         {/* End call */}
@@ -144,6 +154,19 @@ export default function ActiveCallOverlay({
           <Feather name="phone-off" size={28} color="#FFFFFF" />
         </Pressable>
       </View>
+
+      {/* Gift Modal */}
+      {remoteParticipant && (
+        <WatchGiftModal
+          visible={showGiftModal}
+          onClose={() => setShowGiftModal(false)}
+          recipientId={remoteParticipant.id}
+          recipientUsername={remoteParticipant.username || 'user'}
+          recipientDisplayName={remoteParticipant.username || 'User'}
+          recipientAvatarUrl={remoteParticipant.avatarUrl || null}
+          isLive={false}
+        />
+      )}
     </View>
   );
 }
@@ -236,5 +259,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#EF4444',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  giftButton: {
+    backgroundColor: '#F59E0B',
   },
 });
