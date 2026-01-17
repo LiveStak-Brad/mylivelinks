@@ -54,6 +54,7 @@ type LiveTVStreamCard = {
 
 type LiveTVRoomCard = {
   id: string;
+  slug: string;
   name: string;
   imageUrl: string | null;
   viewersText: string;
@@ -216,6 +217,7 @@ export default function LiveTVScreen() {
   const roomCards = useMemo((): LiveTVRoomCard[] => {
     return (rooms || []).map((r) => ({
       id: String(r.id),
+      slug: r.slug || String(r.id),
       name: r.name || r.slug || String(r.id),
       imageUrl: toAbsoluteUrl(r.banner_url || r.icon_url || null),
       viewersText: formatCompactCount(Number(r.viewer_count ?? 0)),
@@ -467,7 +469,12 @@ export default function LiveTVScreen() {
               {!roomsLoading && roomCards.length > 0 && (selectedSpecial === 'Trending' || selectedSpecial === 'Rooms') ? (
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.roomsRail}>
                   {roomCards.map((room) => (
-                    <View key={room.id} style={styles.roomCard}>
+                    <Pressable
+                      key={room.id}
+                      style={({ pressed }) => [styles.roomCard, pressed && { opacity: 0.9 }]}
+                      onPress={() => navigation.navigate('RoomScreen', { slug: room.slug })}
+                      accessibilityRole="button"
+                    >
                       <View style={styles.roomThumb}>
                         {room.imageUrl && !failedRoomImagesById[room.id] ? (
                           <Image
@@ -492,7 +499,7 @@ export default function LiveTVScreen() {
                       <Text numberOfLines={1} style={styles.roomName}>
                         {room.name}
                       </Text>
-                    </View>
+                    </Pressable>
                   ))}
                 </ScrollView>
               ) : null}

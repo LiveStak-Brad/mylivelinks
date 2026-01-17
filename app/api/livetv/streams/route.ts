@@ -92,10 +92,12 @@ export async function GET() {
     // Fallback: Direct query if RPC fails or returns empty
     console.log('[LiveTV API] RPC returned empty, trying direct query...');
     
+    // Only show solo streams in LiveTV, not group/room streams
     const { data: liveStreams, error: queryError } = await admin
       .from('live_streams')
-      .select('id, profile_id, trending_score, views_count, started_at')
+      .select('id, profile_id, trending_score, views_count, started_at, streaming_mode')
       .eq('live_available', true)
+      .or('streaming_mode.is.null,streaming_mode.eq.solo') // Exclude group streams
       .order('trending_score', { ascending: false, nullsFirst: false })
       .limit(100);
 

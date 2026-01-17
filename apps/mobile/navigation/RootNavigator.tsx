@@ -305,7 +305,11 @@ export default function RootNavigator({ header }: { header: () => React.ReactNod
       <RootStack.Screen name="ProfileViewScreen" component={ProfileViewScreen} />
       <RootStack.Screen name="ReferralsScreen" component={ReferralsScreen} />
       <RootStack.Screen name="ResetPasswordScreen" component={ResetPasswordScreen} />
-      <RootStack.Screen name="RoomScreen" component={RoomScreen} />
+      <RootStack.Screen 
+        name="RoomScreen" 
+        component={RoomScreen} 
+        options={{ headerShown: false }}
+      />
       <RootStack.Screen name="RoomSlugScreen" component={RoomSlugScreen} />
       <RootStack.Screen name="SearchLiveScreen" component={SearchLiveScreen} />
       <RootStack.Screen name="SearchMediaScreen" component={SearchMediaScreen} />

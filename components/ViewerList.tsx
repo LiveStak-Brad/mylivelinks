@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { createClient } from '@/lib/supabase';
 import { isBlockedBidirectional } from '@/lib/blocks';
 import { Eye } from 'lucide-react';
@@ -45,6 +45,35 @@ export default function ViewerList({ roomId, onDragStart }: ViewerListProps) {
 
   const normalizedRoomId = roomId || 'live_central';
   const [hasRoomIdColumn, setHasRoomIdColumn] = useState<boolean>(true);
+  
+  // Debounce timer ref to prevent excessive API calls
+  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const lastLoadTimeRef = useRef<number>(0);
+  const MIN_LOAD_INTERVAL = 3000; // Minimum 3 seconds between loads
+
+  // Debounced load function to prevent excessive API calls
+  const debouncedLoadViewers = useCallback(() => {
+    // Clear any pending debounce
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+    
+    // Check if we loaded recently
+    const now = Date.now();
+    const timeSinceLastLoad = now - lastLoadTimeRef.current;
+    
+    if (timeSinceLastLoad < MIN_LOAD_INTERVAL) {
+      // Schedule load after remaining time
+      debounceTimerRef.current = setTimeout(() => {
+        lastLoadTimeRef.current = Date.now();
+        loadViewers();
+      }, MIN_LOAD_INTERVAL - timeSinceLastLoad);
+    } else {
+      // Load immediately
+      lastLoadTimeRef.current = now;
+      loadViewers();
+    }
+  }, []);
 
   useEffect(() => {
     // Get current user ID and load viewers
@@ -53,6 +82,7 @@ export default function ViewerList({ roomId, onDragStart }: ViewerListProps) {
       const userId = user?.id || null;
       setCurrentUserId(userId);
       // Load viewers after setting currentUserId
+      lastLoadTimeRef.current = Date.now();
       await loadViewers();
     };
     
@@ -70,8 +100,8 @@ export default function ViewerList({ roomId, onDragStart }: ViewerListProps) {
           ...(hasRoomIdColumn ? { filter: `room_id=eq.${normalizedRoomId}` } : {}),
         },
         () => {
-          // Reload viewers when room presence changes
-          loadViewers();
+          // Debounced reload when room presence changes
+          debouncedLoadViewers();
         }
       )
       .subscribe();
@@ -86,8 +116,8 @@ export default function ViewerList({ roomId, onDragStart }: ViewerListProps) {
           table: 'live_streams',
         },
         () => {
-          // Reload viewers when live status changes
-          loadViewers();
+          // Debounced reload when live status changes
+          debouncedLoadViewers();
         }
       )
       .subscribe();
@@ -95,8 +125,11 @@ export default function ViewerList({ roomId, onDragStart }: ViewerListProps) {
     return () => {
       supabase.removeChannel(roomPresenceChannel);
       supabase.removeChannel(liveStreamsChannel);
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
     };
-  }, [normalizedRoomId, supabase, hasRoomIdColumn]);
+  }, [normalizedRoomId, supabase, hasRoomIdColumn, debouncedLoadViewers]);
 
   const loadViewers = async () => {
     try {
