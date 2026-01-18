@@ -1,12 +1,19 @@
 ﻿import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { View, StyleSheet, Text, ActivityIndicator, StatusBar, useWindowDimensions } from 'react-native';
-import { useRoute, RouteProp } from '@react-navigation/native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { View, StyleSheet, Text, ActivityIndicator, useWindowDimensions, Pressable, Modal, TouchableOpacity, Alert, Platform, StatusBar as RNStatusBar, Animated, PanResponder, Dimensions, ScrollView, TextInput } from 'react-native';
+import Slider from '@react-native-community/slider';
+import { StatusBar } from 'expo-status-bar';
+import { Ionicons } from '@expo/vector-icons';
+import { useRoute, RouteProp, useFocusEffect, useNavigation } from '@react-navigation/native';
+import * as ScreenOrientation from 'expo-screen-orientation';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Room, RoomEvent, RemoteParticipant, RemoteTrackPublication, Track, RemoteTrack } from 'livekit-client';
 import { VideoView } from '@livekit/react-native';
 import { supabase } from '../lib/supabase';
-import { fetchMobileToken } from '../lib/livekit';
+import { fetchMobileToken, connectAndPublish, disconnectAndCleanup, startLiveStreamRecord, endLiveStreamRecord } from '../lib/livekit';
 import { useAuth } from '../state/AuthContext';
+import { getSupabaseClient } from '../lib/supabase';
+import { LocalVideoTrack, LocalAudioTrack } from 'livekit-client';
+import { ChatContent, StatsContent, LeaderboardContent, OptionsContent, GiftContent } from '../components/RoomModalContents';
 
 // ============================================================================
 // TYPES
@@ -39,12 +46,293 @@ interface RoomConfig {
 interface Participant {
   id: string;
   identity: string;
-  videoTrack: RemoteTrack | null;
+  videoTrack: RemoteTrack | LocalVideoTrack | null;
 }
 
 interface GridConfig {
   rows: number;
   cols: number;
+}
+
+// Drawer panel types
+type DrawerPanel = 'none' | 'chat' | 'gifts' | 'leaderboard' | 'stats' | 'options';
+
+// Volume map for per-participant volume control
+interface VolumeMap {
+  [identity: string]: number; // 0-100
+}
+
+// ============================================================================
+// CONTROL BAR COMPONENT (P1)
+// ============================================================================
+
+interface ControlBarProps {
+  isLandscape: boolean;
+  onExitPress: () => void;
+  onChatPress: () => void;
+  onGiftsPress: () => void;
+  onLeaderboardPress: () => void;
+  onStatsPress: () => void;
+  onOptionsPress: () => void;
+  bottomInset: number;
+  rightInset: number;
+}
+
+function ControlBar({ 
+  isLandscape, 
+  onExitPress, 
+  onChatPress, 
+  onGiftsPress, 
+  onLeaderboardPress, 
+  onStatsPress, 
+  onOptionsPress,
+  bottomInset,
+  rightInset 
+}: ControlBarProps) {
+  const buttons = [
+    { icon: 'arrow-back', label: 'Exit', onPress: onExitPress, active: false },
+    { icon: 'chatbubble-ellipses', label: 'Chat', onPress: onChatPress },
+    { icon: 'gift', label: 'Gifts', onPress: onGiftsPress },
+    { icon: 'trophy', label: 'Board', onPress: onLeaderboardPress },
+    { icon: 'stats-chart', label: 'Stats', onPress: onStatsPress },
+    { icon: 'settings', label: 'Options', onPress: onOptionsPress },
+  ];
+
+  return (
+    <View style={[
+      styles.controlBar, 
+      isLandscape ? styles.controlBarLandscape : styles.controlBarPortrait,
+      { 
+        paddingBottom: isLandscape ? 0 : Math.max(bottomInset, 8),
+        paddingRight: isLandscape ? rightInset : 0
+      }
+    ]}>
+      {buttons.map((btn, idx) => (
+        <TouchableOpacity 
+          key={idx} 
+          style={[
+            styles.controlButton, 
+            isLandscape && styles.controlButtonLandscape,
+            btn.active && styles.controlButtonActive
+          ]}
+          onPress={btn.onPress}
+        >
+          <Ionicons 
+            name={btn.icon as any} 
+            size={22} 
+            color={btn.active ? '#4a90d9' : '#fff'} 
+          />
+          <Text style={[
+            styles.controlButtonText, 
+            isLandscape && styles.controlButtonTextLandscape,
+            btn.active && styles.controlButtonTextActive
+          ]}>
+            {btn.label}
+          </Text>
+        </TouchableOpacity>
+      ))}
+    </View>
+  );
+}
+
+// ============================================================================
+// BOTTOM DRAWER COMPONENT (P1)
+// ============================================================================
+
+interface BottomDrawerProps {
+  visible: boolean;
+  title: string;
+  onClose: () => void;
+  children: React.ReactNode;
+  bottomInset: number;
+  isLandscape: boolean;
+}
+
+function BottomDrawer({ visible, title, onClose, children, bottomInset, isLandscape }: BottomDrawerProps) {
+  const slideAnim = useRef(new Animated.Value(isLandscape ? 400 : 0)).current;
+
+  useEffect(() => {
+    if (visible) {
+      Animated.spring(slideAnim, {
+        toValue: 0,
+        useNativeDriver: true,
+        tension: 65,
+        friction: 11,
+      }).start();
+    } else {
+      Animated.timing(slideAnim, {
+        toValue: isLandscape ? 400 : 0,
+        duration: 200,
+        useNativeDriver: true,
+      }).start();
+    }
+  }, [visible, isLandscape, slideAnim]);
+
+  if (!visible) return null;
+
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="none"
+      onRequestClose={onClose}
+      statusBarTranslucent
+      supportedOrientations={['portrait', 'landscape', 'landscape-left', 'landscape-right']}
+    >
+      <Pressable style={styles.drawerOverlay} onPress={onClose}>
+        <Animated.View
+          style={[
+            isLandscape ? styles.drawerContainerLandscape : styles.drawerContainer,
+            {
+              paddingBottom: isLandscape ? 0 : Math.max(bottomInset, 16),
+              transform: isLandscape 
+                ? [{ translateX: slideAnim }]
+                : [{ translateY: slideAnim }]
+            }
+          ]}
+        >
+          <Pressable onPress={e => e.stopPropagation()}>
+            <View style={[
+              styles.drawerHeader,
+              isLandscape && styles.drawerHeaderLandscape
+            ]}>
+              <Text style={[
+                styles.drawerTitle,
+                isLandscape && styles.drawerTitleLandscape
+              ]}>{title}</Text>
+              <TouchableOpacity onPress={onClose}>
+                <Ionicons name="close" size={isLandscape ? 28 : 24} color="#fff" />
+              </TouchableOpacity>
+            </View>
+            <ScrollView 
+              style={[
+                styles.drawerContent,
+                isLandscape && styles.drawerContentLandscape
+              ]} 
+              showsVerticalScrollIndicator={false}
+            >
+              {children}
+            </ScrollView>
+          </Pressable>
+        </Animated.View>
+      </Pressable>
+    </Modal>
+  );
+}
+
+
+// ============================================================================
+// TILE ACTION SHEET COMPONENT (P2)
+// ============================================================================
+
+interface TileActionSheetProps {
+  visible: boolean;
+  participant: Participant | null;
+  slotIndex: number;
+  isLocal: boolean;
+  isMuted: boolean;
+  volume: number;
+  canModerate: boolean;
+  onClose: () => void;
+  onMuteToggle: () => void;
+  onVolumeChange: (value: number) => void;
+  onReplace: () => void;
+  onKick: () => void;
+  onViewProfile: () => void;
+  bottomInset: number;
+}
+
+function TileActionSheet({
+  visible,
+  participant,
+  slotIndex,
+  isLocal,
+  isMuted,
+  volume,
+  canModerate,
+  onClose,
+  onMuteToggle,
+  onVolumeChange,
+  onReplace,
+  onKick,
+  onViewProfile,
+  bottomInset,
+}: TileActionSheetProps) {
+  if (!visible) return null;
+
+  const displayName = isLocal ? 'You' : (participant?.identity?.replace(/^u_/, '').split(':')[0] || 'Unknown');
+
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="slide"
+      onRequestClose={onClose}
+    >
+      <Pressable style={styles.drawerOverlay} onPress={onClose}>
+        <Pressable style={[styles.actionSheetContainer, { paddingBottom: Math.max(bottomInset, 16) }]} onPress={e => e.stopPropagation()}>
+          <View style={styles.actionSheetHeader}>
+            <View style={styles.actionSheetHandle} />
+            <Text style={styles.actionSheetTitle}>{displayName}</Text>
+            <Text style={styles.actionSheetSubtitle}>Slot {slotIndex + 1}</Text>
+          </View>
+
+          {/* Mute toggle */}
+          {!isLocal && (
+            <TouchableOpacity style={styles.actionSheetRow} onPress={onMuteToggle}>
+              <Ionicons name={isMuted ? 'volume-mute' : 'volume-high'} size={22} color="#fff" />
+              <Text style={styles.actionSheetRowText}>{isMuted ? 'Unmute' : 'Mute'}</Text>
+            </TouchableOpacity>
+          )}
+
+          {/* Volume slider */}
+          {!isLocal && (
+            <View style={styles.actionSheetVolumeRow}>
+              <Ionicons name="volume-low" size={18} color="#888" />
+              <Slider
+                style={styles.volumeSlider}
+                minimumValue={0}
+                maximumValue={100}
+                value={volume}
+                onValueChange={onVolumeChange}
+                minimumTrackTintColor="#4a90d9"
+                maximumTrackTintColor="#444"
+                thumbTintColor="#fff"
+              />
+              <Ionicons name="volume-high" size={18} color="#888" />
+            </View>
+          )}
+
+          {/* Replace */}
+          <TouchableOpacity style={styles.actionSheetRow} onPress={onReplace}>
+            <Ionicons name="swap-horizontal" size={22} color="#fff" />
+            <Text style={styles.actionSheetRowText}>Replace</Text>
+          </TouchableOpacity>
+
+          {/* Kick (moderator only) */}
+          {canModerate && !isLocal && (
+            <TouchableOpacity style={styles.actionSheetRow} onPress={onKick}>
+              <Ionicons name="remove-circle" size={22} color="#ff6b6b" />
+              <Text style={[styles.actionSheetRowText, { color: '#ff6b6b' }]}>Kick</Text>
+            </TouchableOpacity>
+          )}
+
+          {/* View Profile */}
+          {!isLocal && (
+            <TouchableOpacity style={styles.actionSheetRow} onPress={onViewProfile}>
+              <Ionicons name="person" size={22} color="#fff" />
+              <Text style={styles.actionSheetRowText}>View Profile</Text>
+            </TouchableOpacity>
+          )}
+
+          {/* Close */}
+          <TouchableOpacity style={[styles.actionSheetRow, styles.actionSheetCloseRow]} onPress={onClose}>
+            <Text style={styles.actionSheetCloseText}>Close</Text>
+          </TouchableOpacity>
+        </Pressable>
+      </Pressable>
+    </Modal>
+  );
 }
 
 // ============================================================================
@@ -62,27 +350,67 @@ function getGridConfig(isLandscape: boolean): GridConfig {
 
 interface VideoTileProps {
   participant: Participant | null;
+  localVideoTrack?: LocalVideoTrack | null;
+  isLocalTile?: boolean | undefined;
   width: number;
   height: number;
+  slotIndex: number;
+  onTilePress: (slotIndex: number, participant: Participant | null) => void;
 }
 
-function VideoTile({ participant, width, height }: VideoTileProps) {
-  // VideoTile - renders video if participant exists, otherwise empty slot
+// FIX #2: Memoize VideoTile to prevent re-renders when other tiles change
+const VideoTile = React.memo(({ participant, localVideoTrack, isLocalTile, width, height, slotIndex, onTilePress }: VideoTileProps) => {
+  // VideoTile - renders video if participant exists, local preview if publishing, otherwise empty slot
+  const hasVideo = participant?.videoTrack || (isLocalTile && localVideoTrack);
+  const videoTrack = participant?.videoTrack || localVideoTrack;
+  
   return (
-    <View style={[styles.tile, { width, height }]}>
-      {participant?.videoTrack ? (
-        <VideoView
-          style={styles.videoView}
-          videoTrack={participant.videoTrack as any}
-          objectFit="cover"
-          mirror={false}
-        />
+    <TouchableOpacity 
+      style={[styles.tile, { width, height }]}
+      activeOpacity={0.7}
+      onPress={() => {
+        console.log('[VideoTile] Pressed slot:', slotIndex, 'participant:', participant?.identity, 'isLocal:', isLocalTile);
+        onTilePress(slotIndex, participant);
+      }}
+    >
+      {hasVideo && videoTrack ? (
+        <>
+          <VideoView
+            style={styles.videoView}
+            videoTrack={videoTrack as any}
+            objectFit="cover"
+            mirror={isLocalTile} // Mirror local video (front camera)
+          />
+          {/* Local indicator */}
+          {isLocalTile && (
+            <View style={styles.localIndicator}>
+              <Text style={styles.localIndicatorText}>YOU</Text>
+            </View>
+          )}
+          {/* Invisible overlay to capture touches */}
+          <View style={StyleSheet.absoluteFill} />
+        </>
       ) : (
-        <View style={styles.tilePlaceholder} />
+        <View style={styles.tilePlaceholder}>
+          {/* Plus icon for empty slots */}
+          <Ionicons name="add-circle-outline" size={32} color="#666" />
+        </View>
       )}
-    </View>
+    </TouchableOpacity>
   );
-}
+}, (prevProps, nextProps) => {
+  // Custom comparison: only re-render if this tile's props actually changed
+  return (
+    prevProps.participant?.id === nextProps.participant?.id &&
+    prevProps.participant?.videoTrack === nextProps.participant?.videoTrack &&
+    prevProps.localVideoTrack === nextProps.localVideoTrack &&
+    prevProps.isLocalTile === nextProps.isLocalTile &&
+    prevProps.width === nextProps.width &&
+    prevProps.height === nextProps.height &&
+    prevProps.slotIndex === nextProps.slotIndex
+    // onTilePress is stable from useCallback
+  );
+});
 
 // ============================================================================
 // GRID CONTAINER COMPONENT
@@ -93,12 +421,25 @@ interface GridContainerProps {
   screenWidth: number;
   screenHeight: number;
   isLandscape: boolean;
+  onTilePress: (slotIndex: number, participant: Participant | null) => void;
+  localVideoTrack?: LocalVideoTrack | null;
+  localAudioTrack?: LocalAudioTrack | null;
 }
 
-function GridContainer({ participants, screenWidth, screenHeight, isLandscape }: GridContainerProps) {
+function GridContainer({ participants, screenWidth, screenHeight, isLandscape, onTilePress, localVideoTrack, localAudioTrack }: GridContainerProps & { localVideoTrack?: LocalVideoTrack | null; localAudioTrack?: LocalAudioTrack | null }) {
   const { rows, cols } = getGridConfig(isLandscape);
   const tileWidth = screenWidth / cols;
   const tileHeight = screenHeight / rows;
+
+  // Create local participant object if publishing
+  const localParticipant = localVideoTrack ? {
+    id: 'local',
+    identity: 'You',
+    videoTrack: localVideoTrack,
+  } : null;
+
+  // Combine local participant with remote participants
+  const allParticipants = localParticipant ? [localParticipant, ...participants] : participants;
 
   // Build fixed 12-slot grid - empty slots render as placeholders
   const gridRows: React.ReactNode[] = [];
@@ -107,13 +448,20 @@ function GridContainer({ participants, screenWidth, screenHeight, isLandscape }:
   for (let row = 0; row < rows; row++) {
     const rowTiles: React.ReactNode[] = [];
     for (let col = 0; col < cols; col++) {
-      const participant = participants[slotIndex] || null;
+      const currentSlotIndex = slotIndex;
+      const participant = allParticipants[currentSlotIndex] || null;
+      const isLocalTile = localParticipant && currentSlotIndex === 0 ? true : undefined; // Local user always goes in slot 0
+
       rowTiles.push(
         <VideoTile
-          key={`slot-${slotIndex}`}
-          participant={participant}
+          key={`slot-${currentSlotIndex}`}
+          participant={isLocalTile ? null : participant}
+          localVideoTrack={isLocalTile ? localVideoTrack : null}
+          isLocalTile={isLocalTile}
           width={tileWidth}
           height={tileHeight}
+          slotIndex={currentSlotIndex}
+          onTilePress={onTilePress}
         />
       );
       slotIndex++;
@@ -134,11 +482,14 @@ function GridContainer({ participants, screenWidth, screenHeight, isLandscape }:
 
 export default function RoomScreen() {
   const route = useRoute<RoomScreenRouteProp>();
+  const navigation = useNavigation();
   const { user } = useAuth();
   const insets = useSafeAreaInsets();
   
   // Room slug from navigation params (same identifier as web)
   const slug = route.params?.slug || route.params?.roomKey || 'live-central';
+  
+  console.log('[RoomScreen] 🎬 COMPONENT MOUNTED/RENDERED - slug:', slug, 'user:', !!user);
 
   // Track screen dimensions for orientation detection using hook (auto-updates on rotation)
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
@@ -146,9 +497,54 @@ export default function RoomScreen() {
   
   // Debug: log orientation changes
   useEffect(() => {
-    console.log('[RoomScreen] Orientation changed:', isLandscape ? 'LANDSCAPE' : 'PORTRAIT', 
-      'dimensions:', screenWidth, 'x', screenHeight);
-  }, [isLandscape, screenWidth, screenHeight]);
+    console.log('[RoomScreen] Orientation changed:', isLandscape ? 'LANDSCAPE' : 'PORTRAIT',
+      'dimensions:', screenWidth, 'x', screenHeight, 'insets:', insets);
+  }, [isLandscape, screenWidth, screenHeight, insets]);
+
+  // Ensure status bar stays visible when orientation changes
+  useEffect(() => {
+    // Force status bar visibility on orientation changes
+    RNStatusBar.setHidden(false, 'none');
+    console.log('[RoomScreen] Status bar visibility enforced');
+  }, [isLandscape]);
+
+  // Unlock orientation when RoomScreen is focused, lock back to portrait when leaving
+  useFocusEffect(
+    useCallback(() => {
+      const unlockOrientation = async () => {
+        try {
+          // Unlock orientation when entering RoomScreen
+          await ScreenOrientation.unlockAsync();
+          console.log('[RoomScreen] Orientation unlocked');
+
+          // Force status bar to stay visible after orientation unlock
+          // This prevents iOS/Android from auto-hiding it in landscape
+          if (Platform.OS === 'ios') {
+            // On iOS, prevent status bar from hiding in landscape
+            RNStatusBar.setHidden(false, 'fade');
+          }
+        } catch (error) {
+          console.warn('[RoomScreen] Failed to unlock orientation:', error);
+        }
+      };
+
+      unlockOrientation();
+
+      return () => {
+        const lockOrientation = async () => {
+          try {
+            // Lock back to portrait when leaving RoomScreen
+            await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
+            console.log('[RoomScreen] Orientation locked to portrait');
+          } catch (error) {
+            console.warn('[RoomScreen] Failed to lock orientation:', error);
+          }
+        };
+
+        lockOrientation();
+      };
+    }, [])
+  );
 
   // Room state
   const [roomConfig, setRoomConfig] = useState<RoomConfig | null>(null);
@@ -158,8 +554,340 @@ export default function RoomScreen() {
   // LiveKit state
   const [liveKitRoom, setLiveKitRoom] = useState<Room | null>(null);
   const [isConnected, setIsConnected] = useState(false);
+  
+  // DEBUG: Log state changes
+  useEffect(() => {
+    console.log('[RoomScreen] 📊 STATE CHANGE - liveKitRoom:', !!liveKitRoom, 'isConnected:', isConnected);
+  }, [liveKitRoom, isConnected]);
   const [participants, setParticipants] = useState<Participant[]>([]);
   const roomRef = useRef<Room | null>(null);
+  
+  // Publishing state
+  const [isPublishing, setIsPublishing] = useState(false);
+  const isPublishingRef = useRef(false); // Ref for heartbeat closure
+  const [localVideoTrack, setLocalVideoTrack] = useState<LocalVideoTrack | null>(null);
+  const [localAudioTrack, setLocalAudioTrack] = useState<LocalAudioTrack | null>(null);
+  
+  // Room presence state with heartbeat to keep presence alive
+  const presenceActiveRef = useRef(false);
+  const roomPresenceTableAvailableRef = useRef<boolean | null>(null);
+  const hasRoomIdColumnRef = useRef<boolean | null>(null);
+  const heartbeatIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  // CRITICAL: Refs to capture current values for cleanup (empty deps useEffect has stale closures)
+  const userRef = useRef(user);
+  const roomConfigRef = useRef<RoomConfig | null>(null);
+
+  // Keep refs in sync with current values for cleanup
+  useEffect(() => {
+    userRef.current = user;
+  }, [user]);
+  useEffect(() => {
+    roomConfigRef.current = roomConfig;
+  }, [roomConfig]);
+
+  // Group live stream state
+  const groupLiveStreamIdRef = useRef<number | null>(null);
+
+  // P1: Control bar and drawer state
+  const [activeDrawer, setActiveDrawer] = useState<DrawerPanel>('none');
+  
+  // P2: Tile action sheet state
+  const [tileActionTarget, setTileActionTarget] = useState<{
+    slotIndex: number;
+    participant: Participant | null;
+    isLocal: boolean;
+  } | null>(null);
+  const [volumeMap, setVolumeMap] = useState<VolumeMap>({});
+  const [mutedParticipants, setMutedParticipants] = useState<Set<string>>(new Set());
+
+  // P1: Swipe gesture handling
+  const swipeThreshold = 50;
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => false,
+      onMoveShouldSetPanResponder: (evt, gestureState) => {
+        // Only capture swipes if gesture is significant
+        const { dx, dy } = gestureState;
+        return Math.abs(dx) > 20 || Math.abs(dy) > 20;
+      },
+      onPanResponderRelease: (evt, gestureState) => {
+        const { dx, dy } = gestureState;
+        
+        // Determine swipe direction
+        if (Math.abs(dy) > Math.abs(dx)) {
+          // Vertical swipe
+          if (dy < -swipeThreshold) {
+            // Swipe up from anywhere -> Chat
+            setActiveDrawer('chat');
+          } else if (dy > swipeThreshold) {
+            // Swipe down from anywhere -> Leaderboard
+            setActiveDrawer('leaderboard');
+          }
+        } else {
+          // Horizontal swipe
+          if (dx < -swipeThreshold) {
+            // Swipe R->L -> Stats
+            setActiveDrawer('stats');
+          } else if (dx > swipeThreshold) {
+            // Swipe L->R -> Options
+            setActiveDrawer('options');
+          }
+        }
+      },
+    })
+  ).current;
+
+  // Normalize room ID to match web (live-central -> live_central)
+  const normalizedRoomId = useCallback((roomKey: string | undefined) => {
+    const raw = roomKey || 'live_central';
+    if (raw === 'live-central') return 'live_central';
+    return raw;
+  }, []);
+
+  // Update room presence (event-driven only: call on explicit user actions)
+  // - On join: updateRoomPresence(true, false)
+  // - On start publishing: updateRoomPresence(true, true)
+  // - On stop publishing: updateRoomPresence(true, false)
+  // - On leave: updateRoomPresence(false)
+  const updateRoomPresence = useCallback(async (isPresent: boolean, isLiveAvailable: boolean = false) => {
+    if (!user) return;
+    if (roomPresenceTableAvailableRef.current === false) return;
+
+    const username = user.email?.split('@')[0] || user.id;
+    const roomId = normalizedRoomId(roomConfig?.room_key);
+
+    try {
+      if (isPresent) {
+        const baseRow: Record<string, any> = {
+          profile_id: user.id,
+          username,
+          is_live_available: isLiveAvailable,
+          last_seen_at: new Date().toISOString(),
+        };
+
+        if (hasRoomIdColumnRef.current !== false) {
+          baseRow.room_id = roomId;
+        }
+
+        const { error } = await supabase.from('room_presence').upsert(baseRow);
+        
+        if (error) {
+          if (error.code === '42703' || String(error.message || '').includes('room_id')) {
+            hasRoomIdColumnRef.current = false;
+            const fallbackRow = { ...baseRow };
+            delete fallbackRow.room_id;
+            const { error: fallbackError } = await supabase.from('room_presence').upsert(fallbackRow);
+            if (fallbackError) {
+              if (fallbackError.code === '42P01') {
+                roomPresenceTableAvailableRef.current = false;
+              }
+              return;
+            }
+          } else if (error.code === '42P01') {
+            roomPresenceTableAvailableRef.current = false;
+            return;
+          } else {
+            console.error('[RoomScreen] presence upsert error:', error);
+            return;
+          }
+        }
+
+        presenceActiveRef.current = true;
+        roomPresenceTableAvailableRef.current = true;
+        console.log('[RoomScreen] presence upsert ok', { roomId, profileId: user.id });
+      } else {
+        // CRITICAL: Include room_id in delete to only remove THIS room's presence
+        const { error } = await supabase
+          .from('room_presence')
+          .delete()
+          .eq('profile_id', user.id)
+          .eq('room_id', roomId);
+        if (error && error.code !== '42P01') {
+          console.error('[RoomScreen] presence delete error:', error);
+        }
+        presenceActiveRef.current = false;
+      }
+    } catch (err) {
+      console.error('[RoomScreen] presence error:', err);
+    }
+  }, [user, roomConfig?.room_key, normalizedRoomId]);
+
+  // Start publishing to the room (publish to existing connected session)
+  const startPublishing = useCallback(async () => {
+    console.log('[RoomScreen] 🚀 startPublishing called');
+    
+    // CRITICAL FIX: Use roomRef.current instead of liveKitRoom state to avoid stale closures
+    const room = roomRef.current;
+    
+    console.log('[RoomScreen] State check - user:', !!user, 'isPublishing:', isPublishing, 'room:', !!room);
+    console.log('[RoomScreen] Room state:', room?.state, 'localParticipant:', room?.localParticipant.sid);
+    
+    if (!user || isPublishing || !room) {
+      console.warn('[RoomScreen] ❌ Cannot start publishing - conditions not met');
+      console.warn('[RoomScreen] Missing:', {
+        user: !user,
+        isPublishing,
+        noRoom: !room,
+      });
+      return;
+    }
+
+    try {
+      setIsPublishing(true);
+      isPublishingRef.current = true; // Update ref for heartbeat
+      console.log('[RoomScreen] Starting to publish to existing session...');
+
+      // Import createLocalTracks
+      const { createLocalTracks, VideoPresets } = await import('livekit-client');
+
+      // Create and publish local tracks to the existing connected room
+      const tracks = await createLocalTracks({
+        audio: true,
+        video: {
+          facingMode: 'user',
+          resolution: VideoPresets.h720.resolution,
+        },
+      });
+
+      console.log('[RoomScreen] Created local tracks:', tracks.length);
+
+      for (const track of tracks) {
+        await room.localParticipant.publishTrack(track);
+        console.log('[RoomScreen] Published track:', track.kind);
+
+        if (track.kind === 'video') {
+          setLocalVideoTrack(track as LocalVideoTrack);
+        } else if (track.kind === 'audio') {
+          setLocalAudioTrack(track as LocalAudioTrack);
+        }
+      }
+
+      console.log('[RoomScreen] Publishing started successfully!');
+      console.log('[RoomScreen] Local tracks published:', {
+        videoTrack: !!localVideoTrack,
+        audioTrack: !!localAudioTrack,
+        roomName: room.name,
+        participantCount: room.remoteParticipants.size
+      });
+
+      // P3: Set participant metadata for portrait crop on web
+      // Mobile front camera is portrait, web uses object-position: center 20% to show face + some body
+      await room.localParticipant.setMetadata(JSON.stringify({
+        videoAspect: 'portrait',
+        focus: 'top', // Web interprets this as 'center 20%' for a balanced crop
+      }));
+      console.log('[RoomScreen] Set portrait metadata for web crop');
+
+      // Create group live_stream record so web grid sees this publisher
+      const { liveStreamId, error: streamError } = await startLiveStreamRecord(user.id, 'group');
+      if (streamError) {
+        console.error('[RoomScreen] Failed to create live_stream record:', streamError);
+      } else if (liveStreamId) {
+        groupLiveStreamIdRef.current = liveStreamId;
+        console.log('[RoomScreen] group live_stream started', { streamId: liveStreamId });
+      }
+
+      // Update presence to reflect live status
+      updateRoomPresence(true, true);
+      
+      // FIX #1: NO DUPLICATE HEARTBEAT
+      // Heartbeat already running from connectToLiveKit - just update ref so it uses correct publishing state
+      console.log('[RoomScreen] Publishing started - existing heartbeat will detect isPublishingRef change');
+
+      Alert.alert('Live!', 'You are now streaming in the room!');
+    } catch (err: any) {
+      console.error('[RoomScreen] Failed to start publishing:', err);
+      Alert.alert('Error', err?.message || 'Failed to start streaming. Please try again.');
+      setIsPublishing(false);
+      isPublishingRef.current = false;
+    }
+  }, [user, isPublishing, updateRoomPresence]);
+
+  // Handle tile press - empty slot = join, occupied = show action sheet (P2)
+  const handleTilePress = useCallback((slotIndex: number, participant: Participant | null) => {
+    // Check if this is the local user's tile (slot 0 when publishing)
+    const isLocalTile = slotIndex === 0 && localVideoTrack;
+
+    if (isLocalTile) {
+      // Local tile - show action sheet for self
+      console.log('[RoomScreen] Local tile tapped, slot:', slotIndex);
+      setTileActionTarget({
+        slotIndex,
+        participant: {
+          id: 'local',
+          identity: 'You',
+          videoTrack: localVideoTrack,
+        },
+        isLocal: true,
+      });
+      return;
+    }
+
+    if (!participant) {
+      // Empty slot - start publishing if not already publishing
+      console.log('[RoomScreen] Empty slot tapped, slot:', slotIndex);
+      console.log('[RoomScreen] Checks - user:', !!user, 'isPublishing:', isPublishing, 'liveKitRoom:', !!liveKitRoom, 'isConnected:', isConnected);
+
+      if (!user) {
+        console.log('[RoomScreen] ❌ No user - showing sign in alert');
+        Alert.alert('Sign In Required', 'Please sign in to join the room.');
+        return;
+      }
+
+      if (isPublishing) {
+        console.log('[RoomScreen] ❌ Already publishing - showing alert');
+        Alert.alert('Already Streaming', 'You are already streaming in this room.');
+        return;
+      }
+
+      // Start publishing directly (no confirmation needed since we connect with publish permissions)
+      console.log('[RoomScreen] ✅ Calling startPublishing()...');
+      startPublishing();
+    } else {
+      // Occupied slot - show action sheet (P2)
+      console.log('[RoomScreen] Participant tapped:', participant.identity, 'slot:', slotIndex);
+      setTileActionTarget({ slotIndex, participant, isLocal: false });
+    }
+  }, [user, isPublishing, startPublishing, localVideoTrack]);
+
+  // P2: Tile action handlers
+  const handleMuteToggle = useCallback(() => {
+    if (!tileActionTarget?.participant) return;
+    const identity = tileActionTarget.participant.identity;
+    setMutedParticipants(prev => {
+      const next = new Set(prev);
+      if (next.has(identity)) {
+        next.delete(identity);
+      } else {
+        next.add(identity);
+      }
+      return next;
+    });
+  }, [tileActionTarget]);
+
+  const handleVolumeChange = useCallback((value: number) => {
+    if (!tileActionTarget?.participant) return;
+    const identity = tileActionTarget.participant.identity;
+    setVolumeMap(prev => ({ ...prev, [identity]: value }));
+  }, [tileActionTarget]);
+
+  const handleReplace = useCallback(() => {
+    console.log('[RoomScreen] Replace tapped for slot:', tileActionTarget?.slotIndex);
+    // TODO: Implement replace flow
+    setTileActionTarget(null);
+  }, [tileActionTarget]);
+
+  const handleKick = useCallback(() => {
+    console.log('[RoomScreen] Kick tapped for:', tileActionTarget?.participant?.identity);
+    // TODO: Implement kick flow
+    setTileActionTarget(null);
+  }, [tileActionTarget]);
+
+  const handleViewProfile = useCallback(() => {
+    console.log('[RoomScreen] View profile tapped for:', tileActionTarget?.participant?.identity);
+    // TODO: Navigate to profile
+    setTileActionTarget(null);
+  }, [tileActionTarget]);
 
   // Fetch room config from same RPC as web
   const fetchRoomConfig = useCallback(async () => {
@@ -173,7 +901,7 @@ export default function RoomScreen() {
 
       if (rpcError) {
         console.error('[RoomScreen] RPC error:', rpcError);
-        
+
         // Fallback to Live Central default if room not found
         if (slug === 'live-central' || slug === 'live_central') {
           console.log('[RoomScreen] Using Live Central fallback config');
@@ -189,7 +917,7 @@ export default function RoomScreen() {
             grid_size: 12,
             permissions: {
               can_view: true,
-              can_publish: false,
+              can_publish: true, // Allow publishing in fallback mode
               can_moderate: false,
             },
           });
@@ -281,43 +1009,51 @@ export default function RoomScreen() {
       console.log('[RoomScreen] Cannot connect - no room config');
       return;
     }
-    
+
     // Check permissions - handle both nested object and direct boolean
-    const canView = typeof roomConfig.permissions?.can_view === 'boolean' 
-      ? roomConfig.permissions.can_view 
+    const canView = typeof roomConfig.permissions?.can_view === 'boolean'
+      ? roomConfig.permissions.can_view
       : true; // Default to true for public rooms
-    
+
     if (!canView) {
       console.log('[RoomScreen] Cannot connect - no view permission');
       return;
     }
 
+    // Check if user can publish (like web does)
+    // For Live Central and similar rooms, allow publishing by default for authenticated users
+    const canPublish = !!user && (roomConfig.room_key === 'live_central' ||
+                                   roomConfig.slug === 'live-central' ||
+                                   roomConfig.permissions?.can_publish === true);
+
     // Use room_key as LiveKit room name (matches web: roomConfig.roomId)
     // Web uses 'live_central' (underscore) for LiveKit room name
     // Handle both slug format (live-central) and room_key format (live_central)
     let liveKitRoomName = roomConfig.room_key;
-    
+
     // Special case: Live Central uses underscore format for LiveKit
     if (liveKitRoomName === 'live-central' || roomConfig.slug === 'live-central') {
       liveKitRoomName = 'live_central';
     }
-    
+
     try {
-      const identity = user?.id || `anon-${Date.now()}`;
-      const displayName = user?.email?.split('@')[0] || 'Viewer';
-      
+      const identity = user ? `u_${user.id}` : `anon-${Date.now()}`;
+      const displayName = user?.email?.split('@')[0] || user?.id || 'Viewer';
+
       console.log('[RoomScreen] Connecting to LiveKit room:', liveKitRoomName);
       console.log('[RoomScreen] User identity:', identity);
-      
+      console.log('[RoomScreen] Can publish:', canPublish);
+
       const { token, url } = await fetchMobileToken(
         liveKitRoomName,
         identity,
         displayName,
-        false // isHost = false for viewer
+        canPublish // isHost = canPublish for proper permissions
       );
 
-      console.log('[RoomScreen] Token received, URL:', url);
+      console.log('[RoomScreen] Token received, URL:', url?.substring(0, 50) + '...');
       console.log('[RoomScreen] Token length:', token?.length);
+      console.log('[RoomScreen] Connecting to LiveKit server...');
 
       const room = new Room({
         adaptiveStream: true,
@@ -328,54 +1064,216 @@ export default function RoomScreen() {
       room.on(RoomEvent.Connected, () => {
         console.log('[RoomScreen] Connected to LiveKit room:', liveKitRoomName);
         console.log('[RoomScreen] Remote participants count:', room.remoteParticipants.size);
-        room.remoteParticipants.forEach((p) => {
-          console.log('[RoomScreen] Remote participant:', p.identity, 'tracks:', p.trackPublications.size);
-          p.trackPublications.forEach((pub) => {
+        // DEBUG: Cross-client parity logs
+        console.log('[RoomScreen] ?? ROOM CONNECTION PARITY:', {
+          roomName: room.name,
+          wsUrlHost: url.replace(/^wss?:\/\//, '').split('/')[0], // Extract host from ws url
+          localIdentity: room.localParticipant.identity,
+          remoteParticipantsCount: room.remoteParticipants.size,
+        });
+        // Subscribe to all available tracks from remote participants
+        room.remoteParticipants.forEach((participant) => {
+          console.log('[RoomScreen] Remote participant:', participant.identity, 'tracks:', participant.trackPublications.size);
+          participant.trackPublications.forEach((pub) => {
             console.log('[RoomScreen]   Track:', pub.kind, 'subscribed:', pub.isSubscribed, 'hasTrack:', !!pub.track);
+
+            // Explicitly subscribe to camera and microphone tracks
+            if (pub.source === Track.Source.Camera || pub.source === Track.Source.Microphone) {
+              if (!pub.isSubscribed) {
+                console.log('[RoomScreen]   Subscribing to track:', pub.source);
+                try {
+                  pub.setSubscribed(true);
+                } catch (err) {
+                  console.warn('[RoomScreen] Failed to subscribe to track:', err);
+                }
+              }
+            }
           });
         });
+        
+        // CRITICAL: Set liveKitRoom state ONLY after successful connection
+        setLiveKitRoom(room);
         setIsConnected(true);
         updateParticipants(room);
+        
+        // Update presence on successful connection
+        updateRoomPresence(true, false);
+        
+        // Start heartbeat to keep presence alive (every 20s, matches web)
+        if (heartbeatIntervalRef.current) {
+          clearInterval(heartbeatIntervalRef.current);
+        }
+        heartbeatIntervalRef.current = setInterval(() => {
+          console.log('[RoomScreen] Heartbeat - isPublishingRef.current:', isPublishingRef.current);
+          updateRoomPresence(true, isPublishingRef.current);
+        }, 20000);
       });
 
-      room.on(RoomEvent.Disconnected, () => {
-        console.log('[RoomScreen] Disconnected from LiveKit room');
+      room.on(RoomEvent.Disconnected, (reason) => {
+        console.log('[RoomScreen] Disconnected from LiveKit room', { 
+          reason,
+          isPublishing: isPublishingRef.current,
+          hasGroupStreamId: !!groupLiveStreamIdRef.current,
+        });
         setIsConnected(false);
         setParticipants([]);
+        
+        // Stop heartbeat
+        if (heartbeatIntervalRef.current) {
+          clearInterval(heartbeatIntervalRef.current);
+          heartbeatIntervalRef.current = null;
+        }
+        
+        // Clear presence on disconnect
+        updateRoomPresence(false);
+        // CRITICAL: Use userRef to avoid stale closure
+        const currentUser = userRef.current;
+        if (groupLiveStreamIdRef.current && currentUser) {
+          console.log('[RoomScreen] group live_stream ended on disconnect', { streamId: groupLiveStreamIdRef.current });
+          endLiveStreamRecord(currentUser.id);
+          groupLiveStreamIdRef.current = null;
+        }
+        
+        // Reset publishing state on disconnect
+        setIsPublishing(false);
+        isPublishingRef.current = false;
       });
 
-      room.on(RoomEvent.ParticipantConnected, () => {
-        updateParticipants(room);
+      room.on(RoomEvent.ParticipantConnected, (participant) => {
+        console.log('[RoomScreen] Participant connected:', participant.identity);
+        // Subscribe to any existing publications from this participant
+        participant.trackPublications.forEach((pub) => {
+          if (pub.source === Track.Source.Camera || pub.source === Track.Source.Microphone) {
+            if (!pub.isSubscribed) {
+              console.log('[RoomScreen] Subscribing to track from new participant:', pub.source);
+              try {
+                pub.setSubscribed(true);
+              } catch (err) {
+                console.warn('[RoomScreen] Failed to subscribe to track from new participant:', err);
+              }
+            }
+          }
+        });
+        
+        // FIX #2: INCREMENTAL UPDATE - add single participant instead of rebuilding all
+        setParticipants(prev => {
+          // Check if participant already exists
+          if (prev.some(p => p.id === participant.sid)) {
+            return prev;
+          }
+          
+          // Find video track
+          let videoTrack: RemoteTrack | null = null;
+          participant.trackPublications.forEach((pub: RemoteTrackPublication) => {
+            if (pub.kind === Track.Kind.Video && pub.track) {
+              videoTrack = pub.track as RemoteTrack;
+            }
+          });
+          
+          // Only add if has video
+          if (videoTrack) {
+            console.log('[RoomScreen] ✅ INCREMENTAL: Added participant', participant.identity);
+            return [...prev, {
+              id: participant.sid,
+              identity: participant.identity,
+              videoTrack,
+            }];
+          }
+          
+          return prev;
+        });
       });
 
-      room.on(RoomEvent.ParticipantDisconnected, () => {
-        updateParticipants(room);
+      room.on(RoomEvent.ParticipantDisconnected, (participant) => {
+        console.log('[RoomScreen] Participant disconnected:', participant.identity);
+        // FIX #2: INCREMENTAL UPDATE - remove single participant instead of rebuilding all
+        setParticipants(prev => {
+          const filtered = prev.filter(p => p.id !== participant.sid);
+          if (filtered.length !== prev.length) {
+            console.log('[RoomScreen] ✅ INCREMENTAL: Removed participant', participant.identity);
+          }
+          return filtered;
+        });
       });
 
       room.on(RoomEvent.TrackSubscribed, (track: RemoteTrack, publication, participant: RemoteParticipant) => {
         console.log('[RoomScreen] Track subscribed:', track.kind, 'from', participant.identity);
-        updateParticipants(room);
+        // FIX #2: INCREMENTAL UPDATE - update only this participant's track
+        if (track.kind === 'video') {
+          setParticipants(prev => {
+            const index = prev.findIndex(p => p.id === participant.sid);
+            if (index >= 0) {
+              const updated = [...prev];
+              updated[index] = { ...updated[index], videoTrack: track };
+              console.log('[RoomScreen] ✅ INCREMENTAL: Updated video track for', participant.identity);
+              return updated;
+            } else {
+              // Add if not exists
+              console.log('[RoomScreen] ✅ INCREMENTAL: Added new participant with video', participant.identity);
+              return [...prev, {
+                id: participant.sid,
+                identity: participant.identity,
+                videoTrack: track,
+              }];
+            }
+          });
+        }
       });
 
       room.on(RoomEvent.TrackUnsubscribed, (track: RemoteTrack, publication, participant: RemoteParticipant) => {
         console.log('[RoomScreen] Track unsubscribed:', track.kind, 'from', participant.identity);
-        updateParticipants(room);
+        // FIX #2: INCREMENTAL UPDATE - remove only this participant's track
+        if (track.kind === 'video') {
+          setParticipants(prev => {
+            // Remove participant if video track is gone
+            const filtered = prev.filter(p => p.id !== participant.sid);
+            if (filtered.length !== prev.length) {
+              console.log('[RoomScreen] ✅ INCREMENTAL: Removed participant (no video)', participant.identity);
+            }
+            return filtered;
+          });
+        }
+      });
+
+      // Subscribe to tracks when they're published by participants
+      room.on(RoomEvent.TrackPublished, (publication, participant) => {
+        console.log('[RoomScreen] Track published:', publication.source, 'by', participant.identity);
+        if (publication.source === Track.Source.Camera || publication.source === Track.Source.Microphone) {
+          if (!publication.isSubscribed) {
+            console.log('[RoomScreen] Subscribing to newly published track:', publication.source);
+            try {
+              publication.setSubscribed(true);
+            } catch (err) {
+              console.warn('[RoomScreen] Failed to subscribe to newly published track:', err);
+            }
+          }
+        }
+        // NOTE: Track will be added via TrackSubscribed event, no need to update here
       });
 
       await room.connect(url, token);
       
       roomRef.current = room;
-      setLiveKitRoom(room);
+      // Note: setLiveKitRoom(room) is now called INSIDE RoomEvent.Connected handler (line ~1080)
+      // This ensures liveKitRoom state is only set after successful connection
     } catch (err: any) {
       console.error('[RoomScreen] LiveKit connection error:', err);
       setError(err?.message || 'Failed to connect to live room');
     }
-  }, [roomConfig, user, updateParticipants]);
+  }, [roomConfig, user, updateParticipants, updateRoomPresence]);
 
   // Connect to LiveKit when room config is loaded
   useEffect(() => {
-    if (roomConfig && !liveKitRoom) {
+    console.log('[RoomScreen] 🔌 Connection useEffect - roomConfig:', !!roomConfig, 'liveKitRoom:', !!liveKitRoom, 'roomRef:', !!roomRef.current);
+    
+    // CRITICAL FIX: Check if room state matches ref (hot reload can desync them)
+    const roomStateValid = liveKitRoom && roomRef.current === liveKitRoom;
+    
+    if (roomConfig && !roomStateValid) {
+      console.log('[RoomScreen] 🔌 Triggering connectToLiveKit() - roomStateValid:', roomStateValid);
       connectToLiveKit();
+    } else {
+      console.log('[RoomScreen] 🔌 Skipping connection - roomStateValid:', roomStateValid, 'hasConfig:', !!roomConfig);
     }
   }, [roomConfig, liveKitRoom, connectToLiveKit]);
 
@@ -383,6 +1281,49 @@ export default function RoomScreen() {
   useEffect(() => {
     return () => {
       console.log('[RoomScreen] Component unmounting, disconnecting room');
+      
+      // CRITICAL: Use refs for cleanup since empty deps means stale closures
+      const currentUser = userRef.current;
+      const currentRoomConfig = roomConfigRef.current;
+      
+      // End group live stream if publishing
+      if (groupLiveStreamIdRef.current && currentUser) {
+        console.log('[RoomScreen] group live_stream ended', { streamId: groupLiveStreamIdRef.current });
+        endLiveStreamRecord(currentUser.id);
+        groupLiveStreamIdRef.current = null;
+      }
+      
+      // Stop heartbeat
+      if (heartbeatIntervalRef.current) {
+        clearInterval(heartbeatIntervalRef.current);
+        heartbeatIntervalRef.current = null;
+      }
+      
+      // Clear presence (fire and forget)
+      // CRITICAL: Include room_id to only remove THIS room's presence
+      if (currentUser && presenceActiveRef.current && currentRoomConfig?.room_key) {
+        const roomId = currentRoomConfig.room_key === 'live-central' ? 'live_central' : currentRoomConfig.room_key;
+        console.log('[RoomScreen] Clearing presence on unmount...', { roomId, profileId: currentUser.id });
+        supabase
+          .from('room_presence')
+          .delete()
+          .eq('profile_id', currentUser.id)
+          .eq('room_id', roomId)
+          .then(({ error }) => {
+            if (error) {
+              console.error('[RoomScreen] presence delete error on unmount:', error);
+            } else {
+              console.log('[RoomScreen] presence cleared on unmount', { roomId });
+            }
+          });
+      } else {
+        console.log('[RoomScreen] Skipping presence cleanup:', { 
+          hasUser: !!currentUser, 
+          presenceActive: presenceActiveRef.current, 
+          hasRoomKey: !!currentRoomConfig?.room_key 
+        });
+      }
+      
       if (roomRef.current) {
         roomRef.current.disconnect();
         roomRef.current = null;
@@ -390,21 +1331,47 @@ export default function RoomScreen() {
     };
   }, []); // Empty deps - only run on unmount
 
-  // Calculate available height (screen height minus top safe area for status bar)
-  const gridHeight = screenHeight - insets.top;
+  // Calculate safe dimensions that respect all safe area insets
+  // Control bar: 60px height at bottom (portrait) OR 40px width at right (landscape)
+  const CONTROL_BAR_SIZE = isLandscape ? 40 : 60;
+  
+  // Grid wrapper padding: ONLY safe area insets (NOT control bar space)
+  const gridPaddingTop = insets.top;
+  const gridPaddingBottom = insets.bottom;
+  const gridPaddingLeft = insets.left;
+  const gridPaddingRight = insets.right;
+  
+  // Grid dimensions: subtract BOTH safe area padding AND control bar space
+  const safeGridHeight = screenHeight - gridPaddingTop - gridPaddingBottom - (isLandscape ? 0 : CONTROL_BAR_SIZE);
+  const safeGridWidth = screenWidth - gridPaddingLeft - gridPaddingRight - (isLandscape ? CONTROL_BAR_SIZE : 0);
 
   // Always render the grid - overlay loading/error states on top
+  // Grid MUST respect all safe area insets (notch, home bar, left/right in landscape)
   return (
-    <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#000000" translucent />
-      {/* Black spacer for status bar area */}
-      <View style={{ height: insets.top, backgroundColor: '#000000' }} />
-      <GridContainer
-        participants={participants}
-        screenWidth={screenWidth}
-        screenHeight={gridHeight}
-        isLandscape={isLandscape}
+    <View style={styles.container} {...panResponder.panHandlers}>
+      <StatusBar
+        style="light"
+        backgroundColor="#000000"
+        hidden={false}
+        translucent={true}
       />
+      {/* Grid wrapper with safe area padding for notch + home bar + control bar */}
+      <View style={[styles.gridWrapper, {
+        paddingTop: gridPaddingTop,
+        paddingBottom: gridPaddingBottom,
+        paddingLeft: gridPaddingLeft,
+        paddingRight: gridPaddingRight
+      }]}>
+        <GridContainer
+          participants={participants}
+          screenWidth={safeGridWidth}
+          screenHeight={safeGridHeight}
+          isLandscape={isLandscape}
+          onTilePress={handleTilePress}
+          localVideoTrack={localVideoTrack}
+          localAudioTrack={localAudioTrack}
+        />
+      </View>
       
       {/* Loading overlay */}
       {loading && (
@@ -413,20 +1380,102 @@ export default function RoomScreen() {
           <Text style={styles.loadingText}>Loading room...</Text>
         </View>
       )}
-      
+
       {/* Error overlay */}
       {error && !loading && (
         <View style={styles.overlayContainer}>
           <Text style={styles.errorText}>{error}</Text>
         </View>
       )}
-      
+
       {/* No access overlay */}
       {roomConfig && roomConfig.permissions?.can_view === false && !loading && !error && (
         <View style={styles.overlayContainer}>
           <Text style={styles.errorText}>You do not have access to this room</Text>
         </View>
       )}
+
+      {/* P1: Control Bar (portrait only) */}
+      <ControlBar
+        isLandscape={isLandscape}
+        onExitPress={() => navigation.goBack()}
+        onChatPress={() => setActiveDrawer('chat')}
+        onGiftsPress={() => setActiveDrawer('gifts')}
+        onLeaderboardPress={() => setActiveDrawer('leaderboard')}
+        onStatsPress={() => setActiveDrawer('stats')}
+        onOptionsPress={() => setActiveDrawer('options')}
+        bottomInset={insets.bottom}
+        rightInset={insets.right}
+      />
+
+      {/* P1: Bottom Drawer Panels */}
+      <BottomDrawer
+        visible={activeDrawer === 'chat'}
+        title="Chat"
+        onClose={() => setActiveDrawer('none')}
+        bottomInset={insets.bottom}
+        isLandscape={isLandscape}
+      >
+        <ChatContent roomSlug={slug} />
+      </BottomDrawer>
+
+      <BottomDrawer
+        visible={activeDrawer === 'gifts'}
+        title="Send Gift"
+        onClose={() => setActiveDrawer('none')}
+        bottomInset={insets.bottom}
+        isLandscape={isLandscape}
+      >
+        <GiftContent />
+      </BottomDrawer>
+
+      <BottomDrawer
+        visible={activeDrawer === 'leaderboard'}
+        title="Leaderboard"
+        onClose={() => setActiveDrawer('none')}
+        bottomInset={insets.bottom}
+        isLandscape={isLandscape}
+      >
+        <LeaderboardContent />
+      </BottomDrawer>
+
+      <BottomDrawer
+        visible={activeDrawer === 'stats'}
+        title="Stats"
+        onClose={() => setActiveDrawer('none')}
+        bottomInset={insets.bottom}
+        isLandscape={isLandscape}
+      >
+        <StatsContent />
+      </BottomDrawer>
+
+      <BottomDrawer
+        visible={activeDrawer === 'options'}
+        title="Options"
+        onClose={() => setActiveDrawer('none')}
+        bottomInset={insets.bottom}
+        isLandscape={isLandscape}
+      >
+        <OptionsContent />
+      </BottomDrawer>
+
+      {/* P2: Tile Action Sheet */}
+      <TileActionSheet
+        visible={tileActionTarget !== null}
+        participant={tileActionTarget?.participant || null}
+        slotIndex={tileActionTarget?.slotIndex || 0}
+        isLocal={tileActionTarget?.isLocal || false}
+        isMuted={tileActionTarget?.participant ? mutedParticipants.has(tileActionTarget.participant.identity) : false}
+        volume={tileActionTarget?.participant ? (volumeMap[tileActionTarget.participant.identity] ?? 100) : 100}
+        canModerate={roomConfig?.permissions?.can_moderate || false}
+        onClose={() => setTileActionTarget(null)}
+        onMuteToggle={handleMuteToggle}
+        onVolumeChange={handleVolumeChange}
+        onReplace={handleReplace}
+        onKick={handleKick}
+        onViewProfile={handleViewProfile}
+        bottomInset={insets.bottom}
+      />
     </View>
   );
 }
@@ -437,6 +1486,10 @@ export default function RoomScreen() {
 
 const styles = StyleSheet.create({
   container: {
+    flex: 1,
+    backgroundColor: '#000000',
+  },
+  gridWrapper: {
     flex: 1,
     backgroundColor: '#000000',
   },
@@ -452,12 +1505,13 @@ const styles = StyleSheet.create({
   },
   tile: {
     overflow: 'hidden',
-    borderWidth: 0.5,
-    borderColor: '#333333',
+    // Remove borders for seamless full-screen video grid
   },
   tilePlaceholder: {
     flex: 1,
     backgroundColor: '#1a1a1a',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   videoView: {
     flex: 1,
@@ -485,11 +1539,516 @@ const styles = StyleSheet.create({
     fontSize: 16,
     textAlign: 'center',
   },
+  publishingIndicator: {
+    position: 'absolute',
+    top: 60,
+    right: 16,
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  publishingText: {
+    color: '#ff6b6b',
+    fontSize: 12,
+    fontWeight: '600',
+  },
   overlayContainer: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(0, 0, 0, 0.7)',
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 24,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  playerCard: {
+    backgroundColor: '#222',
+    borderRadius: 16,
+    padding: 20,
+    width: 280,
+    alignItems: 'center',
+  },
+  playerCardHeader: {
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  playerAvatar: {
+    marginBottom: 8,
+  },
+  playerName: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  playerSlot: {
+    color: '#888',
+    fontSize: 12,
+    marginTop: 4,
+  },
+  playerCardActions: {
+    width: '100%',
+    gap: 10,
+  },
+  playerCardButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#4a90d9',
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    gap: 8,
+  },
+  playerCardButtonSecondary: {
+    backgroundColor: '#333',
+  },
+  playerCardButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  playerCardButtonTextSecondary: {
+    color: '#999',
+  },
+  // P1: Control Bar styles
+  controlBar: {
+    position: 'absolute',
+    backgroundColor: 'rgba(0, 0, 0, 0.85)',
+  },
+  controlBarPortrait: {
+    bottom: 0,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    alignItems: 'center',
+    paddingTop: 8,
+    paddingHorizontal: 4,
+  },
+  controlBarLandscape: {
+    top: 0,
+    bottom: 0,
+    right: 0,  // Container stays at right edge
+    width: 40,
+    flexDirection: 'column',
+    justifyContent: 'space-around',
+    alignItems: 'center',
+    paddingVertical: 4,
+    paddingHorizontal: 2,
+  },
+  controlButton: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 6,
+    paddingHorizontal: 8,
+    minWidth: 50,
+  },
+  controlButtonLandscape: {
+    minWidth: 0,
+    width: 36,
+    paddingVertical: 4,
+    paddingHorizontal: 1,  // Reduce horizontal padding to prevent text wrapping
+  },
+  controlButtonActive: {
+    backgroundColor: 'rgba(74, 144, 217, 0.2)',
+    borderRadius: 8,
+  },
+  controlButtonText: {
+    color: '#fff',
+    fontSize: 10,
+    marginTop: 2,
+  },
+  controlButtonTextLandscape: {
+    fontSize: 8,  // Smaller font in landscape to prevent wrapping
+    marginTop: 1,
+  },
+  controlButtonTextActive: {
+    color: '#4a90d9',
+  },
+  // P1: Bottom Drawer styles
+  drawerOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  drawerContainer: {
+    backgroundColor: '#1a1a1a',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: '70%',
+    minHeight: 200,
+  },
+  drawerContainerLandscape: {
+    backgroundColor: '#1a1a1a',
+    borderTopLeftRadius: 20,
+    borderBottomLeftRadius: 20,
+    position: 'absolute',
+    right: 0,
+    top: 0,
+    bottom: 0,
+    width: '60%',
+    maxWidth: 400,
+  },
+  drawerHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#333',
+  },
+  drawerHeaderLandscape: {
+    paddingHorizontal: 16,
+    paddingVertical: 20,
+  },
+  drawerTitle: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: '600',
+  },
+  drawerTitleLandscape: {
+    fontSize: 22,
+  },
+  drawerContent: {
+    padding: 20,
+  },
+  drawerContentLandscape: {
+    padding: 24,
+    paddingTop: 16,
+  },
+  drawerPlaceholder: {
+    color: '#888',
+    fontSize: 14,
+    textAlign: 'center',
+    paddingVertical: 40,
+  },
+  // Chat styles
+  chatContainer: {
+    flex: 1,
+    minHeight: 300,
+  },
+  chatLoading: {
+    padding: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  chatMessages: {
+    flex: 1,
+  },
+  chatMessagesContent: {
+    padding: 12,
+  },
+  chatMessage: {
+    flexDirection: 'row',
+    marginBottom: 8,
+    flexWrap: 'wrap',
+  },
+  chatUsername: {
+    color: '#4a90d9',
+    fontWeight: '600',
+    marginRight: 6,
+  },
+  chatMessageText: {
+    color: '#fff',
+    flex: 1,
+  },
+  chatInputContainer: {
+    flexDirection: 'row',
+    padding: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#333',
+    alignItems: 'center',
+  },
+  chatInput: {
+    flex: 1,
+    backgroundColor: '#2a2a2a',
+    color: '#fff',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    marginRight: 8,
+  },
+  chatSendButton: {
+    padding: 8,
+  },
+  // Gift styles
+  giftContainer: {
+    flex: 1,
+    minHeight: 400,
+  },
+  giftLoading: {
+    padding: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  giftBalanceBar: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 12,
+    backgroundColor: '#2a2a2a',
+    borderRadius: 8,
+    margin: 12,
+    marginBottom: 0,
+  },
+  giftBalanceLabel: {
+    color: '#888',
+    fontSize: 14,
+  },
+  giftBalanceAmount: {
+    color: '#4a90d9',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  giftList: {
+    flex: 1,
+  },
+  giftListContent: {
+    padding: 12,
+  },
+  giftItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    backgroundColor: '#2a2a2a',
+    borderRadius: 8,
+    marginBottom: 8,
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  giftItemSelected: {
+    borderColor: '#4a90d9',
+  },
+  giftEmoji: {
+    fontSize: 32,
+    marginRight: 12,
+  },
+  giftInfo: {
+    flex: 1,
+  },
+  giftName: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  giftCost: {
+    color: '#888',
+    fontSize: 14,
+  },
+  giftSendBar: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#333',
+  },
+  giftSendText: {
+    color: '#fff',
+    fontSize: 14,
+    flex: 1,
+  },
+  giftSendButton: {
+    backgroundColor: '#4a90d9',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 20,
+  },
+  giftSendButtonText: {
+    color: '#fff',
+    fontWeight: '600',
+  },
+  // Leaderboard styles
+  leaderboardContainer: {
+    flex: 1,
+    minHeight: 400,
+  },
+  leaderboardTabs: {
+    flexDirection: 'row',
+    padding: 12,
+    paddingBottom: 0,
+  },
+  leaderboardTab: {
+    flex: 1,
+    paddingVertical: 12,
+    alignItems: 'center',
+    borderBottomWidth: 2,
+    borderBottomColor: 'transparent',
+  },
+  leaderboardTabActive: {
+    borderBottomColor: '#4a90d9',
+  },
+  leaderboardTabText: {
+    color: '#888',
+    fontWeight: '600',
+  },
+  leaderboardTabTextActive: {
+    color: '#4a90d9',
+  },
+  leaderboardPeriodTabs: {
+    flexDirection: 'row',
+    padding: 12,
+    gap: 8,
+  },
+  leaderboardPeriodTab: {
+    flex: 1,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 16,
+    backgroundColor: '#2a2a2a',
+    alignItems: 'center',
+  },
+  leaderboardPeriodTabActive: {
+    backgroundColor: '#4a90d9',
+  },
+  leaderboardPeriodTabText: {
+    color: '#888',
+    fontSize: 12,
+  },
+  leaderboardPeriodTabTextActive: {
+    color: '#fff',
+  },
+  leaderboardLoading: {
+    padding: 40,
+    alignItems: 'center',
+  },
+  leaderboardList: {
+    flex: 1,
+  },
+  leaderboardEntry: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#333',
+  },
+  leaderboardRank: {
+    color: '#4a90d9',
+    fontWeight: '600',
+    width: 40,
+  },
+  leaderboardUsername: {
+    color: '#fff',
+    flex: 1,
+  },
+  leaderboardValue: {
+    color: '#888',
+  },
+  // Stats styles
+  statsContainer: {
+    padding: 20,
+    gap: 16,
+  },
+  statItem: {
+    backgroundColor: '#2a2a2a',
+    padding: 20,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  statValue: {
+    color: '#4a90d9',
+    fontSize: 32,
+    fontWeight: '600',
+  },
+  statLabel: {
+    color: '#888',
+    fontSize: 14,
+    marginTop: 4,
+  },
+  // Options styles
+  optionsContainer: {
+    padding: 40,
+    alignItems: 'center',
+  },
+  optionsText: {
+    color: '#888',
+    fontSize: 14,
+  },
+  // P2: Tile Action Sheet styles
+  actionSheetContainer: {
+    backgroundColor: '#1a1a1a',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingTop: 12,
+  },
+  actionSheetHeader: {
+    alignItems: 'center',
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#333',
+  },
+  actionSheetHandle: {
+    width: 40,
+    height: 4,
+    backgroundColor: '#444',
+    borderRadius: 2,
+    marginBottom: 12,
+  },
+  actionSheetTitle: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: '600',
+  },
+  actionSheetSubtitle: {
+    color: '#888',
+    fontSize: 12,
+    marginTop: 4,
+  },
+  actionSheetRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    gap: 12,
+  },
+  actionSheetRowText: {
+    color: '#fff',
+    fontSize: 16,
+  },
+  actionSheetVolumeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 20,
+    gap: 8,
+  },
+  volumeSlider: {
+    flex: 1,
+    height: 40,
+  },
+  actionSheetCloseRow: {
+    justifyContent: 'center',
+    borderTopWidth: 1,
+    borderTopColor: '#333',
+    marginTop: 8,
+  },
+  actionSheetCloseText: {
+    color: '#888',
+    fontSize: 16,
+    textAlign: 'center',
+  },
+  // Local indicator styles
+  localIndicator: {
+    position: 'absolute',
+    top: 8,
+    left: 8,
+    backgroundColor: 'rgba(255, 107, 107, 0.9)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+  },
+  localIndicatorText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: '700',
   },
 });
