@@ -3,7 +3,7 @@ import { View, StyleSheet, Text, ActivityIndicator, ScrollView, TextInput, Touch
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../state/AuthContext';
 import { getSupabaseClient } from '../lib/supabase';
-import { getAvatarUrl } from '../lib/defaultAvatar';
+import { getAvatarSource } from '../lib/defaultAvatar';
 
 // ============================================================================
 // CHAT CONTENT - Match web Chat.tsx exactly
@@ -228,12 +228,10 @@ export function ChatContent({ roomSlug }: { roomSlug: string }) {
       >
         {messages.map((msg) => (
           <View key={msg.id} style={styles.chatMessage}>
-            {msg.avatar_url && (
-              <Image
-                source={{ uri: msg.avatar_url || getAvatarUrl(msg.username || '') }}
-                style={styles.chatAvatar}
-              />
-            )}
+            <Image
+              source={getAvatarSource(msg.avatar_url)}
+              style={styles.chatAvatar}
+            />
             <View style={styles.chatMessageContent}>
               <View style={styles.chatMessageHeader}>
                 <Text style={[styles.chatUsername, msg.is_live && styles.chatUsernameLive]}>
