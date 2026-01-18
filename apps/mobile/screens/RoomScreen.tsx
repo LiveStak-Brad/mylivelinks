@@ -572,7 +572,6 @@ export default function RoomScreen() {
   const presenceActiveRef = useRef(false);
   const roomPresenceTableAvailableRef = useRef<boolean | null>(null);
   const hasRoomIdColumnRef = useRef<boolean | null>(null);
-  const heartbeatIntervalRef = useRef<NodeJS.Timeout | null>(null);
   // CRITICAL: Refs to capture current values for cleanup (empty deps useEffect has stale closures)
   const userRef = useRef(user);
   const roomConfigRef = useRef<RoomConfig | null>(null);
@@ -787,12 +786,8 @@ export default function RoomScreen() {
         console.log('[RoomScreen] group live_stream started', { streamId: liveStreamId });
       }
 
-      // Update presence to reflect live status
+      // Update presence to reflect live status (publishing = true)
       updateRoomPresence(true, true);
-      
-      // FIX #1: NO DUPLICATE HEARTBEAT
-      // Heartbeat already running from connectToLiveKit - just update ref so it uses correct publishing state
-      console.log('[RoomScreen] Publishing started - existing heartbeat will detect isPublishingRef change');
 
       Alert.alert('Live!', 'You are now streaming in the room!');
     } catch (err: any) {
@@ -1096,17 +1091,8 @@ export default function RoomScreen() {
         setIsConnected(true);
         updateParticipants(room);
         
-        // Update presence on successful connection
+        // Update presence on successful connection (join event)
         updateRoomPresence(true, false);
-        
-        // Start heartbeat to keep presence alive (every 20s, matches web)
-        if (heartbeatIntervalRef.current) {
-          clearInterval(heartbeatIntervalRef.current);
-        }
-        heartbeatIntervalRef.current = setInterval(() => {
-          console.log('[RoomScreen] Heartbeat - isPublishingRef.current:', isPublishingRef.current);
-          updateRoomPresence(true, isPublishingRef.current);
-        }, 20000);
       });
 
       room.on(RoomEvent.Disconnected, (reason) => {
@@ -1118,13 +1104,7 @@ export default function RoomScreen() {
         setIsConnected(false);
         setParticipants([]);
         
-        // Stop heartbeat
-        if (heartbeatIntervalRef.current) {
-          clearInterval(heartbeatIntervalRef.current);
-          heartbeatIntervalRef.current = null;
-        }
-        
-        // Clear presence on disconnect
+        // Clear presence on disconnect (leave event)
         updateRoomPresence(false);
         // CRITICAL: Use userRef to avoid stale closure
         const currentUser = userRef.current;
@@ -1291,12 +1271,6 @@ export default function RoomScreen() {
         console.log('[RoomScreen] group live_stream ended', { streamId: groupLiveStreamIdRef.current });
         endLiveStreamRecord(currentUser.id);
         groupLiveStreamIdRef.current = null;
-      }
-      
-      // Stop heartbeat
-      if (heartbeatIntervalRef.current) {
-        clearInterval(heartbeatIntervalRef.current);
-        heartbeatIntervalRef.current = null;
       }
       
       // Clear presence (fire and forget)
