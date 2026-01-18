@@ -105,7 +105,7 @@ export function ChatContent({ roomSlug }: { roomSlug: string }) {
 
       setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: false }), 100);
     } catch (error) {
-      console.error('[Chat] Failed to load messages:', error);
+      // Silently fail
     } finally {
       setLoading(false);
     }
@@ -133,10 +133,9 @@ export function ChatContent({ roomSlug }: { roomSlug: string }) {
           // FIX #3: Check cache first before fetching profile
           const cachedProfile = profileCacheRef.current.get(newMsg.profile_id);
           
-          if (cachedProfile) {
-            // Use cached profile - NO NETWORK CALL
-            console.log('[Chat] ✅ CACHE HIT: Using cached profile for', cachedProfile.username);
-            setMessages((prev) => [...prev, {
+            if (cachedProfile) {
+              // Use cached profile - NO NETWORK CALL
+              setMessages((prev) => [...prev, {
               id: newMsg.id,
               profile_id: newMsg.profile_id,
               username: cachedProfile.username,
@@ -150,7 +149,6 @@ export function ChatContent({ roomSlug }: { roomSlug: string }) {
             setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: true }), 100);
           } else {
             // Cache miss - fetch and cache profile
-            console.log('[Chat] ⚠️  CACHE MISS: Fetching profile for', newMsg.profile_id);
             const { data: profile } = await supabase
               .from('profiles')
               .select('username, avatar_url, is_live, gifter_level')
@@ -206,7 +204,6 @@ export function ChatContent({ roomSlug }: { roomSlug: string }) {
 
       setNewMessage('');
     } catch (error) {
-      console.error('[Chat] Failed to send message:', error);
       Alert.alert('Error', 'Failed to send message');
     }
   };
@@ -347,7 +344,7 @@ export function StatsContent() {
         gifterLevel: data.gifter_level || 0,
       });
     } catch (error) {
-      console.error('[Stats] Failed to load user stats:', error);
+      // Silently fail
     } finally {
       setLoading(false);
     }
@@ -461,7 +458,7 @@ export function LeaderboardContent() {
 
       setEntries(formatted);
     } catch (error) {
-      console.error('[Leaderboard] Failed to load:', error);
+      // Silently fail
     } finally {
       setLoading(false);
     }

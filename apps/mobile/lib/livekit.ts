@@ -39,7 +39,6 @@ export async function fetchMobileToken(
   const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
   
   if (sessionError || !sessionData?.session?.access_token) {
-    console.error('[livekit] No session for token fetch:', sessionError);
     throw new Error('Not authenticated. Please log in.');
   }
 
@@ -56,13 +55,12 @@ export async function fetchMobileToken(
       participantName: name || 'User',
       canPublish: isHost === true,
       canSubscribe: true,
-      role: isHost ? 'host' : 'viewer',
+      role: isHost ? 'publisher' : 'viewer',
     }),
   });
 
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
-    console.error('[livekit] Token API error:', response.status, errorData);
     throw new Error(errorData?.error || `Token request failed: ${response.status}`);
   }
 
@@ -105,19 +103,6 @@ export async function connectAndPublish(
     },
   });
 
-  // Set up event listeners for debugging
-  room.on(RoomEvent.Connected, () => {
-    console.log('[livekit] Connected to room:', room.name);
-  });
-
-  room.on(RoomEvent.Disconnected, (reason) => {
-    console.log('[livekit] Disconnected from room:', reason);
-  });
-
-  room.on(RoomEvent.MediaDevicesError, (error) => {
-    console.error('[livekit] Media device error:', error);
-  });
-
   // Connect to the room
   await room.connect(url, token);
 
@@ -155,13 +140,7 @@ export async function connectAndPublish(
         // Publish the track
         await room.localParticipant.publishTrack(track);
       }
-
-      console.log('[livekit] Published local tracks:', {
-        video: !!videoTrack,
-        audio: !!audioTrack,
-      });
     } catch (err) {
-      console.error('[livekit] Failed to create/publish tracks:', err);
       // Don't throw - connection is still valid, just no publishing
     }
   }
@@ -190,10 +169,8 @@ export async function disconnectAndCleanup(
     if (room) {
       await room.disconnect();
     }
-
-    console.log('[livekit] Cleanup complete');
   } catch (err) {
-    console.error('[livekit] Cleanup error:', err);
+    // Silently fail
   }
 }
 
@@ -208,9 +185,13 @@ export function generateSoloRoomName(userId: string): string {
  * Create a live_streams record when going live.
  * This makes the stream visible on LiveTV for web viewers.
  * Matches the web GoLiveButton.tsx implementation exactly.
+ * 
+ * @param userId - The user's profile ID
+ * @param streamingMode - 'solo' for solo streams, 'group' for group room publishing
  */
 export async function startLiveStreamRecord(
-  userId: string
+  userId: string,
+  streamingMode: 'solo' | 'group' = 'solo'
 ): Promise<{ liveStreamId: number | null; error: string | null }> {
   try {
     // First, end any existing live streams for this user (same as web)
@@ -229,7 +210,7 @@ export async function startLiveStreamRecord(
       .insert({
         profile_id: userId,
         live_available: true,
-        streaming_mode: 'solo', // 'solo' for mobile solo streams
+        streaming_mode: streamingMode,
         started_at: new Date().toISOString(),
         ended_at: null,
       })
@@ -237,14 +218,11 @@ export async function startLiveStreamRecord(
       .single();
 
     if (error) {
-      console.error('[livekit] Failed to create live_streams record:', error);
       return { liveStreamId: null, error: error.message };
     }
 
-    console.log('[livekit] ✅ Created live_stream with ID:', data?.id);
     return { liveStreamId: data?.id || null, error: null };
   } catch (err: any) {
-    console.error('[livekit] startLiveStreamRecord error:', err);
     return { liveStreamId: null, error: err?.message || 'Failed to start stream' };
   }
 }
@@ -265,7 +243,7 @@ export async function endLiveStreamRecord(userId: string): Promise<void> {
       .eq('live_available', true);
 
     if (streamError) {
-      console.error('[livekit] Failed to end live_streams record:', streamError);
+      // Silently fail
     }
 
     // Update profile is_live status
@@ -275,11 +253,9 @@ export async function endLiveStreamRecord(userId: string): Promise<void> {
       .eq('id', userId);
 
     if (profileError) {
-      console.error('[livekit] Failed to update profile is_live:', profileError);
+      // Silently fail
     }
-
-    console.log('[livekit] Live stream record ended for user:', userId);
   } catch (err) {
-    console.error('[livekit] endLiveStreamRecord error:', err);
+    // Silently fail
   }
 }
