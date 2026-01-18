@@ -143,16 +143,20 @@ export default function LiveRoom({
   const [liveStreamers, setLiveStreamers] = useState<LiveStreamer[]>([]);
   const liveStreamersRef = useRef<LiveStreamer[]>([]); // Track current streamers to prevent clearing
   
-  // DEBUG: Log state changes
-  useEffect(() => {
-    console.log('[DEBUG] liveStreamers changed:', {
-      count: liveStreamers?.length,
-      isArray: Array.isArray(liveStreamers),
-      isNull: liveStreamers === null,
-      isUndefined: liveStreamers === undefined,
-      value: liveStreamers
-    });
-  }, [liveStreamers]);
+  // PHASE 4: Centralized LiveKit tracks map (eliminates per-tile listeners)
+  // Map: streamerId -> { video?: RemoteTrack, audio?: RemoteTrack }
+  const tracksMapRef = useRef<Map<string, { video?: any; audio?: any }>>(new Map());
+  const [tracksByStreamerId, setTracksByStreamerId] = useState<Map<string, { video?: any; audio?: any }>>(new Map());
+  const tracksCommitTimerRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // Batched commit for track updates (50ms debounce)
+  const scheduleTracksCommit = useCallback(() => {
+    if (tracksCommitTimerRef.current) return;
+    tracksCommitTimerRef.current = setTimeout(() => {
+      setTracksByStreamerId(new Map(tracksMapRef.current));
+      tracksCommitTimerRef.current = null;
+    }, 50);
+  }, []);
   
   // Sync ref with state changes
   useEffect(() => {
@@ -263,7 +267,6 @@ export default function LiveRoom({
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-
   // CRITICAL: Memoize Supabase client to prevent recreation on every render
   // This prevents effects from re-running and causing LiveKit disconnect/reconnect loops
   const supabase = useMemo(() => createClient(), []);
@@ -280,6 +283,50 @@ export default function LiveRoom({
   const [isRoomConnected, setIsRoomConnected] = useState(false);
   const roomConnectionRef = useRef<{ connecting: boolean; connected: boolean }>({ connecting: false, connected: false });
   const roomRef = useRef<Room | null>(null);
+  
+  // PHASE 4: Manually sync local participant tracks (called after publishing)
+  const syncLocalTracks = useCallback(() => {
+    const room = roomRef.current;
+    if (!room?.localParticipant) return;
+    
+    const extractUserId = (identity: string) => {
+      const parts = identity.split(':');
+      return parts[0]?.startsWith('u_') ? parts[0].substring(2) : parts[0];
+    };
+    
+    const userId = extractUserId(room.localParticipant.identity);
+    if (!userId) return;
+    
+    const localTracks: { video?: any; audio?: any } = {};
+    const { Track } = require('livekit-client');
+    
+    room.localParticipant.trackPublications.forEach((publication) => {
+      if (publication.track) {
+        if (publication.track.kind === Track.Kind.Video) {
+          localTracks.video = publication.track;
+        } else if (publication.track.kind === Track.Kind.Audio) {
+          localTracks.audio = publication.track;
+        }
+      }
+    });
+    
+    if (localTracks.video || localTracks.audio) {
+      tracksMapRef.current.set(userId, localTracks);
+      scheduleTracksCommit();
+      setIsCurrentUserPublishing(true);
+    }
+  }, [scheduleTracksCommit]);
+  
+  // Periodically check for local tracks (fallback if events don't fire)
+  useEffect(() => {
+    if (!isRoomConnected) return;
+    
+    const interval = setInterval(() => {
+      syncLocalTracks();
+    }, 1000); // Check every second
+    
+    return () => clearInterval(interval);
+  }, [isRoomConnected, syncLocalTracks]);
   
   // Expose room to window for debugging
   useEffect(() => {
@@ -317,9 +364,6 @@ export default function LiveRoom({
       // - Fast refresh / component remount
       // - Route transitions
       if (roomConnectionRef.current.connecting || roomConnectionRef.current.connected) {
-        if (DEBUG_LIVEKIT) {
-          console.log('Room connection already in progress or connected, skipping');
-        }
         return;
       }
 
@@ -329,9 +373,6 @@ export default function LiveRoom({
         
         const { data: { user } } = await supabase.auth.getUser();
         if (!user && !authDisabled) {
-          if (DEBUG_LIVEKIT) {
-            console.log('No user, skipping room connection');
-          }
           roomConnectionRef.current.connecting = false; // Reset flag on early return
           return;
         }
@@ -341,7 +382,6 @@ export default function LiveRoom({
         const accessToken = session?.access_token;
         
         if (!accessToken && !authDisabled) {
-          console.log('No access token, skipping room connection');
           roomConnectionRef.current.connecting = false; // Reset flag on early return
           return;
         }
@@ -378,20 +418,6 @@ export default function LiveRoom({
         const roomUser: RoomUser | null = user ? { id: user.id, email: user.email } : null;
         const publishEligible = await Promise.resolve(roomConfig.permissions.canPublish(roomUser));
 
-        if (DEBUG_LIVEKIT) {
-          console.log('[TOKEN] Requesting token:', {
-            endpoint: TOKEN_ENDPOINT,
-            roomName: roomConfig.roomId,
-            roomType: roomConfig.type,
-            userId: userId,
-            deviceType: deviceType,
-            deviceId: deviceId.substring(0, 8) + '...',
-            sessionId: sessionId.substring(0, 8) + '...',
-            canPublish: publishEligible,
-            canSubscribe: true,
-          });
-        }
-
         const response = await fetch(TOKEN_ENDPOINT, {
           method: 'POST',
           headers: {
@@ -418,24 +444,6 @@ export default function LiveRoom({
         }
 
         const { token, url } = await response.json();
-        
-        if (DEBUG_LIVEKIT) {
-          console.log('[TOKEN] fetched token', {
-            identity: participantIdentity,
-            room: roomConfig.roomId,
-            hasToken: !!token,
-            hasUrl: !!url,
-            tokenLength: token?.length,
-          });
-        }
-        
-        console.log('[ROOM] Token received', {
-          hasToken: !!token,
-          hasUrl: !!url,
-          identity: participantIdentity,
-          displayName: participantDisplayName,
-        });
-        
         if (!token || !url) {
           throw new Error('Invalid token response');
         }
@@ -447,16 +455,6 @@ export default function LiveRoom({
         roomInstanceIdRef.current += 1;
         const currentInstanceId = roomInstanceIdRef.current;
         
-        if (DEBUG_LIVEKIT) {
-          console.log('[ROOM] created', {
-            roomInstanceId: currentInstanceId,
-            room: roomConfig.roomId,
-            roomType: roomConfig.type,
-            timestamp: new Date().toISOString(),
-            stackTrace: new Error().stack?.split('\n').slice(0, 5).join('\n'),
-          });
-        }
-        
         const newRoom = new LiveKitRoom({
           adaptiveStream: true,
           dynacast: true,
@@ -466,27 +464,6 @@ export default function LiveRoom({
         
         const handleConnected = () => {
           if (isEffectActive) {
-            if (DEBUG_LIVEKIT) {
-              console.log('[ROOM] connected', {
-                room: roomConfig.roomId,
-                roomType: roomConfig.type,
-                identity: newRoom.localParticipant.identity,
-                roomState: newRoom.state,
-                localParticipantSid: newRoom.localParticipant.sid,
-                remoteParticipantsCount: newRoom.remoteParticipants.size,
-                canPublish: newRoom.localParticipant.permissions?.canPublish,
-                canSubscribe: newRoom.localParticipant.permissions?.canSubscribe,
-              });
-            }
-            console.log('[ROOM] ✅ Connected successfully', {
-              roomState: newRoom.state,
-              roomName: newRoom.name,
-              localParticipantSid: newRoom.localParticipant.sid,
-              localParticipantIdentity: newRoom.localParticipant.identity,
-              remoteParticipantsCount: newRoom.remoteParticipants.size,
-              canPublish: newRoom.localParticipant.permissions?.canPublish,
-              canSubscribe: newRoom.localParticipant.permissions?.canSubscribe,
-            });
             setIsRoomConnected(true);
             roomConnectionRef.current.connected = true;
             roomConnectionRef.current.connecting = false;
@@ -495,13 +472,6 @@ export default function LiveRoom({
 
         const handleDisconnected = () => {
           if (isEffectActive) {
-            if (DEBUG_LIVEKIT) {
-              console.log('[DEBUG] Room disconnected:', {
-                roomState: newRoom.state,
-                roomName: newRoom.name,
-              });
-            }
-            console.log('Shared LiveKit room disconnected');
             setIsRoomConnected(false);
             // CRITICAL: Reset connection flags on disconnect to allow reconnection if needed
             roomConnectionRef.current.connected = false;
@@ -510,76 +480,179 @@ export default function LiveRoom({
         };
 
         const handleParticipantConnected = (participant: any) => {
-          if (DEBUG_LIVEKIT) {
-            console.log('[DEBUG] Participant connected:', {
-              identity: participant.identity,
-              sid: participant.sid,
-              trackPublicationsCount: participant.trackPublications.size,
-              isLocal: participant === newRoom.localParticipant,
-            });
-          }
           
           // CRITICAL: When a new participant connects and starts publishing, 
           // trigger auto-fill to add them to empty slots immediately
           if (!participant.isLocal && participant.trackPublications.size > 0) {
-            console.log('[GRID] New participant with tracks connected, triggering auto-fill reload');
             // Reload streamers list from DB (to get profile info) then auto-fill
             setTimeout(() => {
               loadLiveStreamers().then(() => {
                 // Auto-fill will run via the effect when liveStreamers updates
-                console.log('[GRID] Streamers reloaded after participant connect');
               });
             }, 1000); // Small delay to ensure DB is updated
           }
         };
 
         const handleParticipantDisconnected = (participant: any) => {
-          if (DEBUG_LIVEKIT) {
-            console.log('[DEBUG] Participant disconnected:', {
-              identity: participant.identity,
-              sid: participant.sid,
-            });
+          // PHASE 4: Clean up tracks for disconnected participant
+          const extractUserId = (identity: string) => {
+            const parts = identity.split(':');
+            return parts[0]?.startsWith('u_') ? parts[0].substring(2) : parts[0];
+          };
+          const streamerId = extractUserId(participant.identity);
+          if (streamerId && tracksMapRef.current.has(streamerId)) {
+            tracksMapRef.current.delete(streamerId);
+            scheduleTracksCommit();
           }
         };
 
         const handleTrackSubscribed = (track: any, publication: any, participant: any) => {
-          if (DEBUG_LIVEKIT) {
-            console.log('[DEBUG] Track subscribed:', {
-              participantIdentity: participant.identity,
-              trackKind: track.kind,
-              trackSid: track.sid,
-              publicationSid: publication.trackSid,
-            });
+          // PHASE 4: Centralized track management - update tracksMapRef
+          const extractUserId = (identity: string) => {
+            const parts = identity.split(':');
+            return parts[0]?.startsWith('u_') ? parts[0].substring(2) : parts[0];
+          };
+          const streamerId = extractUserId(participant.identity);
+          if (!streamerId) return;
+          
+          const existing = tracksMapRef.current.get(streamerId) || {};
+          const { Track } = require('livekit-client');
+          
+          if (track.kind === Track.Kind.Video) {
+            tracksMapRef.current.set(streamerId, { ...existing, video: track });
+          } else if (track.kind === Track.Kind.Audio) {
+            tracksMapRef.current.set(streamerId, { ...existing, audio: track });
           }
+          
+          scheduleTracksCommit();
         };
 
         const handleTrackUnsubscribed = (track: any, publication: any, participant: any) => {
-          if (DEBUG_LIVEKIT) {
-            console.log('[DEBUG] Track unsubscribed:', {
-              participantIdentity: participant.identity,
-              trackKind: track.kind,
-              trackSid: track.sid,
-            });
+          // PHASE 4: Remove track from map
+          const extractUserId = (identity: string) => {
+            const parts = identity.split(':');
+            return parts[0]?.startsWith('u_') ? parts[0].substring(2) : parts[0];
+          };
+          const streamerId = extractUserId(participant.identity);
+          if (!streamerId) return;
+          
+          const existing = tracksMapRef.current.get(streamerId);
+          if (!existing) return;
+          
+          const { Track } = require('livekit-client');
+          if (track.kind === Track.Kind.Video) {
+            const updated = { ...existing };
+            delete updated.video;
+            if (updated.audio) {
+              tracksMapRef.current.set(streamerId, updated);
+            } else {
+              tracksMapRef.current.delete(streamerId);
+            }
+          } else if (track.kind === Track.Kind.Audio) {
+            const updated = { ...existing };
+            delete updated.audio;
+            if (updated.video) {
+              tracksMapRef.current.set(streamerId, updated);
+            } else {
+              tracksMapRef.current.delete(streamerId);
+            }
           }
+          
+          scheduleTracksCommit();
         };
         
         const handleTrackPublished = (publication: any, participant: any) => {
-          if (DEBUG_LIVEKIT) {
-            console.log('[DEBUG] Track published:', {
-              participantIdentity: participant.identity,
-              trackKind: publication.kind,
-              trackSid: publication.trackSid,
-              isLocal: participant === newRoom.localParticipant,
-            });
+          // PHASE 4: Add published track to tracks map
+          const extractUserId = (identity: string) => {
+            const parts = identity.split(':');
+            return parts[0]?.startsWith('u_') ? parts[0].substring(2) : parts[0];
+          };
+          const streamerId = extractUserId(participant.identity);
+          if (!streamerId) return;
+          
+          const existing = tracksMapRef.current.get(streamerId) || {};
+          const { Track } = require('livekit-client');
+          
+          if (publication.track) {
+            if (publication.track.kind === Track.Kind.Video) {
+              tracksMapRef.current.set(streamerId, { ...existing, video: publication.track });
+            } else if (publication.track.kind === Track.Kind.Audio) {
+              tracksMapRef.current.set(streamerId, { ...existing, audio: publication.track });
+            }
+            scheduleTracksCommit();
+          }
+          
+          // CRITICAL: If local participant publishes video, set isCurrentUserPublishing
+          if (participant.isLocal && publication.track?.kind === Track.Kind.Video) {
+            setIsCurrentUserPublishing(true);
+            
+            // Immediately add current user to grid using their participant data
+            const extractUserId = (identity: string) => {
+              const parts = identity.split(':');
+              return parts[0]?.startsWith('u_') ? parts[0].substring(2) : parts[0];
+            };
+            const userId = extractUserId(participant.identity);
+            
+            if (userId) {
+              // Fetch user's profile and add to liveStreamers
+              supabase.auth.getUser().then(({ data: { user } }) => {
+                if (user) {
+                  supabase
+                    .from('profiles')
+                    .select('id, username, avatar_url')
+                    .eq('id', userId)
+                    .single()
+                    .then(({ data: profile }) => {
+                      if (profile) {
+                        const userStreamer: LiveStreamer = {
+                          id: `local-${userId}`,
+                          profile_id: profile.id,
+                          username: profile.username,
+                          avatar_url: profile.avatar_url,
+                          live_available: true,
+                          viewer_count: 0,
+                          gifter_level: 0,
+                          gifter_status: null,
+                        };
+                        
+                        // Add to liveStreamers if not already there
+                        setLiveStreamers(prev => {
+                          const exists = prev.some(s => s.profile_id === userId);
+                          if (exists) return prev;
+                          return [userStreamer, ...prev];
+                        });
+                        
+                        // Also trigger adding to slot 1
+                        setTimeout(() => {
+                          const currentSlots = gridSlotsRef.current;
+                          const slot1 = currentSlots.find(s => s.slotIndex === 1);
+                          const userInSlot1 = slot1?.streamer?.profile_id === userId;
+                          
+                          if (!userInSlot1) {
+                            const newSlots = [...currentSlots];
+                            const slot1Index = newSlots.findIndex(s => s.slotIndex === 1);
+                            if (slot1Index !== -1) {
+                              newSlots[slot1Index] = {
+                                ...newSlots[slot1Index],
+                                streamer: userStreamer,
+                                isEmpty: false,
+                              };
+                              setGridSlots(newSlots);
+                            }
+                          }
+                        }, 100);
+                      }
+                    });
+                }
+              });
+            }
           }
           
           // CRITICAL: When someone publishes a track, trigger auto-fill to add them to empty slots
           // This ensures new streamers appear immediately without waiting for DB polling
           if (!participant.isLocal) {
-            console.log('[GRID] Remote track published, triggering auto-fill reload');
             setTimeout(() => {
               loadLiveStreamers().then(() => {
-                console.log('[GRID] Streamers reloaded after track publish');
               });
             }, 1000);
           }
@@ -603,6 +676,7 @@ export default function LiveRoom({
         newRoom.on(RoomEvent.TrackSubscribed, handleTrackSubscribed);
         newRoom.on(RoomEvent.TrackUnsubscribed, handleTrackUnsubscribed);
         newRoom.on(RoomEvent.TrackPublished, handleTrackPublished);
+        newRoom.on(RoomEvent.LocalTrackPublished, handleTrackPublished); // Also listen for local track publications
         
         // Store room ref AFTER adding listeners
         roomRef.current = newRoom;
@@ -610,13 +684,7 @@ export default function LiveRoom({
         // Connect to room
         if (DEBUG_LIVEKIT) {
           const tokenHashShort = token ? token.substring(0, 8) + '...' : 'none';
-          console.log('[ROOM] connect called', {
-            roomInstanceId: currentInstanceId,
-            caller: 'connectSharedRoom',
-            tokenHashShort,
-            timestamp: new Date().toISOString(),
-            stackTrace: new Error().stack?.split('\n').slice(0, 5).join('\n'),
-          });
+          
         }
         await newRoom.connect(url, token);
         
@@ -626,6 +694,57 @@ export default function LiveRoom({
         if (isEffectActive) {
           // Verify connection before setting state
           if (newRoom.state === 'connected') {
+            // PHASE 4: Bootstrap tracks map with existing participants (one-time sync)
+            const extractUserId = (identity: string) => {
+              const parts = identity.split(':');
+              return parts[0]?.startsWith('u_') ? parts[0].substring(2) : parts[0];
+            };
+            const { Track } = await import('livekit-client');
+            
+            // Add local participant tracks (for self-view)
+            if (newRoom.localParticipant) {
+              const localStreamerId = extractUserId(newRoom.localParticipant.identity);
+              if (localStreamerId) {
+                const localTracks: { video?: any; audio?: any } = {};
+                newRoom.localParticipant.trackPublications.forEach((publication) => {
+                  if (publication.track) {
+                    if (publication.track.kind === Track.Kind.Video) {
+                      localTracks.video = publication.track;
+                    } else if (publication.track.kind === Track.Kind.Audio) {
+                      localTracks.audio = publication.track;
+                    }
+                  }
+                });
+                if (localTracks.video || localTracks.audio) {
+                  tracksMapRef.current.set(localStreamerId, localTracks);
+                }
+              }
+            }
+            
+            // Add remote participants
+            newRoom.remoteParticipants.forEach((participant) => {
+              const streamerId = extractUserId(participant.identity);
+              if (!streamerId) return;
+              
+              const tracks: { video?: any; audio?: any } = {};
+              participant.trackPublications.forEach((publication) => {
+                if (publication.track) {
+                  if (publication.track.kind === Track.Kind.Video) {
+                    tracks.video = publication.track;
+                  } else if (publication.track.kind === Track.Kind.Audio) {
+                    tracks.audio = publication.track;
+                  }
+                }
+              });
+              
+              if (tracks.video || tracks.audio) {
+                tracksMapRef.current.set(streamerId, tracks);
+              }
+            });
+            
+            // Commit bootstrap tracks
+            scheduleTracksCommit();
+            
             roomRef.current = newRoom;
             setSharedRoom(newRoom);
             setIsRoomConnected(true);
@@ -641,7 +760,6 @@ export default function LiveRoom({
           await newRoom.disconnect();
         }
       } catch (error: any) {
-        console.error('Error connecting shared room:', error);
         // CRITICAL: Always reset connecting flag on error to allow retry
         roomConnectionRef.current.connecting = false;
         roomConnectionRef.current.connected = false;
@@ -666,9 +784,10 @@ export default function LiveRoom({
         roomRef.current.off(RoomEvent.TrackUnsubscribed, handlers.handleTrackUnsubscribed);
         if ((handlers as any).handleTrackPublished) {
           roomRef.current.off(RoomEvent.TrackPublished, (handlers as any).handleTrackPublished);
+          roomRef.current.off(RoomEvent.LocalTrackPublished, (handlers as any).handleTrackPublished);
         }
         handlersRef.current = null;
-        roomRef.current.disconnect().catch(console.error);
+        roomRef.current.disconnect().catch(() => {});
         roomRef.current = null;
         setSharedRoom(null);
         setIsRoomConnected(false);
@@ -688,21 +807,12 @@ export default function LiveRoom({
     
     const handleVisibilityChange = async () => {
       const isHidden = document.hidden;
-      
-      console.log('[VISIBILITY] Page visibility changed:', { 
-        isHidden, 
-        wasHidden: wasHiddenRef.current,
-        isPublishing: isCurrentUserPublishing,
-        isConnected: isRoomConnected 
-      });
-      
       if (isHidden) {
         // Page is now hidden (tab switch, minimize, app switch on mobile)
         wasHiddenRef.current = true;
         
         // If user is streaming, stop their stream to save bandwidth
         if (isCurrentUserPublishing && currentUserId) {
-          console.log('[VISIBILITY] Streamer left page - stopping live stream');
           try {
             // Update database to end live stream
             await supabase
@@ -715,16 +825,12 @@ export default function LiveRoom({
               .from('user_grid_slots')
               .delete()
               .eq('streamer_id', currentUserId);
-            
-            console.log('[VISIBILITY] Streamer stream ended due to leaving page');
           } catch (err) {
-            console.error('[VISIBILITY] Error stopping stream:', err);
           }
         }
         
         // Disconnect from LiveKit room to save bandwidth
         if (roomRef.current && roomConnectionRef.current.connected) {
-          console.log('[VISIBILITY] Disconnecting from LiveKit to save bandwidth');
           try {
             if (handlersRef.current) {
               const handlers = handlersRef.current;
@@ -737,9 +843,7 @@ export default function LiveRoom({
             }
             await roomRef.current.disconnect();
             disconnectedDueToVisibilityRef.current = true;
-            console.log('[VISIBILITY] Disconnected from LiveKit');
           } catch (err) {
-            console.error('[VISIBILITY] Error disconnecting:', err);
           }
           roomRef.current = null;
           roomConnectionRef.current = { connecting: false, connected: false };
@@ -751,7 +855,6 @@ export default function LiveRoom({
         // Page is now visible again
         if (wasHiddenRef.current && disconnectedDueToVisibilityRef.current) {
           // User returned after being away - redirect to home for fresh start
-          console.log('[VISIBILITY] User returned after disconnect - redirecting to home');
           wasHiddenRef.current = false;
           disconnectedDueToVisibilityRef.current = false;
           
@@ -763,8 +866,6 @@ export default function LiveRoom({
     
     // Handle page unload (closing tab, navigating away completely)
     const handleBeforeUnload = async () => {
-      console.log('[VISIBILITY] Page unloading - cleaning up connections');
-      
       // If user is streaming, try to stop their stream
       if (isCurrentUserPublishing && currentUserId) {
         // Use sendBeacon for reliable delivery during page unload
@@ -789,8 +890,6 @@ export default function LiveRoom({
     
     // Handle page hide (more reliable than beforeunload on mobile)
     const handlePageHide = (event: PageTransitionEvent) => {
-      console.log('[VISIBILITY] Page hide event:', { persisted: event.persisted });
-      
       if (!event.persisted) {
         // Page is being unloaded (not just cached for back-forward)
         handleBeforeUnload();
@@ -852,7 +951,6 @@ export default function LiveRoom({
         }
         setInitError(null); // Clear any previous errors
       } catch (error) {
-        console.error('[LiveRoom] Failed to initialize user:', error);
         setInitError(error instanceof Error ? error.message : 'Failed to load user data');
         // Set to null to allow viewing as anonymous
         setCurrentUserId(null);
@@ -877,9 +975,6 @@ export default function LiveRoom({
       setRoomPresenceCountMinusSelf(0);
       return;
     }
-
-    const DEBUG_LIVEKIT = process.env.NEXT_PUBLIC_DEBUG_LIVEKIT === '1';
-
     const missingTableError = (error: any) => {
       if (!error) return false;
       const code = error.code;
@@ -970,10 +1065,9 @@ export default function LiveRoom({
 
         setRoomPresenceCountMinusSelf(count || 0);
         if (DEBUG_LIVEKIT) {
-          console.log('[ROOM-DEMAND] room presence count (minus self):', count || 0);
+          
         }
       } catch (err) {
-        console.error('Error loading room presence count:', err);
       }
     };
 
@@ -1065,12 +1159,6 @@ export default function LiveRoom({
 
   // Debug logging
   useEffect(() => {
-    console.log('LiveRoom state:', { 
-      mounted, 
-      loading, 
-      gridSlotsLength: gridSlots.length,
-      liveStreamersLength: liveStreamers.length 
-    });
   }, [mounted, loading, gridSlots.length, liveStreamers.length]);
 
   // Initialize immediately - don't wait for useEffect
@@ -1119,33 +1207,13 @@ export default function LiveRoom({
         }
         
         if (userLiveStream) {
-          console.log('[DEBUG] User is live, ensuring in slot 1:', {
-            currentUserId,
-            liveStreamId: userLiveStream.id,
-            live_available: userLiveStream.live_available,
-          });
-          
           // User is live - ensure they're in slot 1
           const currentSlots = gridSlotsRef.current;
           const slot1 = currentSlots.find(s => s.slotIndex === 1);
           const userInSlot1 = slot1?.streamer?.profile_id === currentUserId;
-          
-          console.log('[DEBUG] Slot 1 status:', {
-            userInSlot1,
-            slot1StreamerId: slot1?.streamer?.id,
-            slot1StreamerProfileId: slot1?.streamer?.profile_id,
-            slot1Empty: slot1?.isEmpty,
-          });
-          
           if (!userInSlot1) {
             // Find user's streamer data
             const userStreamer = liveStreamers.find(s => s.profile_id === currentUserId);
-            console.log('[DEBUG] Looking for user in liveStreamers:', {
-              found: !!userStreamer,
-              liveStreamersCount: liveStreamers.length,
-              userStreamerData: userStreamer,
-            });
-            
             if (userStreamer) {
               addUserToSlot1(userStreamer);
             } else {
@@ -1155,9 +1223,6 @@ export default function LiveRoom({
                 .select('username, avatar_url')
                 .eq('id', currentUserId)
                 .single();
-              
-              console.log('[DEBUG] Loaded user profile:', { userProfile });
-              
               if (userProfile) {
                 const ownStatusMap = await fetchGifterStatuses([currentUserId]);
                 const ownStatus = ownStatusMap[currentUserId] || null;
@@ -1172,19 +1237,15 @@ export default function LiveRoom({
                   gifter_level: 0,
                   gifter_status: ownStatus,
                 };
-                
-                console.log('[DEBUG] Created ownStream object:', ownStream);
                 addUserToSlot1(ownStream);
               }
             }
           } else {
-            console.log('[DEBUG] User already in slot 1, no action needed');
           }
         }
       } catch (error) {
         // Silently ignore 406 errors (RLS or query issues)
         if (error && typeof error === 'object' && 'code' in error && error.code !== 'PGRST116') {
-          console.warn('Error checking user live status:', error);
         }
       }
     };
@@ -1237,21 +1298,12 @@ export default function LiveRoom({
             const now = Date.now();
             // CRITICAL: Prevent rapid calls - only load if enough time has passed
             if (now - lastLoadTime < MIN_LOAD_INTERVAL) {
-              const DEBUG_LIVEKIT = process.env.NEXT_PUBLIC_DEBUG_LIVEKIT === '1';
-              if (DEBUG_LIVEKIT) {
-                console.log('[GRID] Skipping loadLiveStreamers - too soon', {
-                  timeSinceLastLoad: now - lastLoadTime,
-                  minInterval: MIN_LOAD_INTERVAL,
-                });
-              }
               return;
             }
             lastLoadTime = now;
             // Only update streamer list, don't reload grid layout
             // Grid layout reload causes disconnections
             loadLiveStreamers().then((streamers) => {
-              const DEBUG_LIVEKIT = process.env.NEXT_PUBLIC_DEBUG_LIVEKIT === '1';
-              
               // CRITICAL: Always run grid cleanup FIRST, regardless of streamer count
               // This ensures offline streamers are removed from tiles even if all streamers go offline
               const liveStreamerIds = new Set(streamers.map(s => s.profile_id));
@@ -1260,13 +1312,6 @@ export default function LiveRoom({
                 const updatedSlots = prevSlots.map(slot => {
                   if (slot.streamer && !liveStreamerIds.has(slot.streamer.profile_id)) {
                     // Streamer is in grid but no longer live - remove them
-                    if (DEBUG_LIVEKIT) {
-                      console.log('[GRID] Auto-removing offline streamer from slot', {
-                        slotIndex: slot.slotIndex,
-                        username: slot.streamer.username,
-                        profile_id: slot.streamer.profile_id,
-                      });
-                    }
                     hasChanges = true;
                     return {
                       ...slot,
@@ -1302,11 +1347,7 @@ export default function LiveRoom({
                 // Update ref with new data BEFORE returning
                 liveStreamersRef.current = streamers;
                 if (DEBUG_LIVEKIT) {
-                  console.log('[GRID] liveStreamers updated (realtime)', {
-                    oldCount: currentStreamers.length,
-                    newCount: streamers.length,
-                    newStreamers: streamers.map(s => ({ username: s.username, profile_id: s.profile_id })),
-                  });
+                  
                 }
                 
                 return streamers; // Changed, update - this triggers useEffect that calls autoFillGrid
@@ -1372,7 +1413,6 @@ export default function LiveRoom({
         return updatedStreamers; // Changed, update
       });
     } catch (error) {
-      console.error('Error updating viewer counts:', error);
     }
   };
 
@@ -1393,10 +1433,6 @@ export default function LiveRoom({
         // CRITICAL: Don't return empty array if we have existing streamers - might be temporary auth issue
         const existingStreamers = liveStreamersRef.current.length > 0 ? liveStreamersRef.current : [];
         if (existingStreamers.length > 0) {
-          const DEBUG_LIVEKIT = process.env.NEXT_PUBLIC_DEBUG_LIVEKIT === '1';
-          if (DEBUG_LIVEKIT) {
-            console.warn('[GRID] loadLiveStreamers: No user but have existing streamers, keeping them');
-          }
           return existingStreamers;
         }
         return []; // Only return empty if truly no streamers
@@ -1433,7 +1469,6 @@ export default function LiveRoom({
           .limit(50);
         
         if (directResult.error) {
-          console.error('Direct query also failed:', directResult.error);
           return []; // Return empty array instead of throwing
         }
         
@@ -1574,9 +1609,8 @@ export default function LiveRoom({
         const ownLiveStream = ownLiveStreams?.[0] ?? null;
 
         if (ownLiveStreamError) {
-          const DEBUG_LIVEKIT = process.env.NEXT_PUBLIC_DEBUG_LIVEKIT === '1';
           if (DEBUG_LIVEKIT) {
-            console.warn('[DEBUG] ownLiveStream query error (non-fatal):', ownLiveStreamError);
+            
           }
         }
 
@@ -1634,26 +1668,12 @@ export default function LiveRoom({
           if (streamersWithBadges.length === 0) {
             const currentCount = currentStreamers.length > 0 ? currentStreamers.length : liveStreamersRef.current.length;
             if (currentCount > 0) {
-              const DEBUG_LIVEKIT = process.env.NEXT_PUBLIC_DEBUG_LIVEKIT === '1';
-              if (DEBUG_LIVEKIT) {
-                console.warn('[GRID] loadLiveStreamers: Blocking empty array - keeping existing streamers', {
-                  currentCount: currentStreamers.length,
-                  refCount: liveStreamersRef.current.length,
-                  reason: 'empty result likely error/race condition',
-                });
-              }
               // Return existing streamers to prevent clearing state
               return currentStreamers.length > 0 ? currentStreamers : liveStreamersRef.current;
             }
             // Only allow empty array if we truly have no streamers (initial load)
             // But still check ref to be safe
             if (liveStreamersRef.current.length > 0) {
-              const DEBUG_LIVEKIT = process.env.NEXT_PUBLIC_DEBUG_LIVEKIT === '1';
-              if (DEBUG_LIVEKIT) {
-                console.warn('[GRID] loadLiveStreamers: Blocking empty array - keeping ref streamers', {
-                  refCount: liveStreamersRef.current.length,
-                });
-              }
               return liveStreamersRef.current;
             }
             liveStreamersRef.current = [];
@@ -1668,31 +1688,12 @@ export default function LiveRoom({
             if (prevIds === newIds) {
               // Data hasn't changed, return previous array reference to prevent re-render
               // This is CRITICAL - prevents tile subscription effects from rerunning
-              const DEBUG_LIVEKIT = process.env.NEXT_PUBLIC_DEBUG_LIVEKIT === '1';
-              if (DEBUG_LIVEKIT) {
-                console.log('[GRID] loadLiveStreamers: No changes detected, keeping previous array reference');
-              }
               return currentStreamers; // Return same reference
             }
           }
           
           // Update ref with new data BEFORE returning
           liveStreamersRef.current = streamersWithBadges;
-          const DEBUG_LIVEKIT = process.env.NEXT_PUBLIC_DEBUG_LIVEKIT === '1';
-          if (DEBUG_LIVEKIT) {
-            console.log('[GRID] liveStreamers updated:', {
-              oldCount: currentStreamers.length,
-              newCount: streamersWithBadges.length,
-              changedFields: currentStreamers.map((s, i) => {
-                const newS = streamersWithBadges[i];
-                if (!newS) return { profile_id: s.profile_id, change: 'removed' };
-                const changes: string[] = [];
-                if (s.viewer_count !== newS.viewer_count) changes.push('viewer_count');
-                if (s.live_available !== newS.live_available) changes.push('live_available');
-                return { profile_id: s.profile_id, changes };
-              }),
-            });
-          }
           // Data changed, return new array
           return streamersWithBadges;
         });
@@ -1705,7 +1706,6 @@ export default function LiveRoom({
       // Return streamers array so caller can use it directly (fixes race condition)
       return streamersWithBadges;
     } catch (error) {
-      console.error('Error loading live streamers:', error);
       setLoading(false);
       // Ensure we have empty slots even on error
       if (gridSlots.length === 0) {
@@ -1761,9 +1761,8 @@ export default function LiveRoom({
       const userLiveStream = userLiveStreams?.[0] ?? null;
 
       if (userLiveStreamError) {
-        const DEBUG_LIVEKIT = process.env.NEXT_PUBLIC_DEBUG_LIVEKIT === '1';
         if (DEBUG_LIVEKIT) {
-          console.warn('[DEBUG] userLiveStream query error (non-fatal):', userLiveStreamError);
+          
         }
       }
 
@@ -1882,7 +1881,6 @@ export default function LiveRoom({
         // Sort slots by index
         // CRITICAL: Ensure updatedSlots is valid before sorting
         if (!updatedSlots || !Array.isArray(updatedSlots)) {
-          console.error('[GRID] updatedSlots is invalid, using defaults');
           const defaultSlots = Array.from({ length: 12 }, (_, i) => ({
             slotIndex: i + 1,
             streamer: null,
@@ -1964,7 +1962,6 @@ export default function LiveRoom({
         autoFillGrid();
       }
     } catch (error) {
-      console.error('Error loading grid layout:', error);
       autoFillGrid();
     }
   };
@@ -2003,23 +2000,12 @@ export default function LiveRoom({
         await supabase.from('user_grid_slots').insert(slotsToSave);
       }
     } catch (error) {
-      console.error('Error saving grid layout:', error);
     }
   }, [supabase]);
 
   const autoFillGrid = useCallback(() => {
-    const DEBUG_LIVEKIT = process.env.NEXT_PUBLIC_DEBUG_LIVEKIT === '1';
-    
-    if (DEBUG_LIVEKIT) {
-      console.log('[GRID] autoFillGrid called', {
-        liveStreamersCount: liveStreamers.length,
-      });
-    }
     
     if (liveStreamers.length === 0) {
-      if (DEBUG_LIVEKIT) {
-        console.log('[GRID] No streamers available to fill');
-      }
       return;
     }
 
@@ -2028,7 +2014,6 @@ export default function LiveRoom({
     setGridSlots((currentSlots) => {
       // CRITICAL: Ensure currentSlots is always a valid array
       if (!currentSlots || !Array.isArray(currentSlots) || currentSlots.length === 0) {
-        console.warn('[GRID] autoFillGrid: currentSlots is invalid, initializing defaults');
         return Array.from({ length: 12 }, (_, i) => ({
           slotIndex: i + 1,
           streamer: null,
@@ -2043,18 +2028,8 @@ export default function LiveRoom({
       const validSlots = currentSlots.filter((s): s is GridSlot => s != null && typeof s === 'object' && typeof s.slotIndex === 'number');
       const emptySlots = validSlots.filter(s => s.isEmpty);
       
-      if (DEBUG_LIVEKIT) {
-        console.log('[GRID] Checking for empty slots', {
-          emptySlotCount: emptySlots.length,
-          totalSlots: currentSlots.length,
-        });
-      }
-      
       if (emptySlots.length === 0) {
         // No empty slots, nothing to fill
-        if (DEBUG_LIVEKIT) {
-          console.log('[GRID] No empty slots to fill');
-        }
         return validSlots;
       }
 
@@ -2071,15 +2046,6 @@ export default function LiveRoom({
       const availableStreamers = liveStreamers.filter(
         s => !usedStreamerIds.has(s.profile_id) && !closedIds.has(s.profile_id)
       );
-      
-      if (DEBUG_LIVEKIT) {
-        console.log('[GRID] Deduplication check', {
-          totalStreamers: liveStreamers.length,
-          alreadyInGrid: usedStreamerIds.size,
-          closedByViewer: closedIds.size,
-          availableToAdd: availableStreamers.length,
-        });
-      }
 
       if (availableStreamers.length === 0) {
         // No new streamers to add
@@ -2120,15 +2086,8 @@ export default function LiveRoom({
 
       // Only save if we actually changed something
       if (streamerIndex > 0) {
-        const DEBUG_LIVEKIT = process.env.NEXT_PUBLIC_DEBUG_LIVEKIT === '1';
         if (DEBUG_LIVEKIT) {
-          console.log('[GRID] Auto-filled slots', {
-            streamersAdded: streamerIndex,
-            addedStreamers: sorted.slice(0, streamerIndex).map(s => ({
-              username: s.username,
-              profile_id: s.profile_id,
-            })),
-          });
+          
         }
         saveGridLayout(updatedSlots);
       }
@@ -2141,21 +2100,12 @@ export default function LiveRoom({
   // This ensures new streamers automatically appear in empty boxes
   useEffect(() => {
     if (liveStreamers.length > 0 && gridSlots.length > 0) {
-      const DEBUG_LIVEKIT = process.env.NEXT_PUBLIC_DEBUG_LIVEKIT === '1';
       const emptyCount = gridSlots.filter(s => s.isEmpty).length;
-      
-      if (DEBUG_LIVEKIT) {
-        console.log('[GRID] liveStreamers updated, checking for auto-fill', {
-          streamersCount: liveStreamers.length,
-          emptySlots: emptyCount,
-        });
-      }
       
       // Only trigger if there are actually empty slots to fill
       if (emptyCount > 0) {
         // Small delay to ensure state is fully updated
         const timer = setTimeout(() => {
-          console.log('[GRID] Triggering auto-fill due to streamer changes');
           autoFillGrid();
         }, 500);
         
@@ -2166,8 +2116,6 @@ export default function LiveRoom({
 
   const handleGoLive = async (liveStreamId: number, profileId: string) => {
     try {
-      console.log('handleGoLive called:', { liveStreamId, profileId });
-      
       // Directly load the user's stream data instead of reloading all streamers
       if (authDisabled) {
         alert('⚠️ Testing Mode: "Go Live" requires authentication. Please enable auth or log in.');
@@ -2179,7 +2127,6 @@ export default function LiveRoom({
       user = result.data?.user || null;
       
       if (!user || user.id !== profileId) {
-        console.error('User mismatch or not authenticated');
         return;
       }
 
@@ -2198,12 +2145,10 @@ export default function LiveRoom({
       ]);
 
       if (profileResult.error || !profileResult.data) {
-        console.error('Error loading profile:', profileResult.error);
         return;
       }
 
       if (liveStreamResult.error || !liveStreamResult.data) {
-        console.error('Error loading live stream:', liveStreamResult.error);
         return;
       }
 
@@ -2282,7 +2227,6 @@ export default function LiveRoom({
               isEmpty: false,
             };
           } else {
-            console.warn('Could not find slot for displaced streamer:', displacedStreamer?.username);
           }
 
           currentSlots[slot1Index] = {
@@ -2298,10 +2242,7 @@ export default function LiveRoom({
       saveGridLayout(currentSlots);
       setPendingSlot1Insert(ownStream);
       setLayoutVersion(v => v + 1);
-      
-      console.log('User added to slot 1:', ownStream);
     } catch (error) {
-      console.error('Error adding user to grid:', error);
     }
   };
 
@@ -2348,20 +2289,12 @@ export default function LiveRoom({
   }, [layoutVersion, pendingPublish]);
 
   const addUserToSlot1 = (streamer: LiveStreamer) => {
-    console.log('[DEBUG] addUserToSlot1 called with:', {
-      streamerId: streamer.id,
-      profileId: streamer.profile_id,
-      username: streamer.username,
-      live_available: streamer.live_available,
-    });
-    
     // Use current grid slots from state
     const currentSlots = [...gridSlots];
     
     // Check if user is already in slot 1
     const slot1 = currentSlots.find(s => s.slotIndex === 1);
     if (slot1 && slot1.streamer?.profile_id === streamer.profile_id) {
-      console.log('[DEBUG] User already in slot 1, updating data');
       // Already in slot 1, but update streamer data in case it changed
       const slot1Index = currentSlots.findIndex(s => s.slotIndex === 1);
       if (slot1Index !== -1) {
@@ -2374,8 +2307,6 @@ export default function LiveRoom({
       }
       return;
     }
-
-    console.log('[DEBUG] Adding user to slot 1');
     const slot1Index = currentSlots.findIndex(s => s.slotIndex === 1);
     
     // Remove user from any other slot they might be in
@@ -2430,7 +2361,6 @@ export default function LiveRoom({
         };
       } else {
         // Fallback: if we can't find a slot, log warning but don't lose the streamer
-        console.warn('Could not find slot for displaced streamer:', displacedStreamer?.username);
       }
     }
 
@@ -2449,7 +2379,7 @@ export default function LiveRoom({
     // Save to database
     saveGridLayout(currentSlots);
     
-    console.log('Added user to slot 1 (top-left)');
+    
   };
 
   const handleDragStart = (slotIndex: number) => {
@@ -2465,27 +2395,15 @@ export default function LiveRoom({
   const handleDrop = async (e: React.DragEvent, targetSlotIndex: number) => {
     e.preventDefault();
     e.stopPropagation();
-    
-    console.log('Drop event triggered on slot:', targetSlotIndex);
-    
     // Check if dropping a viewer from the viewer list
     const dragData = e.dataTransfer.getData('application/json');
-    console.log('Drag data:', dragData);
-    
     if (dragData && dragData.trim()) {
       try {
         const data = JSON.parse(dragData);
-        console.log('Parsed drag data:', data);
-        
         if (data.type === 'viewer' && data.profile_id) {
-          console.log('Processing viewer drop:', data.profile_id, 'into slot:', targetSlotIndex);
-          
           // Find the streamer info for this viewer
           const streamer = liveStreamers.find((s) => s.profile_id === data.profile_id);
-          console.log('Found streamer in list:', streamer);
-          
           if (!streamer) {
-            console.log('Streamer not in list, loading from database...');
             // Try to load streamer info if not in list
             await loadStreamerForViewer(data.profile_id, data.live_stream_id, targetSlotIndex);
             setDraggedSlot(null);
@@ -2494,10 +2412,7 @@ export default function LiveRoom({
           }
 
           const targetSlot = gridSlots.find((s) => s.slotIndex === targetSlotIndex);
-          console.log('Target slot:', targetSlot);
-          
           if (!targetSlot) {
-            console.error('Target slot not found!');
             return;
           }
 
@@ -2513,9 +2428,6 @@ export default function LiveRoom({
             }
             return slot;
           });
-          
-          console.log('Updating slots, new slots:', newSlots);
-          
           setGridSlots(newSlots);
           saveGridLayout(newSlots);
           setDraggedSlot(null);
@@ -2523,7 +2435,6 @@ export default function LiveRoom({
           return;
         }
       } catch (error) {
-        console.error('Error parsing drag data:', error);
       }
     }
 
@@ -2567,8 +2478,6 @@ export default function LiveRoom({
 
   const loadStreamerForViewer = async (profileId: string, liveStreamId: number | undefined, slotIndex: number) => {
     try {
-      console.log('Loading streamer for viewer:', profileId, liveStreamId, slotIndex);
-      
       // Load streamer info from database
       const { data: profile, error: profileError } = await supabase
         .from('profiles')
@@ -2577,7 +2486,6 @@ export default function LiveRoom({
         .single();
 
       if (profileError || !profile) {
-        console.error('Error loading profile:', profileError);
         return;
       }
 
@@ -2643,13 +2551,11 @@ export default function LiveRoom({
         targetSlot.streamer = streamer;
         targetSlot.isEmpty = false;
         targetSlot.volume = 0.5;
-        console.log('Added streamer to slot:', slotIndex, streamer.username);
       }
 
       setGridSlots(newSlots);
       saveGridLayout(newSlots);
     } catch (error) {
-      console.error('Error loading streamer for viewer:', error);
     }
   };
 
@@ -2659,7 +2565,6 @@ export default function LiveRoom({
     if (slot) {
       // CRITICAL: If user closes their own box, end their stream (do NOT rely on isCurrentUserPublishing, which can be briefly stale)
       if (slot.streamer && slot.streamer.profile_id === currentUserId) {
-        console.log('User closed their own box, ending live stream...');
         try {
           const {
             data: { user },
@@ -2669,8 +2574,6 @@ export default function LiveRoom({
               .from('live_streams')
               .update({ live_available: false, ended_at: new Date().toISOString() })
               .eq('profile_id', user.id);
-
-            console.log('Removing self from all grid slots...');
             await supabase.from('user_grid_slots').delete().eq('streamer_id', user.id);
 
             // Best-effort service role cleanup (covers RLS edge cases)
@@ -2682,14 +2585,12 @@ export default function LiveRoom({
                 body: JSON.stringify({ action: 'end_stream', reason: 'close_tile' }),
               });
             } catch (cleanupErr) {
-              console.warn('[LIVE] Failed to call stream-cleanup API:', cleanupErr);
             }
 
             // Proactively clear local state; GoLiveButton realtime will also stop LiveKit publishing
             setIsCurrentUserPublishing(false);
           }
         } catch (err) {
-          console.error('Error ending live when closing own box:', err);
         }
       }
       // Prevent auto-refill of this streamer in this viewer's grid
@@ -2729,7 +2630,6 @@ export default function LiveRoom({
   const handleUnmuteAll = () => {
     // Unmute all tiles to enable sound
     setGridSlots(prev => prev.map(slot => ({ ...slot, isMuted: false })));
-    console.log('[AUDIO] All tiles unmuted');
   };
 
   const handleRandomize = () => {
@@ -2775,8 +2675,6 @@ export default function LiveRoom({
   }, [handleRandomize, handleSortModeChange, handleUnmuteAll, toggleFocusMode]);
 
   const handleAddStreamer = async (slotIndex: number, streamerId: string) => {
-    const DEBUG_LIVEKIT = process.env.NEXT_PUBLIC_DEBUG_LIVEKIT === '1';
-    
     // CRITICAL: Deduplicate - remove this streamer from any other slots first
     // This prevents same person appearing in multiple tiles (bandwidth waste)
     setGridSlots(prev => {
@@ -2785,13 +2683,6 @@ export default function LiveRoom({
       );
       
       if (otherSlotWithSameStreamer !== -1) {
-        if (DEBUG_LIVEKIT) {
-          console.log('[GRID] Removing duplicate streamer from another slot', {
-            streamerId,
-            oldSlot: prev[otherSlotWithSameStreamer].slotIndex,
-            newSlot: slotIndex,
-          });
-        }
         
         const updated = [...prev];
         // Clear the other slot
@@ -2882,7 +2773,6 @@ export default function LiveRoom({
             gifter_status: status,
           } as LiveStreamer;
         } else {
-          console.error('Profile not found:', streamerId);
           return;
         }
       }
@@ -3020,6 +2910,8 @@ export default function LiveRoom({
                   })() : undefined}
                   sharedRoom={sharedRoom}
                   isRoomConnected={isRoomConnected}
+                  videoTrack={tracksByStreamerId.get(expandedSlot.streamer.profile_id)?.video ?? null}
+                  audioTrack={tracksByStreamerId.get(expandedSlot.streamer.profile_id)?.audio ?? null}
                   onClose={handleExitFullscreen}
                   onMute={() => handleMuteTile(expandedSlot.slotIndex)}
                   isMuted={expandedSlot.isMuted}
@@ -3046,17 +2938,11 @@ export default function LiveRoom({
                 {(() => {
                   // DEBUG: Log grid rendering (only in debug mode to avoid performance issues)
                   if (process.env.NEXT_PUBLIC_DEBUG_LIVEKIT === '1') {
-                    console.log('[GRID RENDER]', {
-                      hasGridSlots: !!gridSlots,
-                      isArray: Array.isArray(gridSlots),
-                      length: gridSlots?.length,
-                      gridSlots: gridSlots
-                    });
+                    
                   }
                   
                   // CRITICAL: Ensure gridSlots is always a valid array - handle null/undefined cases
                   if (!gridSlots || !Array.isArray(gridSlots)) {
-                    console.warn('[GRID RENDER] gridSlots is not a valid array, using defaults');
                     const defaultSlots = Array.from({ length: 12 }, (_, i) => ({
                       slotIndex: i + 1,
                       streamer: null,
@@ -3102,10 +2988,6 @@ export default function LiveRoom({
                   
                   // CRITICAL: Final validation - ensure finalSlots is never null and always has 12 items
                   if (!finalSlots || !Array.isArray(finalSlots) || finalSlots.length !== 12) {
-                    console.error('[GRID RENDER] finalSlots validation failed, using defaults', {
-                      finalSlots,
-                      length: finalSlots?.length
-                    });
                     const defaultSlots = Array.from({ length: 12 }, (_, i) => ({
                       slotIndex: i + 1,
                       streamer: null,
@@ -3128,12 +3010,10 @@ export default function LiveRoom({
                   
                   // DEBUG: Only log in debug mode to avoid performance issues
                   if (process.env.NEXT_PUBLIC_DEBUG_LIVEKIT === '1') {
-                    console.log('[GRID RENDER] Using slots:', finalSlots.length, finalSlots);
                   }
                   
                   // CRITICAL: Ensure finalSlots is always a valid array before mapping
                   if (!finalSlots || !Array.isArray(finalSlots)) {
-                    console.error('[GRID RENDER] finalSlots is not a valid array:', finalSlots);
                     return Array.from({ length: 12 }, (_, i) => (
                       <div key={`fallback-${i}`} className="aspect-[3/2] bg-gray-200 dark:bg-gray-800 rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-700 flex flex-col items-center justify-center">
                         <span className="text-gray-400 text-sm">Loading...</span>
@@ -3173,7 +3053,6 @@ export default function LiveRoom({
                     return slotsToRender.map((slot: GridSlot, index: number) => {
                         // CRITICAL: Validate slot structure before rendering - double check
                         if (!slot || typeof slot !== 'object' || typeof slot.slotIndex !== 'number') {
-                          console.error('[GRID RENDER] Invalid slot detected in map:', { slot, index, slotsToRender });
                           return (
                             <div key={`error-${index}`} className="aspect-[3/2] bg-red-200 dark:bg-red-800 rounded-lg border-2 border-red-500 flex flex-col items-center justify-center">
                               <span className="text-red-600 text-sm">Error: Invalid Slot</span>
@@ -3241,7 +3120,6 @@ export default function LiveRoom({
                         ) : (() => {
                           // CRITICAL: Validate slot and streamer before accessing properties
                           if (!slot || typeof slot !== 'object') {
-                            console.error('[GRID RENDER] Invalid slot:', slot);
                             return (
                               <div className="aspect-[3/2] bg-gray-200 dark:bg-gray-800 rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-700 flex flex-col items-center justify-center">
                                 <span className="text-gray-400 text-sm">Invalid Slot</span>
@@ -3252,7 +3130,6 @@ export default function LiveRoom({
                           // CRITICAL: Validate streamer properties are valid strings/numbers before rendering
                           const streamer = slot.streamer;
                           if (!streamer || typeof streamer !== 'object' || streamer === null) {
-                            console.error('[GRID RENDER] Invalid streamer:', streamer, 'slot:', slot);
                             return (
                               <div className="aspect-[3/2] bg-gray-200 dark:bg-gray-800 rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-700 flex flex-col items-center justify-center">
                                 <span className="text-gray-400 text-sm">Invalid Streamer Data</span>
@@ -3277,7 +3154,6 @@ export default function LiveRoom({
                               }
                             }
                           } catch (e) {
-                            console.error('[GRID RENDER] Error extracting profile_id:', e, { streamer, profileIdValue: streamer?.profile_id });
                             profileId = null; // Ensure it's null on error
                           }
                           
@@ -3298,17 +3174,10 @@ export default function LiveRoom({
                               }
                             }
                           } catch (e) {
-                            console.error('[GRID RENDER] Error extracting username:', e, { streamer, usernameValue: streamer?.username });
                             username = null; // Ensure it's null on error
                           }
                           
                           if (!profileId || !username) {
-                            console.warn('[GRID RENDER] Invalid streamer data:', { 
-                              slotIndex: slot.slotIndex, 
-                              profileId, 
-                              username, 
-                              streamer 
-                            });
                             return (
                               <div className="aspect-[3/2] bg-gray-200 dark:bg-gray-800 rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-700 flex flex-col items-center justify-center">
                                 <span className="text-gray-400 text-sm">Invalid Streamer Data</span>
@@ -3347,7 +3216,6 @@ export default function LiveRoom({
                                 }
                               }
                             } catch (e) {
-                              console.error('[GRID RENDER] Error parsing liveStreamId:', e, { streamer, idRaw: streamer?.id });
                               liveStreamId = undefined; // Ensure it's undefined on error
                             }
                           }
@@ -3366,6 +3234,8 @@ export default function LiveRoom({
                         sharedRoom={sharedRoom}
                         isRoomConnected={isRoomConnected}
                         isCurrentUserPublishing={isCurrentUserPublishing}
+                        videoTrack={tracksByStreamerId.get(profileId)?.video ?? null}
+                        audioTrack={tracksByStreamerId.get(profileId)?.audio ?? null}
                         compactMode={isCompactDesktop}
                         onClose={() => handleCloseTile(slot.slotIndex)}
                         onMute={() => handleMuteTile(slot.slotIndex)}
@@ -3383,7 +3253,6 @@ export default function LiveRoom({
                       </div>
                           );
                         } catch (error) {
-                          console.error('[GRID RENDER] Error rendering slot:', error, { slot, index, finalSlots });
                           return (
                             <div key={`error-${slot.slotIndex}`} className="aspect-[3/2] bg-red-200 dark:bg-red-800 rounded-lg border-2 border-red-500 flex flex-col items-center justify-center">
                               <span className="text-red-600 text-sm">Render Error</span>
@@ -3392,7 +3261,6 @@ export default function LiveRoom({
                         }
                       });
                   } catch (error) {
-                    console.error('[GRID RENDER] Fatal error rendering grid:', error, { finalSlots });
                     // Return empty slots as fallback
                     return Array.from({ length: 12 }, (_, i) => (
                       <div key={`fallback-${i}`} className="aspect-[3/2] bg-gray-200 dark:bg-gray-800 rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-700 flex flex-col items-center justify-center">
