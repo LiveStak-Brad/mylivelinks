@@ -538,6 +538,22 @@ export default function RoomScreen() {
   const [participants, setParticipants] = useState<Participant[]>([]);
   const roomRef = useRef<Room | null>(null);
   
+  // PHASE 2: Batched participant updates to prevent event burst jank
+  const participantsMapRef = useRef<Map<string, Participant>>(new Map());
+  const commitTimerRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // Schedule a batched commit of participants from the ref map to React state
+  const scheduleCommitParticipants = useCallback(() => {
+    // If a commit is already scheduled, don't schedule another
+    if (commitTimerRef.current) return;
+    
+    // Schedule commit in 50ms (batches rapid LiveKit events)
+    commitTimerRef.current = setTimeout(() => {
+      setParticipants(Array.from(participantsMapRef.current.values()));
+      commitTimerRef.current = null;
+    }, 50);
+  }, []);
+  
   // Publishing state
   const [isPublishing, setIsPublishing] = useState(false);
   const isPublishingRef = useRef(false); // Ref for heartbeat closure
@@ -881,9 +897,10 @@ export default function RoomScreen() {
     };
   }, [roomConfig?.id, fetchRoomConfig]);
 
-  // Update participants list from LiveKit room
+  // Update participants list from LiveKit room (PHASE 2: Batched via map)
   const updateParticipants = useCallback((room: Room) => {
-    const remoteParticipants: Participant[] = [];
+    // Clear map and rebuild from current room state
+    participantsMapRef.current.clear();
     
     room.remoteParticipants.forEach((participant: RemoteParticipant) => {
       let videoTrack: RemoteTrack | null = null;
@@ -894,8 +911,9 @@ export default function RoomScreen() {
         }
       });
 
+      // Only add participants with video tracks
       if (videoTrack) {
-        remoteParticipants.push({
+        participantsMapRef.current.set(participant.sid, {
           id: participant.sid,
           identity: participant.identity,
           videoTrack,
@@ -903,8 +921,9 @@ export default function RoomScreen() {
       }
     });
 
-    setParticipants(remoteParticipants);
-  }, []);
+    // Schedule a batched commit to React state
+    scheduleCommitParticipants();
+  }, [scheduleCommitParticipants]);
 
   // Connect to LiveKit room (same room name as web)
   const connectToLiveKit = useCallback(async () => {
@@ -976,7 +995,8 @@ export default function RoomScreen() {
 
       room.on(RoomEvent.Disconnected, (reason) => {
         setIsConnected(false);
-        setParticipants([]);
+        participantsMapRef.current.clear(); // Clear map
+        setParticipants([]); // Immediate commit on disconnect
         updateRoomPresence(false);
         
         const currentUser = userRef.current;
@@ -990,6 +1010,7 @@ export default function RoomScreen() {
       });
 
       room.on(RoomEvent.ParticipantConnected, (participant) => {
+        // Auto-subscribe to camera/mic tracks
         participant.trackPublications.forEach((pub) => {
           if (pub.source === Track.Source.Camera || pub.source === Track.Source.Microphone) {
             if (!pub.isSubscribed) {
@@ -1002,56 +1023,49 @@ export default function RoomScreen() {
           }
         });
         
-        setParticipants(prev => {
-          if (prev.some(p => p.id === participant.sid)) {
-            return prev;
+        // PHASE 2: Update map instead of state directly
+        // Note: We might not have video track yet, will be added on TrackSubscribed
+        let videoTrack: RemoteTrack | null = null;
+        participant.trackPublications.forEach((pub: RemoteTrackPublication) => {
+          if (pub.kind === Track.Kind.Video && pub.track) {
+            videoTrack = pub.track as RemoteTrack;
           }
-          
-          let videoTrack: RemoteTrack | null = null;
-          participant.trackPublications.forEach((pub: RemoteTrackPublication) => {
-            if (pub.kind === Track.Kind.Video && pub.track) {
-              videoTrack = pub.track as RemoteTrack;
-            }
-          });
-          
-          if (videoTrack) {
-            return [...prev, {
-              id: participant.sid,
-              identity: participant.identity,
-              videoTrack,
-            }];
-          }
-          
-          return prev;
         });
+        
+        // Only add to map if video track exists
+        if (videoTrack) {
+          participantsMapRef.current.set(participant.sid, {
+            id: participant.sid,
+            identity: participant.identity,
+            videoTrack,
+          });
+          scheduleCommitParticipants();
+        }
       });
 
       room.on(RoomEvent.ParticipantDisconnected, (participant) => {
-        setParticipants(prev => prev.filter(p => p.id !== participant.sid));
+        // PHASE 2: Remove from map and schedule commit
+        participantsMapRef.current.delete(participant.sid);
+        scheduleCommitParticipants();
       });
 
       room.on(RoomEvent.TrackSubscribed, (track: RemoteTrack, publication, participant: RemoteParticipant) => {
         if (track.kind === 'video') {
-          setParticipants(prev => {
-            const index = prev.findIndex(p => p.id === participant.sid);
-            if (index >= 0) {
-              const updated = [...prev];
-              updated[index] = { ...updated[index], videoTrack: track };
-              return updated;
-            } else {
-              return [...prev, {
-                id: participant.sid,
-                identity: participant.identity,
-                videoTrack: track,
-              }];
-            }
+          // PHASE 2: Update map and schedule commit
+          participantsMapRef.current.set(participant.sid, {
+            id: participant.sid,
+            identity: participant.identity,
+            videoTrack: track,
           });
+          scheduleCommitParticipants();
         }
       });
 
       room.on(RoomEvent.TrackUnsubscribed, (track: RemoteTrack, publication, participant: RemoteParticipant) => {
         if (track.kind === 'video') {
-          setParticipants(prev => prev.filter(p => p.id !== participant.sid));
+          // PHASE 2: Remove from map and schedule commit
+          participantsMapRef.current.delete(participant.sid);
+          scheduleCommitParticipants();
         }
       });
 
