@@ -662,7 +662,6 @@ export default function RoomScreen() {
             roomPresenceTableAvailableRef.current = false;
             return;
           } else {
-            console.error('[RoomScreen] presence upsert error:', error);
             return;
           }
         }
@@ -670,19 +669,18 @@ export default function RoomScreen() {
         presenceActiveRef.current = true;
         roomPresenceTableAvailableRef.current = true;
       } else {
-        // CRITICAL: Include room_id in delete to only remove THIS room's presence
         const { error } = await supabase
           .from('room_presence')
           .delete()
           .eq('profile_id', user.id)
           .eq('room_id', roomId);
         if (error && error.code !== '42P01') {
-          console.error('[RoomScreen] presence delete error:', error);
+          // Silently fail
         }
         presenceActiveRef.current = false;
       }
     } catch (err) {
-      console.error('[RoomScreen] presence error:', err);
+      // Silently fail
     }
   }, [user, roomConfig?.room_key, normalizedRoomId]);
 
@@ -801,20 +799,14 @@ export default function RoomScreen() {
   }, [tileActionTarget]);
 
   const handleReplace = useCallback(() => {
-    console.log('[RoomScreen] Replace tapped for slot:', tileActionTarget?.slotIndex);
-    // TODO: Implement replace flow
     setTileActionTarget(null);
   }, [tileActionTarget]);
 
   const handleKick = useCallback(() => {
-    console.log('[RoomScreen] Kick tapped for:', tileActionTarget?.participant?.identity);
-    // TODO: Implement kick flow
     setTileActionTarget(null);
   }, [tileActionTarget]);
 
   const handleViewProfile = useCallback(() => {
-    console.log('[RoomScreen] View profile tapped for:', tileActionTarget?.participant?.identity);
-    // TODO: Navigate to profile
     setTileActionTarget(null);
   }, [tileActionTarget]);
 
@@ -829,11 +821,7 @@ export default function RoomScreen() {
       });
 
       if (rpcError) {
-        console.error('[RoomScreen] RPC error:', rpcError);
-
-        // Fallback to Live Central default if room not found
         if (slug === 'live-central' || slug === 'live_central') {
-          console.log('[RoomScreen] Using Live Central fallback config');
           setRoomConfig({
             id: 'live-central-default',
             room_key: 'live_central',
@@ -856,10 +844,8 @@ export default function RoomScreen() {
         return;
       }
 
-      console.log('[RoomScreen] RPC returned room config:', JSON.stringify(data, null, 2));
       setRoomConfig(data);
     } catch (err: any) {
-      console.error('[RoomScreen] Error fetching room config:', err);
       setError(err?.message || 'Failed to load room');
     } finally {
       setLoading(false);
@@ -885,8 +871,6 @@ export default function RoomScreen() {
           filter: `id=eq.${roomConfig.id}`,
         },
         (payload) => {
-          console.log('[RoomScreen] Room status changed:', payload.new);
-          // Refetch room config on status change
           fetchRoomConfig();
         }
       )
@@ -901,24 +885,15 @@ export default function RoomScreen() {
   const updateParticipants = useCallback((room: Room) => {
     const remoteParticipants: Participant[] = [];
     
-    console.log('[RoomScreen] Checking remote participants, count:', room.remoteParticipants.size);
-    
     room.remoteParticipants.forEach((participant: RemoteParticipant) => {
-      console.log('[RoomScreen] Participant:', participant.identity, 'tracks:', participant.trackPublications.size);
-      
       let videoTrack: RemoteTrack | null = null;
       
       participant.trackPublications.forEach((pub: RemoteTrackPublication) => {
-        console.log('[RoomScreen]   Publication:', pub.kind, 'subscribed:', pub.isSubscribed, 'track:', !!pub.track);
-        
-        // Check for video tracks - include even if not yet subscribed (will update when subscribed)
         if (pub.kind === Track.Kind.Video && pub.track) {
           videoTrack = pub.track as RemoteTrack;
-          console.log('[RoomScreen]   Found video track for', participant.identity);
         }
       });
 
-      // Add all participants with video tracks (subscribed or not)
       if (videoTrack) {
         remoteParticipants.push({
           id: participant.sid,
@@ -928,24 +903,20 @@ export default function RoomScreen() {
       }
     });
 
-    console.log('[RoomScreen] Updated participants:', remoteParticipants.length, 'with video');
     setParticipants(remoteParticipants);
   }, []);
 
   // Connect to LiveKit room (same room name as web)
   const connectToLiveKit = useCallback(async () => {
     if (!roomConfig) {
-      console.log('[RoomScreen] Cannot connect - no room config');
       return;
     }
 
-    // Check permissions - handle both nested object and direct boolean
     const canView = typeof roomConfig.permissions?.can_view === 'boolean'
       ? roomConfig.permissions.can_view
-      : true; // Default to true for public rooms
+      : true;
 
     if (!canView) {
-      console.log('[RoomScreen] Cannot connect - no view permission');
       return;
     }
 
@@ -1099,68 +1070,41 @@ export default function RoomScreen() {
       await room.connect(url, token);
       
       roomRef.current = room;
-      // Note: setLiveKitRoom(room) is now called INSIDE RoomEvent.Connected handler (line ~1080)
-      // This ensures liveKitRoom state is only set after successful connection
     } catch (err: any) {
-      console.error('[RoomScreen] LiveKit connection error:', err);
       setError(err?.message || 'Failed to connect to live room');
     }
   }, [roomConfig, user, updateParticipants, updateRoomPresence]);
 
   // Connect to LiveKit when room config is loaded
   useEffect(() => {
-    console.log('[RoomScreen] 🔌 Connection useEffect - roomConfig:', !!roomConfig, 'liveKitRoom:', !!liveKitRoom, 'roomRef:', !!roomRef.current);
-    
-    // CRITICAL FIX: Check if room state matches ref (hot reload can desync them)
     const roomStateValid = liveKitRoom && roomRef.current === liveKitRoom;
     
     if (roomConfig && !roomStateValid) {
-      console.log('[RoomScreen] 🔌 Triggering connectToLiveKit() - roomStateValid:', roomStateValid);
       connectToLiveKit();
-    } else {
-      console.log('[RoomScreen] 🔌 Skipping connection - roomStateValid:', roomStateValid, 'hasConfig:', !!roomConfig);
     }
   }, [roomConfig, liveKitRoom, connectToLiveKit]);
 
   // Cleanup on unmount only
   useEffect(() => {
     return () => {
-      console.log('[RoomScreen] Component unmounting, disconnecting room');
-      
-      // CRITICAL: Use refs for cleanup since empty deps means stale closures
       const currentUser = userRef.current;
       const currentRoomConfig = roomConfigRef.current;
       
-      // End group live stream if publishing
       if (groupLiveStreamIdRef.current && currentUser) {
-        console.log('[RoomScreen] group live_stream ended', { streamId: groupLiveStreamIdRef.current });
         endLiveStreamRecord(currentUser.id);
         groupLiveStreamIdRef.current = null;
       }
       
-      // Clear presence (fire and forget)
-      // CRITICAL: Include room_id to only remove THIS room's presence
       if (currentUser && presenceActiveRef.current && currentRoomConfig?.room_key) {
         const roomId = currentRoomConfig.room_key === 'live-central' ? 'live_central' : currentRoomConfig.room_key;
-        console.log('[RoomScreen] Clearing presence on unmount...', { roomId, profileId: currentUser.id });
         supabase
           .from('room_presence')
           .delete()
           .eq('profile_id', currentUser.id)
           .eq('room_id', roomId)
           .then(({ error }) => {
-            if (error) {
-              console.error('[RoomScreen] presence delete error on unmount:', error);
-            } else {
-              console.log('[RoomScreen] presence cleared on unmount', { roomId });
-            }
+            // Silently complete
           });
-      } else {
-        console.log('[RoomScreen] Skipping presence cleanup:', { 
-          hasUser: !!currentUser, 
-          presenceActive: presenceActiveRef.current, 
-          hasRoomKey: !!currentRoomConfig?.room_key 
-        });
       }
       
       if (roomRef.current) {
@@ -1168,7 +1112,7 @@ export default function RoomScreen() {
         roomRef.current = null;
       }
     };
-  }, []); // Empty deps - only run on unmount
+  }, []);
 
   // Calculate safe dimensions that respect all safe area insets
   // Control bar: 60px height at bottom (portrait) OR 40px width at right (landscape)
