@@ -11,6 +11,7 @@ import LiveAvatar from '@/components/LiveAvatar';
 import ReportModal from '@/components/ReportModal';
 import { usePresence } from '@/contexts/PresenceContext';
 import { PresenceDot } from '@/components/presence/PresenceDot';
+import { PhotoViewerModal } from './PhotoViewerModal';
 
 interface MessageThreadProps {
   conversation: Conversation;
@@ -82,6 +83,7 @@ export default function MessageThread({ conversation, onBack, showBackButton = f
   const [isSending, setIsSending] = useState(false);
   const [showGiftPicker, setShowGiftPicker] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [viewingPhoto, setViewingPhoto] = useState<string | null>(null);
   const [reportTarget, setReportTarget] = useState<{
     reportedUserId?: string;
     reportedUsername?: string;
@@ -361,6 +363,7 @@ export default function MessageThread({ conversation, onBack, showBackButton = f
                         time={formatTime(msg.timestamp)}
                         senderUsername={conversation.recipientUsername}
                         onReport={!isOwn ? () => openReportDmMessage(msg) : undefined}
+                        onViewPhoto={setViewingPhoto}
                       />
                       {isLastReadMessage && (
                         <p className="text-[10px] text-right text-blue-400 mt-1 mr-1 font-medium">
@@ -484,6 +487,14 @@ export default function MessageThread({ conversation, onBack, showBackButton = f
           contextDetails={reportTarget.contextDetails}
         />
       )}
+
+      {/* Photo Viewer Modal */}
+      {viewingPhoto && (
+        <PhotoViewerModal
+          photoUrl={viewingPhoto}
+          onClose={() => setViewingPhoto(null)}
+        />
+      )}
     </div>
   );
 }
@@ -495,12 +506,14 @@ function MessageBubble({
   time,
   senderUsername,
   onReport,
+  onViewPhoto,
 }: {
   message: Message;
   isOwn: boolean;
   time: string;
   senderUsername: string;
   onReport?: () => void;
+  onViewPhoto?: (url: string) => void;
 }) {
   // Gift message bubble
   if (message.type === 'gift') {
@@ -573,9 +586,13 @@ function MessageBubble({
           }`}
         >
           {url ? (
-            <SafeOutboundLink href={url}>
+            <button
+              type="button"
+              onClick={() => onViewPhoto?.(url)}
+              className="block cursor-pointer hover:opacity-90 transition"
+            >
               <img src={url} alt="Photo" className="block max-h-[260px] w-auto object-contain" />
-            </SafeOutboundLink>
+            </button>
           ) : (
             <div className="px-4 py-3 text-sm text-muted-foreground">Photo</div>
           )}

@@ -36,6 +36,8 @@ interface TileProps {
   sharedRoom?: Room | null; // Shared LiveKit room connection
   isRoomConnected?: boolean; // Whether shared room is connected
   isCurrentUserPublishing?: boolean; // NEW: Whether current user is publishing (for echo prevention)
+  videoTrack?: any | null; // PHASE 4: Receive video track from parent (centralized management)
+  audioTrack?: any | null; // PHASE 4: Receive audio track from parent (centralized management)
   compactMode?: boolean;
   onClose: () => void;
   onMute: () => void;
