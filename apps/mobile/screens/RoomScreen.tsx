@@ -368,10 +368,7 @@ const VideoTile = React.memo(({ participant, localVideoTrack, isLocalTile, width
     <TouchableOpacity 
       style={[styles.tile, { width, height }]}
       activeOpacity={0.7}
-      onPress={() => {
-        console.log('[VideoTile] Pressed slot:', slotIndex, 'participant:', participant?.identity, 'isLocal:', isLocalTile);
-        onTilePress(slotIndex, participant);
-      }}
+      onPress={() => onTilePress(slotIndex, participant)}
     >
       {hasVideo && videoTrack ? (
         <>
@@ -488,43 +485,29 @@ export default function RoomScreen() {
   
   // Room slug from navigation params (same identifier as web)
   const slug = route.params?.slug || route.params?.roomKey || 'live-central';
-  
-  console.log('[RoomScreen] 🎬 COMPONENT MOUNTED/RENDERED - slug:', slug, 'user:', !!user);
 
   // Track screen dimensions for orientation detection using hook (auto-updates on rotation)
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
   const isLandscape = screenWidth > screenHeight;
-  
-  // Debug: log orientation changes
-  useEffect(() => {
-    console.log('[RoomScreen] Orientation changed:', isLandscape ? 'LANDSCAPE' : 'PORTRAIT',
-      'dimensions:', screenWidth, 'x', screenHeight, 'insets:', insets);
-  }, [isLandscape, screenWidth, screenHeight, insets]);
 
-  // Ensure status bar stays visible when orientation changes
+  // FIX #2: Status bar visibility - mount only, no orientation triggers
   useEffect(() => {
-    // Force status bar visibility on orientation changes
     RNStatusBar.setHidden(false, 'none');
-    console.log('[RoomScreen] Status bar visibility enforced');
-  }, [isLandscape]);
+    return () => RNStatusBar.setHidden(false, 'none');
+  }, []);
 
   // Unlock orientation when RoomScreen is focused, lock back to portrait when leaving
   useFocusEffect(
     useCallback(() => {
       const unlockOrientation = async () => {
         try {
-          // Unlock orientation when entering RoomScreen
           await ScreenOrientation.unlockAsync();
-          console.log('[RoomScreen] Orientation unlocked');
 
-          // Force status bar to stay visible after orientation unlock
-          // This prevents iOS/Android from auto-hiding it in landscape
           if (Platform.OS === 'ios') {
-            // On iOS, prevent status bar from hiding in landscape
             RNStatusBar.setHidden(false, 'fade');
           }
         } catch (error) {
-          console.warn('[RoomScreen] Failed to unlock orientation:', error);
+          // Silently fail
         }
       };
 
@@ -533,11 +516,9 @@ export default function RoomScreen() {
       return () => {
         const lockOrientation = async () => {
           try {
-            // Lock back to portrait when leaving RoomScreen
             await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
-            console.log('[RoomScreen] Orientation locked to portrait');
           } catch (error) {
-            console.warn('[RoomScreen] Failed to lock orientation:', error);
+            // Silently fail
           }
         };
 
@@ -554,11 +535,6 @@ export default function RoomScreen() {
   // LiveKit state
   const [liveKitRoom, setLiveKitRoom] = useState<Room | null>(null);
   const [isConnected, setIsConnected] = useState(false);
-  
-  // DEBUG: Log state changes
-  useEffect(() => {
-    console.log('[RoomScreen] 📊 STATE CHANGE - liveKitRoom:', !!liveKitRoom, 'isConnected:', isConnected);
-  }, [liveKitRoom, isConnected]);
   const [participants, setParticipants] = useState<Participant[]>([]);
   const roomRef = useRef<Room | null>(null);
   
@@ -693,7 +669,6 @@ export default function RoomScreen() {
 
         presenceActiveRef.current = true;
         roomPresenceTableAvailableRef.current = true;
-        console.log('[RoomScreen] presence upsert ok', { roomId, profileId: user.id });
       } else {
         // CRITICAL: Include room_id in delete to only remove THIS room's presence
         const { error } = await supabase
@@ -713,85 +688,57 @@ export default function RoomScreen() {
 
   // Start publishing to the room (publish to existing connected session)
   const startPublishing = useCallback(async () => {
-    console.log('[RoomScreen] 🚀 startPublishing called');
-    
-    // CRITICAL FIX: Use roomRef.current instead of liveKitRoom state to avoid stale closures
     const room = roomRef.current;
     
-    console.log('[RoomScreen] State check - user:', !!user, 'isPublishing:', isPublishing, 'room:', !!room);
-    console.log('[RoomScreen] Room state:', room?.state, 'localParticipant:', room?.localParticipant.sid);
-    
     if (!user || isPublishing || !room) {
-      console.warn('[RoomScreen] ❌ Cannot start publishing - conditions not met');
-      console.warn('[RoomScreen] Missing:', {
-        user: !user,
-        isPublishing,
-        noRoom: !room,
-      });
       return;
     }
 
     try {
       setIsPublishing(true);
-      isPublishingRef.current = true; // Update ref for heartbeat
-      console.log('[RoomScreen] Starting to publish to existing session...');
+      isPublishingRef.current = true;
 
-      // Import createLocalTracks
+      // FIX #3: Lower video encoding - 540p @ 24fps
       const { createLocalTracks, VideoPresets } = await import('livekit-client');
 
-      // Create and publish local tracks to the existing connected room
       const tracks = await createLocalTracks({
         audio: true,
         video: {
           facingMode: 'user',
-          resolution: VideoPresets.h720.resolution,
+          resolution: VideoPresets.h540.resolution,
         },
       });
 
-      console.log('[RoomScreen] Created local tracks:', tracks.length);
-
       for (const track of tracks) {
-        await room.localParticipant.publishTrack(track);
-        console.log('[RoomScreen] Published track:', track.kind);
-
+        // Publish with reduced bitrate and framerate
         if (track.kind === 'video') {
+          await room.localParticipant.publishTrack(track, {
+            videoEncoding: {
+              maxBitrate: 800_000,
+              maxFramerate: 24,
+            },
+          });
           setLocalVideoTrack(track as LocalVideoTrack);
         } else if (track.kind === 'audio') {
+          await room.localParticipant.publishTrack(track);
           setLocalAudioTrack(track as LocalAudioTrack);
         }
       }
 
-      console.log('[RoomScreen] Publishing started successfully!');
-      console.log('[RoomScreen] Local tracks published:', {
-        videoTrack: !!localVideoTrack,
-        audioTrack: !!localAudioTrack,
-        roomName: room.name,
-        participantCount: room.remoteParticipants.size
-      });
-
-      // P3: Set participant metadata for portrait crop on web
-      // Mobile front camera is portrait, web uses object-position: center 20% to show face + some body
       await room.localParticipant.setMetadata(JSON.stringify({
         videoAspect: 'portrait',
-        focus: 'top', // Web interprets this as 'center 20%' for a balanced crop
+        focus: 'top',
       }));
-      console.log('[RoomScreen] Set portrait metadata for web crop');
 
-      // Create group live_stream record so web grid sees this publisher
       const { liveStreamId, error: streamError } = await startLiveStreamRecord(user.id, 'group');
-      if (streamError) {
-        console.error('[RoomScreen] Failed to create live_stream record:', streamError);
-      } else if (liveStreamId) {
+      if (!streamError && liveStreamId) {
         groupLiveStreamIdRef.current = liveStreamId;
-        console.log('[RoomScreen] group live_stream started', { streamId: liveStreamId });
       }
 
-      // Update presence to reflect live status (publishing = true)
       updateRoomPresence(true, true);
 
       Alert.alert('Live!', 'You are now streaming in the room!');
     } catch (err: any) {
-      console.error('[RoomScreen] Failed to start publishing:', err);
       Alert.alert('Error', err?.message || 'Failed to start streaming. Please try again.');
       setIsPublishing(false);
       isPublishingRef.current = false;
@@ -800,12 +747,9 @@ export default function RoomScreen() {
 
   // Handle tile press - empty slot = join, occupied = show action sheet (P2)
   const handleTilePress = useCallback((slotIndex: number, participant: Participant | null) => {
-    // Check if this is the local user's tile (slot 0 when publishing)
     const isLocalTile = slotIndex === 0 && localVideoTrack;
 
     if (isLocalTile) {
-      // Local tile - show action sheet for self
-      console.log('[RoomScreen] Local tile tapped, slot:', slotIndex);
       setTileActionTarget({
         slotIndex,
         participant: {
@@ -819,28 +763,18 @@ export default function RoomScreen() {
     }
 
     if (!participant) {
-      // Empty slot - start publishing if not already publishing
-      console.log('[RoomScreen] Empty slot tapped, slot:', slotIndex);
-      console.log('[RoomScreen] Checks - user:', !!user, 'isPublishing:', isPublishing, 'liveKitRoom:', !!liveKitRoom, 'isConnected:', isConnected);
-
       if (!user) {
-        console.log('[RoomScreen] ❌ No user - showing sign in alert');
         Alert.alert('Sign In Required', 'Please sign in to join the room.');
         return;
       }
 
       if (isPublishing) {
-        console.log('[RoomScreen] ❌ Already publishing - showing alert');
         Alert.alert('Already Streaming', 'You are already streaming in this room.');
         return;
       }
 
-      // Start publishing directly (no confirmation needed since we connect with publish permissions)
-      console.log('[RoomScreen] ✅ Calling startPublishing()...');
       startPublishing();
     } else {
-      // Occupied slot - show action sheet (P2)
-      console.log('[RoomScreen] Participant tapped:', participant.identity, 'slot:', slotIndex);
       setTileActionTarget({ slotIndex, participant, isLocal: false });
     }
   }, [user, isPublishing, startPublishing, localVideoTrack]);
@@ -1035,114 +969,73 @@ export default function RoomScreen() {
       const identity = user ? `u_${user.id}` : `anon-${Date.now()}`;
       const displayName = user?.email?.split('@')[0] || user?.id || 'Viewer';
 
-      console.log('[RoomScreen] Connecting to LiveKit room:', liveKitRoomName);
-      console.log('[RoomScreen] User identity:', identity);
-      console.log('[RoomScreen] Can publish:', canPublish);
-
       const { token, url } = await fetchMobileToken(
         liveKitRoomName,
         identity,
         displayName,
-        canPublish // isHost = canPublish for proper permissions
+        canPublish
       );
-
-      console.log('[RoomScreen] Token received, URL:', url?.substring(0, 50) + '...');
-      console.log('[RoomScreen] Token length:', token?.length);
-      console.log('[RoomScreen] Connecting to LiveKit server...');
 
       const room = new Room({
         adaptiveStream: true,
         dynacast: true,
       });
 
-      // Event handlers
+      // FIX #5: Silent event handlers - no logging
       room.on(RoomEvent.Connected, () => {
-        console.log('[RoomScreen] Connected to LiveKit room:', liveKitRoomName);
-        console.log('[RoomScreen] Remote participants count:', room.remoteParticipants.size);
-        // DEBUG: Cross-client parity logs
-        console.log('[RoomScreen] ?? ROOM CONNECTION PARITY:', {
-          roomName: room.name,
-          wsUrlHost: url.replace(/^wss?:\/\//, '').split('/')[0], // Extract host from ws url
-          localIdentity: room.localParticipant.identity,
-          remoteParticipantsCount: room.remoteParticipants.size,
-        });
-        // Subscribe to all available tracks from remote participants
         room.remoteParticipants.forEach((participant) => {
-          console.log('[RoomScreen] Remote participant:', participant.identity, 'tracks:', participant.trackPublications.size);
           participant.trackPublications.forEach((pub) => {
-            console.log('[RoomScreen]   Track:', pub.kind, 'subscribed:', pub.isSubscribed, 'hasTrack:', !!pub.track);
-
-            // Explicitly subscribe to camera and microphone tracks
             if (pub.source === Track.Source.Camera || pub.source === Track.Source.Microphone) {
               if (!pub.isSubscribed) {
-                console.log('[RoomScreen]   Subscribing to track:', pub.source);
                 try {
                   pub.setSubscribed(true);
                 } catch (err) {
-                  console.warn('[RoomScreen] Failed to subscribe to track:', err);
+                  // Silently fail
                 }
               }
             }
           });
         });
         
-        // CRITICAL: Set liveKitRoom state ONLY after successful connection
         setLiveKitRoom(room);
         setIsConnected(true);
         updateParticipants(room);
-        
-        // Update presence on successful connection (join event)
         updateRoomPresence(true, false);
       });
 
       room.on(RoomEvent.Disconnected, (reason) => {
-        console.log('[RoomScreen] Disconnected from LiveKit room', { 
-          reason,
-          isPublishing: isPublishingRef.current,
-          hasGroupStreamId: !!groupLiveStreamIdRef.current,
-        });
         setIsConnected(false);
         setParticipants([]);
-        
-        // Clear presence on disconnect (leave event)
         updateRoomPresence(false);
-        // CRITICAL: Use userRef to avoid stale closure
+        
         const currentUser = userRef.current;
         if (groupLiveStreamIdRef.current && currentUser) {
-          console.log('[RoomScreen] group live_stream ended on disconnect', { streamId: groupLiveStreamIdRef.current });
           endLiveStreamRecord(currentUser.id);
           groupLiveStreamIdRef.current = null;
         }
         
-        // Reset publishing state on disconnect
         setIsPublishing(false);
         isPublishingRef.current = false;
       });
 
       room.on(RoomEvent.ParticipantConnected, (participant) => {
-        console.log('[RoomScreen] Participant connected:', participant.identity);
-        // Subscribe to any existing publications from this participant
         participant.trackPublications.forEach((pub) => {
           if (pub.source === Track.Source.Camera || pub.source === Track.Source.Microphone) {
             if (!pub.isSubscribed) {
-              console.log('[RoomScreen] Subscribing to track from new participant:', pub.source);
               try {
                 pub.setSubscribed(true);
               } catch (err) {
-                console.warn('[RoomScreen] Failed to subscribe to track from new participant:', err);
+                // Silently fail
               }
             }
           }
         });
         
-        // FIX #2: INCREMENTAL UPDATE - add single participant instead of rebuilding all
         setParticipants(prev => {
-          // Check if participant already exists
           if (prev.some(p => p.id === participant.sid)) {
             return prev;
           }
           
-          // Find video track
           let videoTrack: RemoteTrack | null = null;
           participant.trackPublications.forEach((pub: RemoteTrackPublication) => {
             if (pub.kind === Track.Kind.Video && pub.track) {
@@ -1150,9 +1043,7 @@ export default function RoomScreen() {
             }
           });
           
-          // Only add if has video
           if (videoTrack) {
-            console.log('[RoomScreen] ✅ INCREMENTAL: Added participant', participant.identity);
             return [...prev, {
               id: participant.sid,
               identity: participant.identity,
@@ -1165,31 +1056,18 @@ export default function RoomScreen() {
       });
 
       room.on(RoomEvent.ParticipantDisconnected, (participant) => {
-        console.log('[RoomScreen] Participant disconnected:', participant.identity);
-        // FIX #2: INCREMENTAL UPDATE - remove single participant instead of rebuilding all
-        setParticipants(prev => {
-          const filtered = prev.filter(p => p.id !== participant.sid);
-          if (filtered.length !== prev.length) {
-            console.log('[RoomScreen] ✅ INCREMENTAL: Removed participant', participant.identity);
-          }
-          return filtered;
-        });
+        setParticipants(prev => prev.filter(p => p.id !== participant.sid));
       });
 
       room.on(RoomEvent.TrackSubscribed, (track: RemoteTrack, publication, participant: RemoteParticipant) => {
-        console.log('[RoomScreen] Track subscribed:', track.kind, 'from', participant.identity);
-        // FIX #2: INCREMENTAL UPDATE - update only this participant's track
         if (track.kind === 'video') {
           setParticipants(prev => {
             const index = prev.findIndex(p => p.id === participant.sid);
             if (index >= 0) {
               const updated = [...prev];
               updated[index] = { ...updated[index], videoTrack: track };
-              console.log('[RoomScreen] ✅ INCREMENTAL: Updated video track for', participant.identity);
               return updated;
             } else {
-              // Add if not exists
-              console.log('[RoomScreen] ✅ INCREMENTAL: Added new participant with video', participant.identity);
               return [...prev, {
                 id: participant.sid,
                 identity: participant.identity,
@@ -1201,34 +1079,21 @@ export default function RoomScreen() {
       });
 
       room.on(RoomEvent.TrackUnsubscribed, (track: RemoteTrack, publication, participant: RemoteParticipant) => {
-        console.log('[RoomScreen] Track unsubscribed:', track.kind, 'from', participant.identity);
-        // FIX #2: INCREMENTAL UPDATE - remove only this participant's track
         if (track.kind === 'video') {
-          setParticipants(prev => {
-            // Remove participant if video track is gone
-            const filtered = prev.filter(p => p.id !== participant.sid);
-            if (filtered.length !== prev.length) {
-              console.log('[RoomScreen] ✅ INCREMENTAL: Removed participant (no video)', participant.identity);
-            }
-            return filtered;
-          });
+          setParticipants(prev => prev.filter(p => p.id !== participant.sid));
         }
       });
 
-      // Subscribe to tracks when they're published by participants
       room.on(RoomEvent.TrackPublished, (publication, participant) => {
-        console.log('[RoomScreen] Track published:', publication.source, 'by', participant.identity);
         if (publication.source === Track.Source.Camera || publication.source === Track.Source.Microphone) {
           if (!publication.isSubscribed) {
-            console.log('[RoomScreen] Subscribing to newly published track:', publication.source);
             try {
               publication.setSubscribed(true);
             } catch (err) {
-              console.warn('[RoomScreen] Failed to subscribe to newly published track:', err);
+              // Silently fail
             }
           }
         }
-        // NOTE: Track will be added via TrackSubscribed event, no need to update here
       });
 
       await room.connect(url, token);
