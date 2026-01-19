@@ -1,5 +1,5 @@
-﻿import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { View, StyleSheet, Text, ActivityIndicator, useWindowDimensions, Pressable, Modal, TouchableOpacity, Alert, Platform, StatusBar as RNStatusBar, Animated, PanResponder, Dimensions, ScrollView, TextInput, NativeModules, Image } from 'react-native';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { View, StyleSheet, Text, ActivityIndicator, useWindowDimensions, Pressable, Modal, TouchableOpacity, Alert, Platform, StatusBar as RNStatusBar, Animated, PanResponder, Dimensions, ScrollView, TextInput, NativeModules, Image, StyleProp, ViewStyle } from 'react-native';
 import Slider from '@react-native-community/slider';
 import { StatusBar } from 'expo-status-bar';
 import Constants from 'expo-constants';
@@ -144,9 +144,9 @@ function ReplaceStreamerModal({
         >
           {/* Header */}
           <View style={styles.replaceModalHeader}>
-            <Text style={styles.replaceModalTitle}>Replace Stream</Text>
+            <Text style={styles.replaceModalTitle}>Switch Participant</Text>
             <Text style={styles.replaceModalSubtitle}>
-              Replace {targetUsername} in slot {targetSlotIndex + 1}
+              Replace {targetUsername} in your grid view
             </Text>
           </View>
 
@@ -154,27 +154,31 @@ function ReplaceStreamerModal({
           <View style={styles.replaceModalOptions}>
             {/* Show "Replace & Go Live" only if user is NOT already live */}
             {!currentUserIsLive && (
-              <TouchableOpacity 
-                style={styles.replaceOptionButton}
-                onPress={onReplaceAndGoLive}
-              >
-                <Ionicons name="videocam" size={24} color="#4a90d9" />
-                <View style={styles.replaceOptionText}>
-                  <Text style={styles.replaceOptionTitle}>Replace & Go Live</Text>
-                  <Text style={styles.replaceOptionSubtitle}>Start your camera and take this slot</Text>
-                </View>
-              </TouchableOpacity>
+              <>
+                <TouchableOpacity 
+                  style={styles.replaceOptionButton}
+                  onPress={onReplaceAndGoLive}
+                >
+                  <Ionicons name="videocam" size={24} color="#4a90d9" />
+                  <View style={styles.replaceOptionText}>
+                    <Text style={styles.replaceOptionTitle}>Replace & Go Live</Text>
+                    <Text style={styles.replaceOptionSubtitle}>Start your camera and take this slot</Text>
+                  </View>
+                </TouchableOpacity>
+
+                {/* Divider if there are also streamers to show */}
+                {activeStreamers.length > 0 && (
+                  <View style={styles.replaceModalDivider} />
+                )}
+              </>
             )}
 
-            {/* Divider if both options visible */}
-            {!currentUserIsLive && activeStreamers.length > 0 && (
-              <View style={styles.replaceModalDivider} />
-            )}
-
-            {/* Active Streamers List */}
+            {/* Active Streamers List - always show if there are any */}
             {activeStreamers.length > 0 ? (
               <>
-                <Text style={styles.replaceModalSectionTitle}>Replace with Active Streamer:</Text>
+                <Text style={styles.replaceModalSectionTitle}>
+                  {currentUserIsLive ? 'Available Streamers:' : 'Switch with Another Streamer:'}
+                </Text>
                 <ScrollView style={styles.replaceStreamerList} showsVerticalScrollIndicator={false}>
                   {activeStreamers.map((streamer) => (
                     <TouchableOpacity
@@ -205,10 +209,12 @@ function ReplaceStreamerModal({
                 </ScrollView>
               </>
             ) : (
-              <View style={styles.replaceModalEmpty}>
-                <Ionicons name="videocam-off" size={48} color="#666" />
-                <Text style={styles.replaceModalEmptyText}>No other active streamers</Text>
-              </View>
+              !currentUserIsLive && (
+                <View style={styles.replaceModalEmpty}>
+                  <Ionicons name="videocam-off" size={48} color="#666" />
+                  <Text style={styles.replaceModalEmptyText}>No other active streamers</Text>
+                </View>
+              )
             )}
           </View>
 
@@ -442,9 +448,13 @@ interface BottomDrawerProps {
   children: React.ReactNode;
   bottomInset: number;
   isLandscape: boolean;
+  scrollable?: boolean;
+  hideHeader?: boolean;
+  contentStyle?: StyleProp<ViewStyle>;
+  containerStyle?: StyleProp<ViewStyle>;
 }
 
-function BottomDrawer({ visible, title, onClose, children, bottomInset, isLandscape }: BottomDrawerProps) {
+function BottomDrawer({ visible, title, onClose, children, bottomInset, isLandscape, scrollable = true, hideHeader = false, contentStyle, containerStyle }: BottomDrawerProps) {
   const slideAnim = useRef(new Animated.Value(isLandscape ? 400 : 0)).current;
 
   useEffect(() => {
@@ -475,10 +485,12 @@ function BottomDrawer({ visible, title, onClose, children, bottomInset, isLandsc
       statusBarTranslucent
       supportedOrientations={['portrait', 'landscape', 'landscape-left', 'landscape-right']}
     >
-      <Pressable style={styles.drawerOverlay} onPress={onClose}>
+      <View style={styles.drawerOverlay}>
+        <Pressable style={StyleSheet.absoluteFillObject} onPress={onClose} />
         <Animated.View
           style={[
             isLandscape ? styles.drawerContainerLandscape : styles.drawerContainer,
+            containerStyle,
             {
               paddingBottom: isLandscape ? 0 : Math.max(bottomInset, 16),
               transform: isLandscape 
@@ -487,31 +499,47 @@ function BottomDrawer({ visible, title, onClose, children, bottomInset, isLandsc
             }
           ]}
         >
-          <Pressable onPress={e => e.stopPropagation()}>
-            <View style={[
-              styles.drawerHeader,
-              isLandscape && styles.drawerHeaderLandscape
-            ]}>
-              <Text style={[
-                styles.drawerTitle,
-                isLandscape && styles.drawerTitleLandscape
-              ]}>{title}</Text>
-              <TouchableOpacity onPress={onClose}>
-                <Ionicons name="close" size={isLandscape ? 28 : 24} color="#fff" />
-              </TouchableOpacity>
-            </View>
-            <ScrollView 
-              style={[
-                styles.drawerContent,
-                isLandscape && styles.drawerContentLandscape
-              ]} 
-              showsVerticalScrollIndicator={false}
-            >
-              {children}
-            </ScrollView>
-          </Pressable>
+          <View style={styles.drawerBody}>
+            {!hideHeader && (
+              <View style={[
+                styles.drawerHeader,
+                isLandscape && styles.drawerHeaderLandscape
+              ]}>
+                <Text style={[
+                  styles.drawerTitle,
+                  isLandscape && styles.drawerTitleLandscape
+                ]}>{title}</Text>
+                <TouchableOpacity onPress={onClose}>
+                  <Ionicons name="close" size={isLandscape ? 28 : 24} color="#fff" />
+                </TouchableOpacity>
+              </View>
+            )}
+            {scrollable ? (
+              <ScrollView 
+                style={[
+                  styles.drawerContent,
+                  isLandscape && styles.drawerContentLandscape,
+                  contentStyle
+                ]} 
+                showsVerticalScrollIndicator={false}
+              >
+                {children}
+              </ScrollView>
+            ) : (
+              <View
+                style={[
+                  styles.drawerContent,
+                  styles.drawerContentFixed,
+                  isLandscape && styles.drawerContentLandscape,
+                  contentStyle
+                ]}
+              >
+                {children}
+              </View>
+            )}
+          </View>
         </Animated.View>
-      </Pressable>
+      </View>
     </Modal>
   );
 }
@@ -661,6 +689,8 @@ interface VideoTileProps {
   onVolumeChange: (participantId: string, volume: number) => void;
   // 📺 Fullscreen props
   onToggleFullscreen: (tileId: string, participant: Participant | null, isLocal: boolean) => void;
+  // 👁️ Hide participant
+  onHideParticipant: (identity: string) => void;
 }
 
 // FIX #2: Memoize VideoTile to prevent re-renders when other tiles change
@@ -679,6 +709,7 @@ const VideoTile = React.memo(({
   onSpeakerIconPress,
   onVolumeChange,
   onToggleFullscreen,
+  onHideParticipant,
 }: VideoTileProps) => {
   const hasVideo = participant?.videoTrack || (isLocalTile && localVideoTrack);
   const videoTrack = participant?.videoTrack || localVideoTrack;
@@ -714,7 +745,7 @@ const VideoTile = React.memo(({
     
     console.log('[TILE_PRESS] tileId:', tileId, 'timeSinceLastTap:', timeSinceLastTap);
     
-    if (timeSinceLastTap < 300) {
+    if (timeSinceLastTap < 400) {
       // Double tap detected → FULLSCREEN
       console.log('[TILE_DOUBLE_TAP] Triggering fullscreen for tile:', tileId);
       onToggleFullscreen(tileId, participant, isLocalTile || false);
@@ -722,14 +753,14 @@ const VideoTile = React.memo(({
     } else {
       // Single tap → Show mini profile
       lastTapRef.current = now;
-      // Delay to allow double-tap to cancel this
+      // Delay to allow double-tap to cancel this (must be longer than double-tap window)
       setTimeout(() => {
         if (lastTapRef.current === now) {
           // Still a single tap after delay
           console.log('[TILE_SINGLE_TAP] Show mini profile for:', participantId);
           onTilePress(slotIndex, participant);
         }
-      }, 300);
+      }, 450);
     }
   };
   
@@ -787,7 +818,7 @@ const VideoTile = React.memo(({
                 hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               >
                 <Ionicons
-                  name="close-circle"
+                  name="close"
                   size={24}
                   color="#ffffff"
                 />
@@ -814,17 +845,28 @@ const VideoTile = React.memo(({
             <Pressable
               style={styles.closeIcon}
               onPress={() => {
-                console.log('[HIDE_PARTICIPANT]', { participantId });
-                // Mute this participant completely
-                const identity = participant.identity;
-                onDoubleTap(identity); // Toggle mute
-                Alert.alert('Muted', 'Participant audio muted');
+                console.log('[HIDE_PARTICIPANT]', { participantId, identity: participant.identity });
+                Alert.alert(
+                  'Remove from Grid',
+                  'Hide this participant from your view?',
+                  [
+                    { text: 'Cancel', style: 'cancel' },
+                    {
+                      text: 'Hide',
+                      onPress: () => {
+                        // Add to hidden list (client-side only)
+                        const identity = participant.identity;
+                        onHideParticipant(identity);
+                      }
+                    }
+                  ]
+                );
               }}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             >
               <Ionicons
-                name="close-circle"
-                size={24}
+                name="close"
+                size={28}
                 color="#ffffff"
               />
             </Pressable>
@@ -922,6 +964,10 @@ interface GridContainerProps {
   onVolumeChange: (participantId: string, volume: number) => void;
   // 📺 Fullscreen props
   onToggleFullscreen: (tileId: string, participant: Participant | null, isLocal: boolean) => void;
+  // 👁️ Hide participant
+  onHideParticipant: (identity: string) => void;
+  hiddenParticipants: Set<string>;
+  slotAssignments: Map<number, string>;
 }
 
 function GridContainer({ 
@@ -939,6 +985,9 @@ function GridContainer({
   onSpeakerIconPress,
   onVolumeChange,
   onToggleFullscreen,
+  onHideParticipant,
+  hiddenParticipants,
+  slotAssignments,
 }: GridContainerProps) {
   const { rows, cols } = getGridConfig(isLandscape);
   const tileWidth = screenWidth / cols;
@@ -951,10 +1000,27 @@ function GridContainer({
     videoTrack: localVideoTrack,
   } : null;
 
-  // Combine local participant with remote participants
-  const allParticipants = localParticipant ? [localParticipant, ...participants] : participants;
+  // Filter out hidden participants
+  const visibleParticipants = participants.filter(p => !hiddenParticipants.has(p.identity));
 
-  // Build fixed 12-slot grid - empty slots render as placeholders
+  // Create a map of identity to participant for quick lookup
+  const participantMap = new Map<string, Participant>();
+  visibleParticipants.forEach(p => {
+    participantMap.set(p.identity, p);
+  });
+
+  // Build list of participants that don't have explicit slot assignments
+  const unassignedParticipants = visibleParticipants.filter(p => {
+    // Check if this participant is already assigned to a slot
+    for (const [_, identity] of slotAssignments.entries()) {
+      if (identity === p.identity) return false;
+    }
+    return true;
+  });
+  
+  let unassignedIndex = 0;
+
+  // Build fixed 12-slot grid using slot assignments
   const gridRows: React.ReactNode[] = [];
   let slotIndex = 0;
 
@@ -962,8 +1028,26 @@ function GridContainer({
     const rowTiles: React.ReactNode[] = [];
     for (let col = 0; col < cols; col++) {
       const currentSlotIndex = slotIndex;
-      const participant = allParticipants[currentSlotIndex] || null;
-      const isLocalTile = localParticipant && currentSlotIndex === 0 ? true : undefined; // Local user always goes in slot 0
+      
+      // Determine which participant should be in this slot
+      let participant: Participant | null = null;
+      let isLocalTile: boolean | undefined = undefined;
+      
+      if (currentSlotIndex === 0 && localParticipant) {
+        // Slot 0 is always local participant if they're streaming
+        isLocalTile = true;
+        participant = null;
+      } else if (slotAssignments.has(currentSlotIndex)) {
+        // This slot has a specific assignment
+        const assignedIdentity = slotAssignments.get(currentSlotIndex)!;
+        participant = participantMap.get(assignedIdentity) || null;
+      } else {
+        // No assignment - fill with next unassigned participant
+        if (unassignedIndex < unassignedParticipants.length) {
+          participant = unassignedParticipants[unassignedIndex];
+          unassignedIndex++;
+        }
+      }
 
       rowTiles.push(
         <VideoTile
@@ -982,6 +1066,7 @@ function GridContainer({
           onSpeakerIconPress={onSpeakerIconPress}
           onVolumeChange={onVolumeChange}
           onToggleFullscreen={onToggleFullscreen}
+          onHideParticipant={onHideParticipant}
         />
       );
       slotIndex++;
@@ -1173,6 +1258,12 @@ export default function RoomScreen() {
   // P1: Control bar and drawer state
   const [activeDrawer, setActiveDrawer] = useState<DrawerPanel>('none');
   
+  // Hidden participants (viewer's personal preference)
+  const [hiddenParticipants, setHiddenParticipants] = useState<Set<string>>(new Set());
+  
+  // Slot assignments (which participant is in which slot) - viewer controlled
+  const [slotAssignments, setSlotAssignments] = useState<Map<number, string>>(new Map());
+
   // Mini profile modal state
   const [miniProfileVisible, setMiniProfileVisible] = useState(false);
   const [miniProfileData, setMiniProfileData] = useState<MiniProfileData | null>(null);
@@ -1249,6 +1340,17 @@ export default function RoomScreen() {
     if (raw === 'live-central') return 'live_central';
     return raw;
   }, []);
+
+  // Chat room ID MUST match room presence scope (no fallback when missing)
+  const chatRoomId = roomConfig?.room_key ? normalizedRoomId(roomConfig.room_key) : undefined;
+
+  useEffect(() => {
+    if (!roomConfig) return;
+    console.log('[ROOM_CHAT] chatRoomId:', chatRoomId);
+    if (!chatRoomId) {
+      console.error('[ROOM_CHAT] Missing chatRoomId - chat UI disabled');
+    }
+  }, [chatRoomId, roomConfig]);
 
   // Update room presence (event-driven only: call on explicit user actions)
   // - On join: updateRoomPresence(true, false)
@@ -1465,17 +1567,116 @@ export default function RoomScreen() {
     }
 
     if (!participant) {
+      console.log('[EMPTY_SLOT] Clicked empty slot:', { slotIndex, isPublishing, hasLocalVideo: !!localVideoTrack, user: !!user });
+      
       if (!user) {
         Alert.alert('Sign In Required', 'Please sign in to join the room.');
         return;
       }
 
-      if (isPublishing) {
-        Alert.alert('Already Streaming', 'You are already streaming in this room.');
+      // Clicking empty slot - show options to fill it
+      // Check if user is publishing by looking at localVideoTrack (more reliable than isPublishing state)
+      const userIsLive = !!localVideoTrack || isPublishing;
+      
+      if (userIsLive) {
+        console.log('[EMPTY_SLOT] User is live, showing available streamers');
+        // Already live - show list of available streamers to put in this slot
+        const room = roomRef.current;
+        if (!room) return;
+
+        const allParticipants = Array.from(room.remoteParticipants.values());
+        const availableStreamers: ActiveStreamer[] = [];
+        
+        // Get list of identities that are already visible in the grid
+        const visibleIdentities = new Set<string>();
+        
+        // Add all assigned participants
+        for (const [_, identity] of slotAssignments.entries()) {
+          visibleIdentities.add(identity);
+        }
+        
+        // Add unassigned but visible participants (those filling remaining slots)
+        const visibleParticipants = participants.filter(p => !hiddenParticipants.has(p.identity));
+        const unassignedVisible = visibleParticipants.filter(p => {
+          for (const [_, identity] of slotAssignments.entries()) {
+            if (identity === p.identity) return false;
+          }
+          return true;
+        });
+        
+        // Calculate how many unassigned participants are currently visible
+        // (they fill slots that don't have assignments, starting after slot 0)
+        const totalSlots = 12;
+        const assignedSlots = slotAssignments.size;
+        const availableUnassignedSlots = totalSlots - assignedSlots - 1; // -1 for local slot 0
+        
+        for (let i = 0; i < Math.min(availableUnassignedSlots, unassignedVisible.length); i++) {
+          visibleIdentities.add(unassignedVisible[i].identity);
+        }
+        
+        console.log('[EMPTY_SLOT] Currently visible:', Array.from(visibleIdentities));
+        
+        for (const remoteParticipant of allParticipants) {
+          // Skip if already visible in grid
+          if (visibleIdentities.has(remoteParticipant.identity)) {
+            console.log('[EMPTY_SLOT] Skipping (already visible):', remoteParticipant.identity);
+            continue;
+          }
+
+          // Check if they have video
+          let hasVideo = false;
+          remoteParticipant.trackPublications.forEach((pub: any) => {
+            if (pub.kind === 'video' && pub.track) {
+              hasVideo = true;
+            }
+          });
+
+          if (!hasVideo) continue;
+
+          const userIdPart = remoteParticipant.identity.split(':')[0].replace(/^u_/, '');
+          
+          try {
+            const { data: profile } = await supabase
+              .from('profiles')
+              .select('username, avatar_url')
+              .eq('id', userIdPart)
+              .single();
+
+            availableStreamers.push({
+              identity: remoteParticipant.identity,
+              userId: userIdPart,
+              username: profile?.username || userIdPart.substring(0, 8),
+              avatarUrl: profile?.avatar_url || null,
+            });
+          } catch (error) {
+            availableStreamers.push({
+              identity: remoteParticipant.identity,
+              userId: userIdPart,
+              username: userIdPart.substring(0, 8),
+              avatarUrl: null,
+            });
+          }
+        }
+
+        console.log('[EMPTY_SLOT] Available streamers:', availableStreamers.map(s => s.username));
+
+        if (availableStreamers.length === 0) {
+          Alert.alert('No Available Streamers', 'All streamers with cameras are already in your grid. You can hide someone first to make room.');
+          return;
+        }
+
+        // Show modal to pick someone for this slot
+        setReplaceModalData({
+          targetUsername: 'Empty Slot',
+          targetSlotIndex: slotIndex,
+          targetParticipantId: '',
+          activeStreamers: availableStreamers,
+        });
+        setReplaceModalVisible(true);
         return;
       }
 
-      // Show confirmation dialog before going live
+      // Not live yet - show confirmation dialog before going live
       Alert.alert(
         'Go Live',
         'Are you sure you want to start streaming?',
@@ -1491,6 +1692,7 @@ export default function RoomScreen() {
         ],
         { cancelable: true }
       );
+      return;
     } else {
       // Extract user ID from participant identity (format: u_<uuid>:platform:...)
       const identityParts = participant.identity.split(':');
@@ -2154,8 +2356,10 @@ export default function RoomScreen() {
 
   // Always render the grid - overlay loading/error states on top
   // Grid MUST respect all safe area insets (notch, home bar, left/right in landscape)
+  const shouldEnableSwipes = !activeVolumeSliderTileId && activeDrawer === 'none';
+
   return (
-    <View style={styles.container} {...(activeVolumeSliderTileId ? {} : panResponder.panHandlers)}>
+    <View style={styles.container} {...(shouldEnableSwipes ? panResponder.panHandlers : {})}>
       <StatusBar
         style="light"
         backgroundColor="#000000"
@@ -2218,6 +2422,11 @@ export default function RoomScreen() {
           onSpeakerIconPress={handleSpeakerIconPress}
           onVolumeChange={handleVolumeChangeGesture}
           onToggleFullscreen={handleToggleFullscreen}
+          onHideParticipant={(identity) => {
+            setHiddenParticipants(prev => new Set([...prev, identity]));
+          }}
+          hiddenParticipants={hiddenParticipants}
+          slotAssignments={slotAssignments}
         />
       </View>
       
@@ -2321,8 +2530,12 @@ export default function RoomScreen() {
         onClose={() => setActiveDrawer('none')}
         bottomInset={insets.bottom}
         isLandscape={isLandscape}
+        scrollable={false}
+        hideHeader={true}
+        contentStyle={styles.chatDrawerContent}
+        containerStyle={styles.chatDrawerContainer}
       >
-        <ChatContent roomSlug={slug} />
+        <ChatContent roomSlug={chatRoomId} />
       </BottomDrawer>
 
       <BottomDrawer
@@ -2485,19 +2698,33 @@ export default function RoomScreen() {
         onReplace={async () => {
           if (!miniProfileData || !user) return;
 
-          // Get list of participants with active cameras (excluding the target and current user)
-          const activeStreamers: ActiveStreamer[] = [];
+          // Get list of ALL participants (including hidden ones) with active cameras
+          const allActiveStreamers: ActiveStreamer[] = [];
           
-          for (const p of participants) {
-            // Skip target user and current user
-            if (p.identity === miniProfileData.participantId || 
-                p.identity === `u_${user.id}:mobile` ||
-                !p.videoTrack) {
+          // Get the full participants list from room, not filtered
+          const room = roomRef.current;
+          if (!room) return;
+
+          const allParticipants = Array.from(room.remoteParticipants.values());
+          
+          for (const remoteParticipant of allParticipants) {
+            // Skip if this is the target user
+            if (remoteParticipant.identity === miniProfileData.participantId) {
               continue;
             }
 
+            // Check if they have video
+            let hasVideo = false;
+            remoteParticipant.trackPublications.forEach((pub: any) => {
+              if (pub.kind === 'video' && pub.track) {
+                hasVideo = true;
+              }
+            });
+
+            if (!hasVideo) continue;
+
             // Extract user ID from participant identity
-            const userIdPart = p.identity.split(':')[0].replace(/^u_/, '');
+            const userIdPart = remoteParticipant.identity.split(':')[0].replace(/^u_/, '');
             
             // Try to fetch username and avatar
             try {
@@ -2507,16 +2734,16 @@ export default function RoomScreen() {
                 .eq('id', userIdPart)
                 .single();
 
-              activeStreamers.push({
-                identity: p.identity,
+              allActiveStreamers.push({
+                identity: remoteParticipant.identity,
                 userId: userIdPart,
                 username: profile?.username || userIdPart.substring(0, 8),
                 avatarUrl: profile?.avatar_url || null,
               });
             } catch (error) {
               // Fallback if profile fetch fails
-              activeStreamers.push({
-                identity: p.identity,
+              allActiveStreamers.push({
+                identity: remoteParticipant.identity,
                 userId: userIdPart,
                 username: userIdPart.substring(0, 8),
                 avatarUrl: null,
@@ -2530,7 +2757,7 @@ export default function RoomScreen() {
             targetUsername: miniProfileData.username,
             targetSlotIndex: miniProfileData.slotIndex,
             targetParticipantId: miniProfileData.participantId,
-            activeStreamers,
+            activeStreamers: allActiveStreamers,
           });
           setReplaceModalVisible(true);
         }}
@@ -2553,37 +2780,84 @@ export default function RoomScreen() {
         onReplaceWithStreamer={(streamer) => {
           if (!replaceModalData) return;
           
+          console.log('[REPLACE] Target:', replaceModalData.targetParticipantId, 'Replacement:', streamer.identity);
+          
+          // If target is empty slot, just assign the streamer to that slot
+          if (!replaceModalData.targetParticipantId) {
+            setReplaceModalVisible(false);
+            console.log('[FILL_SLOT] Assigning to slot:', replaceModalData.targetSlotIndex);
+            
+            // Assign to slot
+            setSlotAssignments(prev => {
+              const next = new Map(prev);
+              next.set(replaceModalData.targetSlotIndex, streamer.identity);
+              console.log('[FILL_SLOT] New assignments:', Array.from(next.entries()));
+              return next;
+            });
+            
+            // Unhide the streamer if they were hidden
+            setHiddenParticipants(prev => {
+              const next = new Set(prev);
+              next.delete(streamer.identity);
+              console.log('[FILL_SLOT] Unhiding:', streamer.identity);
+              return next;
+            });
+            
+            return;
+          }
+          
           Alert.alert(
-            'Replace Streamer',
-            `Kick ${replaceModalData.targetUsername} so ${streamer.username} can take their spot?`,
+            'Switch Participants',
+            `Swap ${replaceModalData.targetUsername} with ${streamer.username}?`,
             [
               { text: 'Cancel', style: 'cancel' },
               {
-                text: 'Kick & Replace',
-                style: 'destructive',
-                onPress: async () => {
-                  try {
-                    setReplaceModalVisible(false);
-                    
-                    // In LiveKit, we can't directly swap participants without server-side kick
-                    // This requires room admin permissions
-                    // For now, log the intent and show message
-                    console.log('[REPLACE] Kick request:', {
-                      targetIdentity: replaceModalData.targetParticipantId,
-                      targetUsername: replaceModalData.targetUsername,
-                      keepIdentity: streamer.identity,
-                      keepUsername: streamer.username,
-                    });
-                    
-                    Alert.alert(
-                      'Admin Action Required',
-                      'Kicking participants requires room moderator permissions. This will be available to room admins and moderators.',
-                      [{ text: 'OK' }]
-                    );
-                  } catch (error) {
-                    console.error('[REPLACE] Error:', error);
-                    Alert.alert('Error', 'Failed to process replace request');
+                text: 'Switch',
+                onPress: () => {
+                  setReplaceModalVisible(false);
+                  
+                  console.log('[SWITCH] Current assignments:', Array.from(slotAssignments.entries()));
+                  
+                  // Find which slot the replacement streamer is currently in
+                  let replacementCurrentSlot = -1;
+                  for (const [slot, identity] of slotAssignments.entries()) {
+                    if (identity === streamer.identity) {
+                      replacementCurrentSlot = slot;
+                      break;
+                    }
                   }
+                  
+                  // If replacement isn't in a slot yet, find them in the natural order
+                  if (replacementCurrentSlot === -1) {
+                    const visibleParticipants = participants.filter(p => !hiddenParticipants.has(p.identity));
+                    for (let i = 0; i < visibleParticipants.length; i++) {
+                      if (visibleParticipants[i].identity === streamer.identity) {
+                        // This participant is at natural index i, which corresponds to slot i+1 (after local at slot 0)
+                        replacementCurrentSlot = i + (localVideoTrack ? 1 : 0);
+                        break;
+                      }
+                    }
+                  }
+                  
+                  console.log('[SWITCH] Swapping:', {
+                    targetSlot: replaceModalData.targetSlotIndex,
+                    targetIdentity: replaceModalData.targetParticipantId,
+                    replacementSlot: replacementCurrentSlot,
+                    replacementIdentity: streamer.identity,
+                  });
+                  
+                  // Swap their slot assignments
+                  setSlotAssignments(prev => {
+                    const next = new Map(prev);
+                    // Put replacement in target's slot
+                    next.set(replaceModalData.targetSlotIndex, streamer.identity);
+                    // Put target in replacement's slot (if they had one)
+                    if (replacementCurrentSlot >= 0) {
+                      next.set(replacementCurrentSlot, replaceModalData.targetParticipantId);
+                    }
+                    console.log('[SWITCH] New assignments:', Array.from(next.entries()));
+                    return next;
+                  });
                 },
               },
             ]
@@ -2830,6 +3104,10 @@ const styles = StyleSheet.create({
     width: '60%',
     maxWidth: 400,
   },
+  chatDrawerContainer: {
+    maxHeight: '80%',
+    minHeight: '60%',
+  },
   drawerHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -2851,12 +3129,22 @@ const styles = StyleSheet.create({
   drawerTitleLandscape: {
     fontSize: 22,
   },
+  drawerBody: {
+    flex: 1,
+  },
   drawerContent: {
     padding: 20,
+  },
+  drawerContentFixed: {
+    flex: 1,
   },
   drawerContentLandscape: {
     padding: 24,
     paddingTop: 16,
+  },
+  chatDrawerContent: {
+    padding: 0,
+    flex: 1,
   },
   drawerPlaceholder: {
     color: '#888',

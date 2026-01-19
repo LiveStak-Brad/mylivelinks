@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { View, StyleSheet, Text, ActivityIndicator, ScrollView, TextInput, TouchableOpacity, Image, Alert } from 'react-native';
+import { View, StyleSheet, Text, ActivityIndicator, ScrollView, TextInput, TouchableOpacity, Image, Alert, FlatList, InteractionManager } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../state/AuthContext';
 import { getSupabaseClient } from '../lib/supabase';
 import { getAvatarSource } from '../lib/defaultAvatar';
+import { getGifterTierFromCoins, getTierByKey } from './live/ChatOverlay';
+import MllProBadge from './shared/MllProBadge';
 
 // ============================================================================
 // CHAT CONTENT - Match web Chat.tsx exactly
@@ -21,15 +23,20 @@ interface ChatMessage {
   chat_bubble_color?: string;
   chat_font?: string;
   gifter_level?: number;
+  total_spent?: number;
+  is_mll_pro?: boolean;
 }
 
-export function ChatContent({ roomSlug }: { roomSlug: string }) {
+export function ChatContent({ roomSlug }: { roomSlug?: string }) {
   const { user } = useAuth();
   const supabase = getSupabaseClient();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(true);
-  const scrollViewRef = useRef<ScrollView>(null);
+  const [initialLoaded, setInitialLoaded] = useState(false);
+  const listRef = useRef<FlatList<ChatMessage>>(null);
+  const shouldAutoScrollRef = useRef(true);
+  const initialScrollDoneRef = useRef(false);
   
   // FIX #3: Profile cache to prevent repeated fetches for same user
   const profileCacheRef = useRef<Map<string, {
@@ -37,14 +44,23 @@ export function ChatContent({ roomSlug }: { roomSlug: string }) {
     avatar_url?: string;
     is_live?: boolean;
     gifter_level?: number;
+    total_spent?: number;
+    is_mll_pro?: boolean;
   }>>(new Map());
-
-  // CRITICAL: Normalize room_id to use underscores (matches room_presence canonical format)
-  const normalizedRoomId = roomSlug === 'live-central' ? 'live_central' : roomSlug;
+  const chatRoomId = roomSlug;
 
   // Load initial messages
   const loadMessages = useCallback(async () => {
     try {
+      initialScrollDoneRef.current = false;
+      if (!chatRoomId) {
+        console.error('[ROOM_CHAT] Missing chatRoomId - cannot load messages');
+        setMessages([]);
+        setInitialLoaded(false);
+        setLoading(false);
+        return;
+      }
+
       let query = supabase
         .from('chat_messages')
         .select(`
@@ -59,16 +75,18 @@ export function ChatContent({ roomSlug }: { roomSlug: string }) {
             is_live,
             chat_bubble_color,
             chat_font,
-            gifter_level
+            gifter_level,
+            total_spent,
+            is_mll_pro
           )
         `);
 
       // Apply scope filter
-      query = query.eq('room_id', normalizedRoomId).is('live_stream_id', null);
+      query = query.eq('room_id', chatRoomId).is('live_stream_id', null);
 
       const { data, error } = await query
         .order('created_at', { ascending: false })
-        .limit(50);
+        .limit(100);
 
       if (error) throw error;
 
@@ -82,6 +100,8 @@ export function ChatContent({ roomSlug }: { roomSlug: string }) {
             avatar_url: profile.avatar_url,
             is_live: profile.is_live || false,
             gifter_level: profile.gifter_level || 0,
+            total_spent: profile.total_spent || 0,
+            is_mll_pro: profile.is_mll_pro || false,
           });
         }
         
@@ -97,19 +117,19 @@ export function ChatContent({ roomSlug }: { roomSlug: string }) {
           chat_bubble_color: profile?.chat_bubble_color,
           chat_font: profile?.chat_font,
           gifter_level: profile?.gifter_level || 0,
+          total_spent: profile?.total_spent || 0,
+          is_mll_pro: profile?.is_mll_pro || false,
         };
       });
 
-      const ordered = [...messagesWithProfiles].reverse();
-      setMessages(ordered);
-
-      setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: false }), 100);
+      setMessages(messagesWithProfiles);
+      setInitialLoaded(true);
     } catch (error) {
       // Silently fail
     } finally {
       setLoading(false);
     }
-  }, [normalizedRoomId]);
+  }, [chatRoomId, supabase]);
 
   useEffect(() => {
     loadMessages();
@@ -117,15 +137,19 @@ export function ChatContent({ roomSlug }: { roomSlug: string }) {
 
   // Subscribe to new messages
   useEffect(() => {
+    if (!chatRoomId) {
+      return;
+    }
+
     const channel = supabase
-      .channel(`room-chat-${normalizedRoomId}`)
+      .channel(`room-chat:${chatRoomId}`)
       .on(
         'postgres_changes',
         {
           event: 'INSERT',
           schema: 'public',
           table: 'chat_messages',
-          filter: `room_id=eq.${normalizedRoomId}`,
+          filter: `room_id=eq.${chatRoomId}`,
         },
         async (payload: any) => {
           const newMsg = payload.new;
@@ -133,9 +157,18 @@ export function ChatContent({ roomSlug }: { roomSlug: string }) {
           // FIX #3: Check cache first before fetching profile
           const cachedProfile = profileCacheRef.current.get(newMsg.profile_id);
           
-            if (cachedProfile) {
-              // Use cached profile - NO NETWORK CALL
-              setMessages((prev) => [...prev, {
+          const appendMessage = (nextMsg: ChatMessage) => {
+            setMessages((prev) => {
+              if (prev.some((msg) => String(msg.id) === String(nextMsg.id))) {
+                return prev;
+              }
+              return [nextMsg, ...prev];
+            });
+          };
+
+          if (cachedProfile) {
+            // Use cached profile - NO NETWORK CALL
+            appendMessage({
               id: newMsg.id,
               profile_id: newMsg.profile_id,
               username: cachedProfile.username,
@@ -145,13 +178,14 @@ export function ChatContent({ roomSlug }: { roomSlug: string }) {
               content: newMsg.content,
               created_at: newMsg.created_at,
               gifter_level: cachedProfile.gifter_level || 0,
-            }]);
-            setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: true }), 100);
+              total_spent: cachedProfile.total_spent || 0,
+              is_mll_pro: cachedProfile.is_mll_pro || false,
+            });
           } else {
             // Cache miss - fetch and cache profile
             const { data: profile } = await supabase
               .from('profiles')
-              .select('username, avatar_url, is_live, gifter_level')
+              .select('username, avatar_url, is_live, gifter_level, total_spent, is_mll_pro')
               .eq('id', newMsg.profile_id)
               .single();
               
@@ -162,9 +196,11 @@ export function ChatContent({ roomSlug }: { roomSlug: string }) {
                 avatar_url: profile.avatar_url,
                 is_live: profile.is_live || false,
                 gifter_level: profile.gifter_level || 0,
+                total_spent: profile.total_spent || 0,
+                is_mll_pro: profile.is_mll_pro || false,
               });
               
-              setMessages((prev) => [...prev, {
+              appendMessage({
                 id: newMsg.id,
                 profile_id: newMsg.profile_id,
                 username: profile.username || 'Unknown',
@@ -174,8 +210,9 @@ export function ChatContent({ roomSlug }: { roomSlug: string }) {
                 content: newMsg.content,
                 created_at: newMsg.created_at,
                 gifter_level: profile.gifter_level || 0,
-              }]);
-              setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: true }), 100);
+                total_spent: profile.total_spent || 0,
+                is_mll_pro: profile.is_mll_pro || false,
+              });
             }
           }
         }
@@ -185,24 +222,45 @@ export function ChatContent({ roomSlug }: { roomSlug: string }) {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [normalizedRoomId]);
+  }, [chatRoomId, supabase]);
+
+  useEffect(() => {
+    if (!initialLoaded) return;
+    if (initialScrollDoneRef.current) return;
+    InteractionManager.runAfterInteractions(() => {
+      listRef.current?.scrollToOffset({ offset: 0, animated: false });
+      initialScrollDoneRef.current = true;
+    });
+  }, [initialLoaded]);
+
+  useEffect(() => {
+    if (!initialLoaded) return;
+    if (!shouldAutoScrollRef.current) return;
+    requestAnimationFrame(() => {
+      listRef.current?.scrollToOffset({ offset: 0, animated: true });
+    });
+  }, [initialLoaded, messages.length]);
 
   const sendMessage = async () => {
-    if (!newMessage.trim() || !user) return;
+    const messageToSend = newMessage.trim();
+    if (!messageToSend || !user) return;
+    if (!chatRoomId) {
+      console.error('[ROOM_CHAT] Missing chatRoomId - cannot send message');
+      return;
+    }
 
     try {
+      setNewMessage('');
       const { error } = await supabase
         .from('chat_messages')
         .insert({
-          room_id: normalizedRoomId,
+          room_id: chatRoomId,
           profile_id: user.id,
-          content: newMessage.trim(),
+          content: messageToSend,
           message_type: 'text',
         });
 
       if (error) throw error;
-
-      setNewMessage('');
     } catch (error) {
       Alert.alert('Error', 'Failed to send message');
     }
@@ -216,15 +274,48 @@ export function ChatContent({ roomSlug }: { roomSlug: string }) {
     );
   }
 
+  if (!chatRoomId) {
+    return (
+      <View style={styles.chatDisabled}>
+        <Text style={styles.noDataText}>Chat unavailable for this room.</Text>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.chatContainer}>
-      <ScrollView
-        ref={scrollViewRef}
+      <FlatList
+        ref={listRef}
+        data={messages}
+        inverted={true}
         style={styles.chatMessages}
-        contentContainerStyle={styles.chatMessagesContent}
-      >
-        {messages.map((msg) => (
-          <View key={msg.id} style={styles.chatMessage}>
+        contentContainerStyle={user ? styles.chatMessagesContentWithInput : styles.chatMessagesContent}
+        keyExtractor={(item) => String(item.id)}
+        keyboardShouldPersistTaps="handled"
+        scrollEnabled={true}
+        nestedScrollEnabled={true}
+        scrollEventThrottle={16}
+        onScroll={(event) => {
+          const { layoutMeasurement, contentOffset, contentSize } = event.nativeEvent;
+          shouldAutoScrollRef.current = contentOffset.y < 60;
+        }}
+        onLayout={() => {
+          if (!initialLoaded) return;
+          if (initialScrollDoneRef.current) return;
+          InteractionManager.runAfterInteractions(() => {
+            listRef.current?.scrollToOffset({ offset: 0, animated: false });
+            initialScrollDoneRef.current = true;
+          });
+        }}
+        onContentSizeChange={() => {
+          if (!initialLoaded) return;
+          if (!shouldAutoScrollRef.current) return;
+          requestAnimationFrame(() => {
+            listRef.current?.scrollToOffset({ offset: 0, animated: true });
+          });
+        }}
+        renderItem={({ item: msg }) => (
+          <View style={styles.chatMessage}>
             <Image
               source={getAvatarSource(msg.avatar_url)}
               style={styles.chatAvatar}
@@ -234,15 +325,31 @@ export function ChatContent({ roomSlug }: { roomSlug: string }) {
                 <Text style={[styles.chatUsername, msg.is_live && styles.chatUsernameLive]}>
                   {msg.username}
                 </Text>
-                {msg.gifter_level && msg.gifter_level > 0 && (
-                  <Text style={styles.chatBadge}>L{msg.gifter_level}</Text>
-                )}
+                {msg.is_mll_pro ? <MllProBadge size="md" /> : null}
+                {(() => {
+                  const lifetime = Number(msg.total_spent ?? 0);
+                  if (lifetime <= 0) return null;
+                  const { tierKey, levelInTier } = getGifterTierFromCoins(lifetime);
+                  const tier = getTierByKey(tierKey);
+                  if (!tier) return null;
+                  return (
+                    <View style={[
+                      styles.gifterBadgePill,
+                      { backgroundColor: `${tier.color}30`, borderColor: `${tier.color}60` }
+                    ]}>
+                      <Text style={styles.gifterBadgeIcon}>{tier.icon}</Text>
+                      <Text style={[styles.gifterBadgeLevel, { color: tier.color }]}>
+                        {levelInTier}
+                      </Text>
+                    </View>
+                  );
+                })()}
               </View>
               <Text style={styles.chatMessageText}>{msg.content}</Text>
             </View>
           </View>
-        ))}
-      </ScrollView>
+        )}
+      />
       
       {user && (
         <View style={styles.chatInputContainer}>
@@ -254,7 +361,7 @@ export function ChatContent({ roomSlug }: { roomSlug: string }) {
             placeholderTextColor="#888"
             onSubmitEditing={sendMessage}
             returnKeyType="send"
-            multiline
+            blurOnSubmit={true}
             maxLength={500}
           />
           <TouchableOpacity
@@ -641,13 +748,17 @@ const styles = StyleSheet.create({
   // Chat styles
   chatContainer: {
     flex: 1,
-    minHeight: 300,
+    minHeight: 0,
   },
   chatMessages: {
     flex: 1,
   },
   chatMessagesContent: {
     padding: 12,
+  },
+  chatMessagesContentWithInput: {
+    padding: 12,
+    paddingBottom: 56,
   },
   chatMessage: {
     flexDirection: 'row',
@@ -685,16 +796,35 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
     borderRadius: 4,
   },
+  gifterBadgePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+    borderRadius: 10,
+    borderWidth: 1,
+    marginLeft: 4,
+    gap: 2,
+  },
+  gifterBadgeIcon: {
+    fontSize: 9,
+  },
+  gifterBadgeLevel: {
+    fontSize: 9,
+    fontWeight: '700',
+  },
   chatMessageText: {
     color: '#fff',
     flexWrap: 'wrap',
   },
   chatInputContainer: {
     flexDirection: 'row',
-    padding: 12,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
     borderTopWidth: 1,
     borderTopColor: '#333',
     alignItems: 'center',
+    flexShrink: 0,
   },
   chatInput: {
     flex: 1,
@@ -704,10 +834,17 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 20,
     marginRight: 8,
-    maxHeight: 100,
+    minHeight: 40,
+    maxHeight: 140,
+    textAlignVertical: 'top',
   },
   chatSendButton: {
     padding: 8,
+  },
+  chatDisabled: {
+    padding: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 
   // Stats styles
