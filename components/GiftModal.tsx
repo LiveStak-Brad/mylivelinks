@@ -284,6 +284,10 @@ export default function GiftModal({
         });
       }
 
+      // Reset selected gift to clear the selection
+      setSelectedGift(null);
+      setError(null);
+      
       onGiftSent();
       onClose();
     } catch (err: any) {
