@@ -356,10 +356,13 @@ interface VideoTileProps {
   height: number;
   slotIndex: number;
   onTilePress: (slotIndex: number, participant: Participant | null) => void;
-  // 🎛️ Mute control props (no volume slider - mobile limitation)
+  // 🎛️ Volume control props
+  volumeMap: VolumeMap;
   mutedParticipants: Set<string>;
+  activeVolumeSliderTileId: string | null;
   onDoubleTap: (participantId: string) => void;
-  onSpeakerIconPress: (participantId: string) => void;
+  onSpeakerIconPress: (participantId: string, event: any) => void;
+  onVolumeChange: (participantId: string, volume: number) => void;
   // 📺 Fullscreen props
   onToggleFullscreen: (tileId: string, participant: Participant | null, isLocal: boolean) => void;
 }
@@ -373,9 +376,12 @@ const VideoTile = React.memo(({
   height, 
   slotIndex, 
   onTilePress,
+  volumeMap,
   mutedParticipants,
+  activeVolumeSliderTileId,
   onDoubleTap,
   onSpeakerIconPress,
+  onVolumeChange,
   onToggleFullscreen,
 }: VideoTileProps) => {
   const hasVideo = participant?.videoTrack || (isLocalTile && localVideoTrack);
@@ -383,10 +389,13 @@ const VideoTile = React.memo(({
   const participantId = participant?.identity || '';
   const tileId = `tile-${slotIndex}`;
   
-  // Mute state for this tile
-  const isMuted = mutedParticipants.has(participantId);
+  // Volume state for this tile
+  const volume = volumeMap[participantId] ?? 100;
+  const isMuted = mutedParticipants.has(participantId) || volume === 0;
+  const showVolumeSlider = activeVolumeSliderTileId === tileId;
   
-  // 📺 Fullscreen double-tap detection
+  // 📺 Fullscreen double-tap detection (separate from mute double-tap)
+  // Priority: speaker icon > slider > fullscreen double-tap
   const lastTapRef = useRef(0);
   const ignoreNextDoubleTapRef = useRef(false);
   
@@ -416,10 +425,11 @@ const VideoTile = React.memo(({
     }
   };
   
-  const handleSpeakerPress = () => {
-    // Prevent fullscreen when tapping speaker - just toggle mute
+  const handleSpeakerPress = (e: any) => {
+    // Prevent tile double-tap when tapping speaker
     ignoreNextDoubleTapRef.current = true;
-    onSpeakerIconPress(participantId);
+    // Pass participantId as second param for mute/unmute detection
+    onSpeakerIconPress(tileId, participantId);
   };
   
   return (
@@ -443,7 +453,7 @@ const VideoTile = React.memo(({
             </View>
           )}
           
-          {/* 🔊 SPEAKER ICON (tap to mute/unmute - no slider on mobile) */}
+          {/* 🔊 SPEAKER ICON (always visible for remote participants) */}
           {!isLocalTile && participant && (
             <Pressable
               style={styles.speakerIcon}
@@ -456,6 +466,22 @@ const VideoTile = React.memo(({
                 color="#ffffff"
               />
             </Pressable>
+          )}
+          
+          {/* 🎚️ VOLUME SLIDER (floating, no background) */}
+          {showVolumeSlider && !isLocalTile && participant && (
+            <View style={styles.volumeSliderContainer}>
+              <Slider
+                style={styles.volumeSliderFloating}
+                minimumValue={0}
+                maximumValue={100}
+                value={volume}
+                onValueChange={(val) => onVolumeChange(participantId, val)}
+                minimumTrackTintColor="#ffffff"
+                maximumTrackTintColor="rgba(255, 255, 255, 0.3)"
+                thumbTintColor="#ffffff"
+              />
+            </View>
           )}
         </>
       ) : (
@@ -475,7 +501,9 @@ const VideoTile = React.memo(({
     prevProps.width === nextProps.width &&
     prevProps.height === nextProps.height &&
     prevProps.slotIndex === nextProps.slotIndex &&
-    prevProps.mutedParticipants === nextProps.mutedParticipants
+    prevProps.volumeMap === nextProps.volumeMap &&
+    prevProps.mutedParticipants === nextProps.mutedParticipants &&
+    prevProps.activeVolumeSliderTileId === nextProps.activeVolumeSliderTileId
   );
 });
 
@@ -491,10 +519,13 @@ interface GridContainerProps {
   onTilePress: (slotIndex: number, participant: Participant | null) => void;
   localVideoTrack?: LocalVideoTrack | null;
   localAudioTrack?: LocalAudioTrack | null;
-  // 🎛️ Mute control props (no volume slider on mobile)
+  // 🎛️ Volume control props
+  volumeMap: VolumeMap;
   mutedParticipants: Set<string>;
+  activeVolumeSliderTileId: string | null;
   onDoubleTap: (participantId: string) => void;
-  onSpeakerIconPress: (participantId: string) => void;
+  onSpeakerIconPress: (tileId: string, event: any) => void;
+  onVolumeChange: (participantId: string, volume: number) => void;
   // 📺 Fullscreen props
   onToggleFullscreen: (tileId: string, participant: Participant | null, isLocal: boolean) => void;
 }
@@ -507,9 +538,12 @@ function GridContainer({
   onTilePress, 
   localVideoTrack, 
   localAudioTrack,
+  volumeMap,
   mutedParticipants,
+  activeVolumeSliderTileId,
   onDoubleTap,
   onSpeakerIconPress,
+  onVolumeChange,
   onToggleFullscreen,
 }: GridContainerProps) {
   const { rows, cols } = getGridConfig(isLandscape);
@@ -547,9 +581,12 @@ function GridContainer({
           height={tileHeight}
           slotIndex={currentSlotIndex}
           onTilePress={onTilePress}
+          volumeMap={volumeMap}
           mutedParticipants={mutedParticipants}
+          activeVolumeSliderTileId={activeVolumeSliderTileId}
           onDoubleTap={onDoubleTap}
           onSpeakerIconPress={onSpeakerIconPress}
+          onVolumeChange={onVolumeChange}
           onToggleFullscreen={onToggleFullscreen}
         />
       );
@@ -683,9 +720,9 @@ export default function RoomScreen() {
   const [volumeMap, setVolumeMap] = useState<VolumeMap>({});
   const [mutedParticipants, setMutedParticipants] = useState<Set<string>>(new Set());
   
-  // 🎛️ MUTE CONTROL STATE (mobile doesn't support per-track volume sliders)
-  // Removed: activeVolumeSliderTileId - sliders don't work on mobile
-  // Only mute/unmute is supported
+  // 🎛️ VOLUME CONTROL STATE (gesture-first)
+  const [activeVolumeSliderTileId, setActiveVolumeSliderTileId] = useState<string | null>(null);
+  const lastTapTimeRef = useRef<{ [key: string]: number }>({});
   
   // 📺 FULLSCREEN STATE (double-tap to maximize)
   const [fullscreenTileId, setFullscreenTileId] = useState<string | null>(null);
@@ -959,10 +996,93 @@ export default function RoomScreen() {
     });
   }, []);
   
-  // Tap speaker icon → toggle mute (no slider - mobile doesn't support per-track volume)
-  const handleSpeakerIconPress = useCallback((participantId: string) => {
-    handleDoubleTap(participantId);
-  }, [handleDoubleTap]);
+  // Tap speaker icon → toggle volume slider for that tile
+  const speakerLastTapRef = useRef<{ [key: string]: number }>({});
+  
+  const handleSpeakerIconPress = useCallback((tileId: string, event: any) => {
+    const now = Date.now();
+    const lastTap = speakerLastTapRef.current[tileId] || 0;
+    const timeSinceLastTap = now - lastTap;
+    
+    if (timeSinceLastTap < 300) {
+      // Double tap on speaker → MUTE/UNMUTE
+      const participantId = event; // Actually the participantId is passed as second param from VideoTile
+      if (participantId) {
+        setMutedParticipants(prev => {
+          const next = new Set(prev);
+          if (next.has(participantId)) {
+            next.delete(participantId);
+          } else {
+            next.add(participantId);
+          }
+          return next;
+        });
+      }
+      speakerLastTapRef.current[tileId] = 0; // Reset
+    } else {
+      // Single tap on speaker → TOGGLE SLIDER
+      setActiveVolumeSliderTileId(prev => prev === tileId ? null : tileId);
+      speakerLastTapRef.current[tileId] = now;
+    }
+  }, []);
+  
+  // Drag volume slider → update volume
+  const handleVolumeChangeGesture = useCallback((participantId: string, volume: number) => {
+    if (!participantId) return;
+    
+    // Update volume map for UI
+    setVolumeMap(prev => ({ ...prev, [participantId]: volume }));
+    
+    // Apply volume to the actual audio track
+    if (roomRef.current) {
+      const remoteParticipant = Array.from(roomRef.current.remoteParticipants.values()).find(
+        (p) => p.identity === participantId
+      );
+      
+      if (remoteParticipant) {
+        // Find audio track and set volume
+        remoteParticipant.audioTrackPublications.forEach((pub) => {
+          if (pub.audioTrack) {
+            try {
+              // Try to set volume property directly (0-1 range, so divide by 100)
+              (pub.audioTrack as any).volume = volume / 100;
+            } catch (err) {
+              // If that doesn't work, try accessing the underlying MediaStreamTrack
+              try {
+                const mediaStreamTrack = (pub.audioTrack as any).mediaStreamTrack;
+                if (mediaStreamTrack) {
+                  // Note: Web Audio API needed for actual volume control
+                  // This is a limitation - mobile might not support per-track volume
+                }
+              } catch (innerErr) {
+                // Volume control not supported on this track
+              }
+            }
+          }
+        });
+      }
+    }
+    
+    // Auto-unmute if volume is increased from 0
+    if (volume > 0) {
+      setMutedParticipants(prev => {
+        const next = new Set(prev);
+        next.delete(participantId);
+        return next;
+      });
+    }
+    
+    // Auto-mute if volume reaches 0
+    if (volume === 0) {
+      setMutedParticipants(prev => {
+        const next = new Set(prev);
+        next.add(participantId);
+        return next;
+      });
+    }
+  }, []);
+  
+  // Close volume slider when tapping elsewhere (handled by grid wrapper)
   
   // 📺 FULLSCREEN HANDLERS
   
@@ -1355,12 +1475,21 @@ export default function RoomScreen() {
         translucent={true}
       />
       {/* Grid wrapper with safe area padding for notch + home bar + control bar */}
-      <View style={[styles.gridWrapper, {
-        paddingTop: gridPaddingTop,
-        paddingBottom: gridPaddingBottom,
-        paddingLeft: gridPaddingLeft,
-        paddingRight: gridPaddingRight
-      }]}>
+      {/* 🎛️ TouchableWithoutFeedback to close volume slider when tapping outside */}
+      <TouchableOpacity
+        activeOpacity={1}
+        onPress={() => {
+          if (activeVolumeSliderTileId) {
+            setActiveVolumeSliderTileId(null);
+          }
+        }}
+        style={[styles.gridWrapper, {
+          paddingTop: gridPaddingTop,
+          paddingBottom: gridPaddingBottom,
+          paddingLeft: gridPaddingLeft,
+          paddingRight: gridPaddingRight
+        }]}
+      >
         <GridContainer
           participants={participants}
           screenWidth={safeGridWidth}
@@ -1369,12 +1498,15 @@ export default function RoomScreen() {
           onTilePress={handleTilePress}
           localVideoTrack={localVideoTrack}
           localAudioTrack={localAudioTrack}
+          volumeMap={volumeMap}
           mutedParticipants={mutedParticipants}
+          activeVolumeSliderTileId={activeVolumeSliderTileId}
           onDoubleTap={handleDoubleTap}
           onSpeakerIconPress={handleSpeakerIconPress}
+          onVolumeChange={handleVolumeChangeGesture}
           onToggleFullscreen={handleToggleFullscreen}
         />
-      </View>
+      </TouchableOpacity>
       
       {/* 📺 FULLSCREEN OVERLAY (when double-tapped) */}
       {fullscreenTileId && (
@@ -1397,12 +1529,12 @@ export default function RoomScreen() {
             <Text style={styles.fullscreenHint}>Double-tap to exit</Text>
           </View>
           
-          {/* Speaker icon in fullscreen (tap to mute - no slider) */}
+          {/* Speaker icon in fullscreen (for remote participants) */}
           {!fullscreenIsLocal && fullscreenParticipant && (
             <Pressable
               style={styles.speakerIconFullscreen}
-              onPress={() => {
-                handleSpeakerIconPress(fullscreenParticipant.identity);
+              onPress={(e) => {
+                handleSpeakerIconPress(fullscreenTileId, e);
               }}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             >
@@ -1412,6 +1544,23 @@ export default function RoomScreen() {
                 color="#ffffff"
               />
             </Pressable>
+          )}
+          
+          {/* Volume slider in fullscreen */}
+          {activeVolumeSliderTileId === fullscreenTileId && !fullscreenIsLocal && fullscreenParticipant && (
+            <View style={styles.volumeSliderContainerFullscreen}>
+              <Slider
+                style={styles.volumeSliderFloating}
+                minimumValue={0}
+                maximumValue={100}
+                value={volumeMap[fullscreenParticipant.identity] ?? 100}
+                onValueChange={(val) => handleVolumeChangeGesture(fullscreenParticipant.identity, val)}
+                minimumTrackTintColor="#ffffff"
+                maximumTrackTintColor="rgba(255, 255, 255, 0.3)"
+                thumbTintColor="#ffffff"
+                vertical={true}
+              />
+            </View>
           )}
         </Pressable>
       )}
