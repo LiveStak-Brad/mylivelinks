@@ -1070,11 +1070,11 @@ export default function RoomScreen() {
           
           // Lock to matching orientation - FORCE viewer to rotate device
           if (isVideoPortrait) {
-            // Video is PORTRAIT (tall) → force viewer to PORTRAIT
-            await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
-          } else {
-            // Video is LANDSCAPE (wide) → force viewer to LANDSCAPE
+            // Video is PORTRAIT (tall) → force viewer to LANDSCAPE (this is the fix)
             await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE);
+          } else {
+            // Video is LANDSCAPE (wide) → force viewer to PORTRAIT (this is the fix)
+            await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
           }
         }
       } catch (error) {
