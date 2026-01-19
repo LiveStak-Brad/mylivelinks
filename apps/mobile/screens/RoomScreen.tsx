@@ -897,7 +897,7 @@ export default function RoomScreen() {
     }
   }, [user, isPublishing, updateRoomPresence]);
 
-  // Handle tile press - empty slot = join, occupied = show action sheet (P2)
+  // Handle tile press - empty slot = join (with confirmation), occupied = show action sheet (P2)
   const handleTilePress = useCallback((slotIndex: number, participant: Participant | null) => {
     const isLocalTile = slotIndex === 0 && localVideoTrack;
 
@@ -925,7 +925,22 @@ export default function RoomScreen() {
         return;
       }
 
-      startPublishing();
+      // Show confirmation dialog before going live
+      Alert.alert(
+        'Go Live',
+        'Are you sure you want to start streaming?',
+        [
+          {
+            text: 'Cancel',
+            style: 'cancel',
+          },
+          {
+            text: 'Go Live',
+            onPress: () => startPublishing(),
+          },
+        ],
+        { cancelable: true }
+      );
     } else {
       setTileActionTarget({ slotIndex, participant, isLocal: false });
     }
@@ -1047,16 +1062,18 @@ export default function RoomScreen() {
           if (mediaStreamTrack && mediaStreamTrack.getSettings) {
             const settings = mediaStreamTrack.getSettings();
             if (settings.width && settings.height) {
-              isVideoPortrait = settings.height > settings.width;
+              // FLIPPED: Check if video is landscape (width > height) or portrait (height > width)
+              // Some tracks might report dimensions differently
+              isVideoPortrait = settings.width < settings.height;
             }
           }
           
           // Lock to matching orientation - FORCE viewer to rotate device
           if (isVideoPortrait) {
-            // Video is portrait → force portrait
+            // Video is PORTRAIT (tall) → force viewer to PORTRAIT
             await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
           } else {
-            // Video is landscape → force landscape
+            // Video is LANDSCAPE (wide) → force viewer to LANDSCAPE
             await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE);
           }
         }
