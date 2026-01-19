@@ -72,6 +72,27 @@ interface MiniProfileData {
   isFollowing: boolean;
 }
 
+// Replace streamer modal state
+interface ActiveStreamer {
+  identity: string;
+  userId: string;
+  username: string;
+  avatarUrl: string | null;
+}
+
+interface ReplaceStreamerModalProps {
+  visible: boolean;
+  targetUsername: string;
+  targetSlotIndex: number;
+  targetParticipantId: string;
+  activeStreamers: ActiveStreamer[];
+  currentUserIsLive: boolean;
+  onClose: () => void;
+  onReplaceAndGoLive: () => void;
+  onReplaceWithStreamer: (streamer: ActiveStreamer) => void;
+  bottomInset: number;
+}
+
 // Volume map for per-participant volume control
 interface VolumeMap {
   [identity: string]: number; // 0-100
@@ -92,6 +113,116 @@ interface MiniProfileModalProps {
   onBlock: () => void;
   onReplace: () => void;
   bottomInset: number;
+}
+
+function ReplaceStreamerModal({
+  visible,
+  targetUsername,
+  targetSlotIndex,
+  targetParticipantId,
+  activeStreamers,
+  currentUserIsLive,
+  onClose,
+  onReplaceAndGoLive,
+  onReplaceWithStreamer,
+  bottomInset,
+}: ReplaceStreamerModalProps) {
+  if (!visible) return null;
+
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="fade"
+      onRequestClose={onClose}
+      statusBarTranslucent
+    >
+      <Pressable style={styles.replaceModalOverlay} onPress={onClose}>
+        <Pressable 
+          style={[styles.replaceModalContainer, { paddingBottom: Math.max(bottomInset, 16) }]} 
+          onPress={e => e.stopPropagation()}
+        >
+          {/* Header */}
+          <View style={styles.replaceModalHeader}>
+            <Text style={styles.replaceModalTitle}>Replace Stream</Text>
+            <Text style={styles.replaceModalSubtitle}>
+              Replace {targetUsername} in slot {targetSlotIndex + 1}
+            </Text>
+          </View>
+
+          {/* Options */}
+          <View style={styles.replaceModalOptions}>
+            {/* Show "Replace & Go Live" only if user is NOT already live */}
+            {!currentUserIsLive && (
+              <TouchableOpacity 
+                style={styles.replaceOptionButton}
+                onPress={onReplaceAndGoLive}
+              >
+                <Ionicons name="videocam" size={24} color="#4a90d9" />
+                <View style={styles.replaceOptionText}>
+                  <Text style={styles.replaceOptionTitle}>Replace & Go Live</Text>
+                  <Text style={styles.replaceOptionSubtitle}>Start your camera and take this slot</Text>
+                </View>
+              </TouchableOpacity>
+            )}
+
+            {/* Divider if both options visible */}
+            {!currentUserIsLive && activeStreamers.length > 0 && (
+              <View style={styles.replaceModalDivider} />
+            )}
+
+            {/* Active Streamers List */}
+            {activeStreamers.length > 0 ? (
+              <>
+                <Text style={styles.replaceModalSectionTitle}>Replace with Active Streamer:</Text>
+                <ScrollView style={styles.replaceStreamerList} showsVerticalScrollIndicator={false}>
+                  {activeStreamers.map((streamer) => (
+                    <TouchableOpacity
+                      key={streamer.identity}
+                      style={styles.replaceStreamerItem}
+                      onPress={() => onReplaceWithStreamer(streamer)}
+                    >
+                      {streamer.avatarUrl ? (
+                        <Image 
+                          source={{ uri: streamer.avatarUrl }} 
+                          style={styles.replaceStreamerAvatar}
+                        />
+                      ) : (
+                        <View style={[styles.replaceStreamerAvatar, styles.replaceStreamerAvatarPlaceholder]}>
+                          <Ionicons name="person" size={20} color="#666" />
+                        </View>
+                      )}
+                      <View style={styles.replaceStreamerInfo}>
+                        <Text style={styles.replaceStreamerName}>{streamer.username}</Text>
+                        <View style={styles.replaceStreamerLiveIndicator}>
+                          <View style={styles.replaceStreamerLiveDot} />
+                          <Text style={styles.replaceStreamerLiveText}>Live</Text>
+                        </View>
+                      </View>
+                      <Ionicons name="chevron-forward" size={20} color="#666" />
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </>
+            ) : (
+              <View style={styles.replaceModalEmpty}>
+                <Ionicons name="videocam-off" size={48} color="#666" />
+                <Text style={styles.replaceModalEmptyText}>No other active streamers</Text>
+              </View>
+            )}
+          </View>
+
+          {/* Close Button */}
+          <TouchableOpacity 
+            style={styles.replaceModalCloseButton}
+            onPress={onClose}
+          >
+            <Text style={styles.replaceModalCloseText}>Cancel</Text>
+          </TouchableOpacity>
+        </Pressable>
+      </Pressable>
+    </Modal>
+  );
 }
 
 function MiniProfileModal({
@@ -1024,6 +1155,15 @@ export default function RoomScreen() {
   // Mini profile modal state
   const [miniProfileVisible, setMiniProfileVisible] = useState(false);
   const [miniProfileData, setMiniProfileData] = useState<MiniProfileData | null>(null);
+
+  // Replace streamer modal state
+  const [replaceModalVisible, setReplaceModalVisible] = useState(false);
+  const [replaceModalData, setReplaceModalData] = useState<{
+    targetUsername: string;
+    targetSlotIndex: number;
+    targetParticipantId: string;
+    activeStreamers: ActiveStreamer[];
+  } | null>(null);
   
   // P2: Tile action sheet state
   const [tileActionTarget, setTileActionTarget] = useState<{
@@ -2272,73 +2412,94 @@ export default function RoomScreen() {
             ]
           );
         }}
-        onReplace={() => {
+        onReplace={async () => {
           if (!miniProfileData || !user) return;
 
           // Get list of participants with active cameras (excluding the target and current user)
-          const activeStreamers = participants
-            .filter(p => 
-              p.identity !== miniProfileData.participantId &&
-              p.identity !== `u_${user.id}:mobile` &&
-              p.videoTrack
-            )
-            .map(p => ({
-              identity: p.identity,
-              displayName: p.identity.split(':')[0].replace(/^u_/, '').substring(0, 8),
-            }));
+          const activeStreamers: ActiveStreamer[] = [];
+          
+          for (const p of participants) {
+            // Skip target user and current user
+            if (p.identity === miniProfileData.participantId || 
+                p.identity === `u_${user.id}:mobile` ||
+                !p.videoTrack) {
+              continue;
+            }
 
-          const options: Array<{ text: string; onPress: () => void }> = [
-            {
-              text: 'Replace & Go Live',
-              onPress: () => {
-                if (isPublishing) {
-                  Alert.alert('Already Streaming', 'You are already streaming in this room.');
-                  return;
-                }
-                setMiniProfileVisible(false);
-                startPublishing();
-              },
-            },
-          ];
+            // Extract user ID from participant identity
+            const userIdPart = p.identity.split(':')[0].replace(/^u_/, '');
+            
+            // Try to fetch username and avatar
+            try {
+              const { data: profile } = await supabase
+                .from('profiles')
+                .select('username, avatar_url')
+                .eq('id', userIdPart)
+                .single();
 
-          // Add "Replace with..." options for each active streamer
-          if (activeStreamers.length > 0) {
-            activeStreamers.forEach((streamer: { identity: string; displayName: string }) => {
-              options.push({
-                text: `Replace with ${streamer.displayName}`,
-                onPress: () => {
-                  Alert.alert(
-                    'Replace Streamer',
-                    `This will move ${streamer.displayName} to slot ${miniProfileData.slotIndex + 1}. Continue?`,
-                    [
-                      { text: 'Cancel', style: 'cancel' },
-                      {
-                        text: 'Replace',
-                        onPress: () => {
-                          // TODO: Implement slot swap logic via RPC
-                          console.log('[REPLACE] Swap:', { 
-                            targetSlot: miniProfileData.slotIndex, 
-                            targetIdentity: miniProfileData.participantId,
-                            replacementIdentity: streamer.identity 
-                          });
-                          setMiniProfileVisible(false);
-                          Alert.alert('Coming Soon', 'Streamer replacement will be implemented');
-                        },
-                      },
-                    ]
-                  );
-                },
+              activeStreamers.push({
+                identity: p.identity,
+                userId: userIdPart,
+                username: profile?.username || userIdPart.substring(0, 8),
+                avatarUrl: profile?.avatar_url || null,
               });
-            });
+            } catch (error) {
+              // Fallback if profile fetch fails
+              activeStreamers.push({
+                identity: p.identity,
+                userId: userIdPart,
+                username: userIdPart.substring(0, 8),
+                avatarUrl: null,
+              });
+            }
           }
 
-          options.push({ text: 'Cancel', onPress: () => {} });
+          // Close mini profile and open replace modal
+          setMiniProfileVisible(false);
+          setReplaceModalData({
+            targetUsername: miniProfileData.username,
+            targetSlotIndex: miniProfileData.slotIndex,
+            targetParticipantId: miniProfileData.participantId,
+            activeStreamers,
+          });
+          setReplaceModalVisible(true);
+        }}
+        bottomInset={insets.bottom}
+      />
 
+      {/* Replace Streamer Modal */}
+      <ReplaceStreamerModal
+        visible={replaceModalVisible}
+        targetUsername={replaceModalData?.targetUsername || ''}
+        targetSlotIndex={replaceModalData?.targetSlotIndex || 0}
+        targetParticipantId={replaceModalData?.targetParticipantId || ''}
+        activeStreamers={replaceModalData?.activeStreamers || []}
+        currentUserIsLive={isPublishing}
+        onClose={() => setReplaceModalVisible(false)}
+        onReplaceAndGoLive={() => {
+          setReplaceModalVisible(false);
+          startPublishing();
+        }}
+        onReplaceWithStreamer={(streamer) => {
           Alert.alert(
-            'Replace Stream',
-            `Choose how to replace ${miniProfileData.username} in slot ${miniProfileData.slotIndex + 1}`,
-            options as any,
-            { cancelable: true }
+            'Replace Streamer',
+            `Move ${streamer.username} to slot ${(replaceModalData?.targetSlotIndex || 0) + 1}?`,
+            [
+              { text: 'Cancel', style: 'cancel' },
+              {
+                text: 'Replace',
+                onPress: () => {
+                  // TODO: Implement slot swap logic via RPC
+                  console.log('[REPLACE] Swap:', { 
+                    targetSlot: replaceModalData?.targetSlotIndex, 
+                    targetIdentity: replaceModalData?.targetParticipantId,
+                    replacementIdentity: streamer.identity 
+                  });
+                  setReplaceModalVisible(false);
+                  Alert.alert('Coming Soon', 'Streamer replacement will be implemented');
+                },
+              },
+            ]
           );
         }}
         bottomInset={insets.bottom}
@@ -2949,6 +3110,138 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   miniProfileCloseText: {
+    color: '#888',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  // Replace Streamer Modal
+  replaceModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    justifyContent: 'flex-end',
+  },
+  replaceModalContainer: {
+    backgroundColor: '#1a1a1a',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingTop: 20,
+    paddingHorizontal: 20,
+    maxHeight: '80%',
+  },
+  replaceModalHeader: {
+    marginBottom: 20,
+  },
+  replaceModalTitle: {
+    color: '#fff',
+    fontSize: 20,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  replaceModalSubtitle: {
+    color: '#888',
+    fontSize: 14,
+  },
+  replaceModalOptions: {
+    marginBottom: 16,
+  },
+  replaceOptionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#2a2a2a',
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 12,
+  },
+  replaceOptionText: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  replaceOptionTitle: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 2,
+  },
+  replaceOptionSubtitle: {
+    color: '#888',
+    fontSize: 13,
+  },
+  replaceModalDivider: {
+    height: 1,
+    backgroundColor: '#333',
+    marginVertical: 12,
+  },
+  replaceModalSectionTitle: {
+    color: '#888',
+    fontSize: 13,
+    fontWeight: '600',
+    marginBottom: 12,
+    textTransform: 'uppercase',
+  },
+  replaceStreamerList: {
+    maxHeight: 300,
+  },
+  replaceStreamerItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#2a2a2a',
+    padding: 12,
+    borderRadius: 12,
+    marginBottom: 8,
+  },
+  replaceStreamerAvatar: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+  },
+  replaceStreamerAvatarPlaceholder: {
+    backgroundColor: '#333',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  replaceStreamerInfo: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  replaceStreamerName: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  replaceStreamerLiveIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  replaceStreamerLiveDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#ff4444',
+    marginRight: 6,
+  },
+  replaceStreamerLiveText: {
+    color: '#ff4444',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  replaceModalEmpty: {
+    alignItems: 'center',
+    paddingVertical: 40,
+  },
+  replaceModalEmptyText: {
+    color: '#666',
+    fontSize: 14,
+    marginTop: 12,
+  },
+  replaceModalCloseButton: {
+    backgroundColor: '#2a2a2a',
+    padding: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  replaceModalCloseText: {
     color: '#888',
     fontSize: 14,
     fontWeight: '600',
