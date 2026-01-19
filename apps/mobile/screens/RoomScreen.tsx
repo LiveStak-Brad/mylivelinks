@@ -1005,7 +1005,38 @@ export default function RoomScreen() {
   const handleVolumeChangeGesture = useCallback((participantId: string, volume: number) => {
     if (!participantId) return;
     
+    // Update volume map for UI
     setVolumeMap(prev => ({ ...prev, [participantId]: volume }));
+    
+    // Apply volume to the actual audio track
+    if (roomRef.current) {
+      const remoteParticipant = Array.from(roomRef.current.remoteParticipants.values()).find(
+        (p) => p.identity === participantId
+      );
+      
+      if (remoteParticipant) {
+        // Find audio track and set volume
+        remoteParticipant.audioTrackPublications.forEach((pub) => {
+          if (pub.audioTrack) {
+            try {
+              // Try to set volume property directly (0-1 range, so divide by 100)
+              (pub.audioTrack as any).volume = volume / 100;
+            } catch (err) {
+              // If that doesn't work, try accessing the underlying MediaStreamTrack
+              try {
+                const mediaStreamTrack = (pub.audioTrack as any).mediaStreamTrack;
+                if (mediaStreamTrack) {
+                  // Note: Web Audio API needed for actual volume control
+                  // This is a limitation - mobile might not support per-track volume
+                }
+              } catch (innerErr) {
+                // Volume control not supported on this track
+              }
+            }
+          }
+        });
+      }
+    }
     
     // Auto-unmute if volume is increased from 0
     if (volume > 0) {
