@@ -363,6 +363,8 @@ interface VideoTileProps {
   onDoubleTap: (participantId: string) => void;
   onSpeakerIconPress: (participantId: string, event: any) => void;
   onVolumeChange: (participantId: string, volume: number) => void;
+  // 📺 Fullscreen props
+  onToggleFullscreen: (tileId: string, participant: Participant | null, isLocal: boolean) => void;
 }
 
 // FIX #2: Memoize VideoTile to prevent re-renders when other tiles change
@@ -380,6 +382,7 @@ const VideoTile = React.memo(({
   onDoubleTap,
   onSpeakerIconPress,
   onVolumeChange,
+  onToggleFullscreen,
 }: VideoTileProps) => {
   const hasVideo = participant?.videoTrack || (isLocalTile && localVideoTrack);
   const videoTrack = participant?.videoTrack || localVideoTrack;
@@ -391,11 +394,21 @@ const VideoTile = React.memo(({
   const isMuted = mutedParticipants.has(participantId) || volume === 0;
   const showVolumeSlider = activeVolumeSliderTileId === tileId;
   
-  // Double-tap detection
+  // 📺 Fullscreen double-tap detection (separate from mute double-tap)
+  // Priority: speaker icon > slider > fullscreen double-tap
   const lastTapRef = useRef(0);
+  const ignoreNextDoubleTapRef = useRef(false);
+  
   const handleTilePress = () => {
-    if (!participant) {
+    // If tapping empty slot, use old behavior
+    if (!hasVideo) {
       onTilePress(slotIndex, null);
+      return;
+    }
+    
+    // Check if we should ignore (speaker icon was pressed)
+    if (ignoreNextDoubleTapRef.current) {
+      ignoreNextDoubleTapRef.current = false;
       return;
     }
     
@@ -403,19 +416,24 @@ const VideoTile = React.memo(({
     const timeSinceLastTap = now - lastTapRef.current;
     
     if (timeSinceLastTap < 300) {
-      // Double tap detected
-      onDoubleTap(participantId);
-      lastTapRef.current = 0; // Reset to prevent triple-tap
+      // Double tap detected → FULLSCREEN
+      onToggleFullscreen(tileId, participant, isLocalTile || false);
+      lastTapRef.current = 0; // Reset
     } else {
-      // Single tap - currently does nothing, preserving for future use
+      // Single tap → currently does nothing in grid view
       lastTapRef.current = now;
     }
   };
   
+  const handleSpeakerPress = (e: any) => {
+    // Prevent fullscreen when tapping speaker
+    ignoreNextDoubleTapRef.current = true;
+    onSpeakerIconPress(tileId, e);
+  };
+  
   return (
-    <TouchableOpacity 
+    <Pressable 
       style={[styles.tile, { width, height }]}
-      activeOpacity={0.7}
       onPress={handleTilePress}
     >
       {hasVideo && videoTrack ? (
@@ -436,12 +454,9 @@ const VideoTile = React.memo(({
           
           {/* 🔊 SPEAKER ICON (always visible for remote participants) */}
           {!isLocalTile && participant && (
-            <TouchableOpacity
+            <Pressable
               style={styles.speakerIcon}
-              onPress={(e) => {
-                e.stopPropagation();
-                onSpeakerIconPress(tileId, e);
-              }}
+              onPress={handleSpeakerPress}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             >
               <Ionicons
@@ -449,7 +464,7 @@ const VideoTile = React.memo(({
                 size={24}
                 color="#ffffff"
               />
-            </TouchableOpacity>
+            </Pressable>
           )}
           
           {/* 🎚️ VOLUME SLIDER (floating, no background) */}
@@ -474,7 +489,7 @@ const VideoTile = React.memo(({
           <Ionicons name="add-circle-outline" size={32} color="#666" />
         </View>
       )}
-    </TouchableOpacity>
+    </Pressable>
   );
 }, (prevProps, nextProps) => {
   // Custom comparison: re-render if any relevant prop changed
@@ -511,6 +526,8 @@ interface GridContainerProps {
   onDoubleTap: (participantId: string) => void;
   onSpeakerIconPress: (tileId: string, event: any) => void;
   onVolumeChange: (participantId: string, volume: number) => void;
+  // 📺 Fullscreen props
+  onToggleFullscreen: (tileId: string, participant: Participant | null, isLocal: boolean) => void;
 }
 
 function GridContainer({ 
@@ -527,6 +544,7 @@ function GridContainer({
   onDoubleTap,
   onSpeakerIconPress,
   onVolumeChange,
+  onToggleFullscreen,
 }: GridContainerProps) {
   const { rows, cols } = getGridConfig(isLandscape);
   const tileWidth = screenWidth / cols;
@@ -569,6 +587,7 @@ function GridContainer({
           onDoubleTap={onDoubleTap}
           onSpeakerIconPress={onSpeakerIconPress}
           onVolumeChange={onVolumeChange}
+          onToggleFullscreen={onToggleFullscreen}
         />
       );
       slotIndex++;
@@ -704,6 +723,11 @@ export default function RoomScreen() {
   // 🎛️ VOLUME CONTROL STATE (gesture-first)
   const [activeVolumeSliderTileId, setActiveVolumeSliderTileId] = useState<string | null>(null);
   const lastTapTimeRef = useRef<{ [key: string]: number }>({});
+  
+  // 📺 FULLSCREEN STATE (double-tap to maximize)
+  const [fullscreenTileId, setFullscreenTileId] = useState<string | null>(null);
+  const [fullscreenParticipant, setFullscreenParticipant] = useState<Participant | null>(null);
+  const [fullscreenIsLocal, setFullscreenIsLocal] = useState(false);
 
   // P1: Swipe gesture handling
   const swipeThreshold = 50;
@@ -988,6 +1012,58 @@ export default function RoomScreen() {
   }, []);
   
   // Close volume slider when tapping elsewhere (handled by grid wrapper)
+  
+  // 📺 FULLSCREEN HANDLERS
+  
+  // Toggle fullscreen mode for a tile
+  const handleToggleFullscreen = useCallback(async (tileId: string, participant: Participant | null, isLocal: boolean) => {
+    if (fullscreenTileId === tileId) {
+      // Exit fullscreen - unlock orientation to allow auto-rotation
+      setFullscreenTileId(null);
+      setFullscreenParticipant(null);
+      setFullscreenIsLocal(false);
+      
+      try {
+        await ScreenOrientation.unlockAsync();
+      } catch (error) {
+        // Silently fail
+      }
+    } else {
+      // Enter fullscreen - lock orientation to match video
+      setFullscreenTileId(tileId);
+      setFullscreenParticipant(participant);
+      setFullscreenIsLocal(isLocal);
+      
+      // Determine video orientation from track dimensions
+      try {
+        const videoTrack = isLocal ? localVideoTrack : participant?.videoTrack;
+        
+        if (videoTrack) {
+          // Get video dimensions (most cameras are 16:9 or 9:16)
+          const dimensions = (videoTrack as any).dimensions;
+          const isVideoPortrait = dimensions ? dimensions.height > dimensions.width : true;
+          
+          // Lock to matching orientation
+          if (isVideoPortrait) {
+            await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
+          } else {
+            await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE);
+          }
+        }
+      } catch (error) {
+        // Silently fail - worst case user can rotate manually
+      }
+    }
+  }, [fullscreenTileId, localVideoTrack]);
+  
+  // Close fullscreen when exiting (also unlock orientation)
+  useEffect(() => {
+    return () => {
+      if (fullscreenTileId) {
+        ScreenOrientation.unlockAsync().catch(() => {});
+      }
+    };
+  }, [fullscreenTileId]);
 
   // Fetch room config from same RPC as web
   const fetchRoomConfig = useCallback(async () => {
@@ -1345,8 +1421,66 @@ export default function RoomScreen() {
           onDoubleTap={handleDoubleTap}
           onSpeakerIconPress={handleSpeakerIconPress}
           onVolumeChange={handleVolumeChangeGesture}
+          onToggleFullscreen={handleToggleFullscreen}
         />
       </TouchableOpacity>
+      
+      {/* 📺 FULLSCREEN OVERLAY (when double-tapped) */}
+      {fullscreenTileId && (
+        <Pressable
+          style={styles.fullscreenOverlay}
+          onPress={() => handleToggleFullscreen(fullscreenTileId, fullscreenParticipant, fullscreenIsLocal)}
+        >
+          <VideoView
+            style={StyleSheet.absoluteFillObject}
+            videoTrack={fullscreenIsLocal ? localVideoTrack as any : fullscreenParticipant?.videoTrack as any}
+            objectFit="contain"
+            mirror={fullscreenIsLocal}
+          />
+          
+          {/* Fullscreen indicator */}
+          <View style={styles.fullscreenIndicator}>
+            <Text style={styles.fullscreenIndicatorText}>
+              {fullscreenIsLocal ? 'YOU' : fullscreenParticipant?.identity || 'Participant'}
+            </Text>
+            <Text style={styles.fullscreenHint}>Double-tap to exit</Text>
+          </View>
+          
+          {/* Speaker icon in fullscreen (for remote participants) */}
+          {!fullscreenIsLocal && fullscreenParticipant && (
+            <Pressable
+              style={styles.speakerIconFullscreen}
+              onPress={(e) => {
+                handleSpeakerIconPress(fullscreenTileId, e);
+              }}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <Ionicons
+                name={mutedParticipants.has(fullscreenParticipant.identity) ? 'volume-mute' : 'volume-high'}
+                size={32}
+                color="#ffffff"
+              />
+            </Pressable>
+          )}
+          
+          {/* Volume slider in fullscreen */}
+          {activeVolumeSliderTileId === fullscreenTileId && !fullscreenIsLocal && fullscreenParticipant && (
+            <View style={styles.volumeSliderContainerFullscreen}>
+              <Slider
+                style={styles.volumeSliderFloating}
+                minimumValue={0}
+                maximumValue={100}
+                value={volumeMap[fullscreenParticipant.identity] ?? 100}
+                onValueChange={(val) => handleVolumeChangeGesture(fullscreenParticipant.identity, val)}
+                minimumTrackTintColor="#ffffff"
+                maximumTrackTintColor="rgba(255, 255, 255, 0.3)"
+                thumbTintColor="#ffffff"
+                vertical={true}
+              />
+            </View>
+          )}
+        </Pressable>
+      )}
       
       {/* Loading overlay */}
       {loading && (
@@ -2048,5 +2182,50 @@ const styles = StyleSheet.create({
     width: 150, // Height when vertical (rotated 90deg)
     height: 40,
     transform: [{ rotate: '-90deg' }],
+  },
+  // 📺 FULLSCREEN STYLES
+  fullscreenOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: '#000000',
+    zIndex: 1000,
+  },
+  fullscreenIndicator: {
+    position: 'absolute',
+    top: 60,
+    left: 20,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  fullscreenIndicatorText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  fullscreenHint: {
+    color: '#ffffff',
+    fontSize: 12,
+    marginTop: 4,
+    opacity: 0.7,
+  },
+  speakerIconFullscreen: {
+    position: 'absolute',
+    top: 60,
+    right: 20,
+    padding: 8,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    borderRadius: 24,
+    zIndex: 10,
+  },
+  volumeSliderContainerFullscreen: {
+    position: 'absolute',
+    right: 20,
+    top: 120,
+    bottom: 120,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 20,
+    width: 40,
   },
 });
