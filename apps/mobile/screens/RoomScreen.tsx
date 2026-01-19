@@ -1385,7 +1385,7 @@ export default function RoomScreen() {
           <VideoView
             style={StyleSheet.absoluteFillObject}
             videoTrack={fullscreenIsLocal ? localVideoTrack as any : fullscreenParticipant?.videoTrack as any}
-            objectFit="contain"
+            objectFit="cover"
             mirror={fullscreenIsLocal}
           />
           
@@ -1438,18 +1438,20 @@ export default function RoomScreen() {
         </View>
       )}
 
-      {/* P1: Control Bar (portrait only) */}
-      <ControlBar
-        isLandscape={isLandscape}
-        onExitPress={() => navigation.goBack()}
-        onChatPress={() => setActiveDrawer('chat')}
-        onGiftsPress={() => setActiveDrawer('gifts')}
-        onLeaderboardPress={() => setActiveDrawer('leaderboard')}
-        onStatsPress={() => setActiveDrawer('stats')}
-        onOptionsPress={() => setActiveDrawer('options')}
-        bottomInset={insets.bottom}
-        rightInset={insets.right}
-      />
+      {/* P1: Control Bar (hidden in fullscreen mode) */}
+      {!fullscreenTileId && (
+        <ControlBar
+          isLandscape={isLandscape}
+          onExitPress={() => navigation.goBack()}
+          onChatPress={() => setActiveDrawer('chat')}
+          onGiftsPress={() => setActiveDrawer('gifts')}
+          onLeaderboardPress={() => setActiveDrawer('leaderboard')}
+          onStatsPress={() => setActiveDrawer('stats')}
+          onOptionsPress={() => setActiveDrawer('options')}
+          bottomInset={insets.bottom}
+          rightInset={insets.right}
+        />
+      )}
 
       {/* P1: Bottom Drawer Panels */}
       <BottomDrawer
