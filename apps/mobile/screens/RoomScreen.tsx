@@ -1224,20 +1224,15 @@ export default function RoomScreen() {
       try {
         const { data: profile, error } = await supabase
           .from('profiles')
-          .select('username, avatar_url')
+          .select('username, avatar_url, follower_count')
           .eq('id', user.id)
           .single();
 
         if (error) throw error;
 
-        // Get follower/following counts
-        const { count: followerCount } = await supabase
-          .from('followers')
-          .select('*', { count: 'exact', head: true })
-          .eq('following_id', user.id);
-
+        // Get following count
         const { count: followingCount } = await supabase
-          .from('followers')
+          .from('follows')
           .select('*', { count: 'exact', head: true })
           .eq('follower_id', user.id);
 
@@ -1248,7 +1243,7 @@ export default function RoomScreen() {
           avatarUrl: profile?.avatar_url || null,
           isLocal: true,
           slotIndex,
-          followerCount: followerCount || 0,
+          followerCount: profile?.follower_count || 0,
           followingCount: followingCount || 0,
           isFollowing: false,
         });
@@ -1295,10 +1290,10 @@ export default function RoomScreen() {
       console.log('[MINI_PROFILE] Fetching profile for:', { participantIdentity: participant.identity, userId });
 
       try {
-        // Fetch profile data
+        // Fetch profile data with cached follower count
         const { data: profile, error: profileError } = await supabase
           .from('profiles')
-          .select('username, avatar_url')
+          .select('username, avatar_url, follower_count')
           .eq('id', userId)
           .single();
 
@@ -1321,14 +1316,9 @@ export default function RoomScreen() {
           return;
         }
 
-        // Get follower/following counts
-        const { count: followerCount } = await supabase
-          .from('followers')
-          .select('*', { count: 'exact', head: true })
-          .eq('following_id', userId);
-
+        // Get following count
         const { count: followingCount } = await supabase
-          .from('followers')
+          .from('follows')
           .select('*', { count: 'exact', head: true })
           .eq('follower_id', userId);
 
@@ -1336,11 +1326,11 @@ export default function RoomScreen() {
         let isFollowing = false;
         if (user) {
           const { data: followData } = await supabase
-            .from('followers')
+            .from('follows')
             .select('id')
             .eq('follower_id', user.id)
-            .eq('following_id', userId)
-            .single();
+            .eq('followee_id', userId)
+            .maybeSingle();
           isFollowing = !!followData;
         }
 
@@ -1351,7 +1341,7 @@ export default function RoomScreen() {
           avatarUrl: profile?.avatar_url || null,
           isLocal: false,
           slotIndex,
-          followerCount: followerCount || 0,
+          followerCount: profile?.follower_count || 0,
           followingCount: followingCount || 0,
           isFollowing,
         });
@@ -2177,28 +2167,26 @@ export default function RoomScreen() {
             if (miniProfileData.isFollowing) {
               // Unfollow
               const { error } = await supabase
-                .from('followers')
+                .from('follows')
                 .delete()
                 .eq('follower_id', user.id)
-                .eq('following_id', miniProfileData.userId);
+                .eq('followee_id', miniProfileData.userId);
 
               if (error) throw error;
 
-              setMiniProfileData(prev => prev ? { ...prev, isFollowing: false, followerCount: prev.followerCount - 1 } : null);
-              Alert.alert('Success', 'Unfollowed');
+              setMiniProfileData(prev => prev ? { ...prev, isFollowing: false, followerCount: Math.max(0, prev.followerCount - 1) } : null);
             } else {
               // Follow
               const { error } = await supabase
-                .from('followers')
+                .from('follows')
                 .insert({
                   follower_id: user.id,
-                  following_id: miniProfileData.userId,
+                  followee_id: miniProfileData.userId,
                 });
 
               if (error) throw error;
 
               setMiniProfileData(prev => prev ? { ...prev, isFollowing: true, followerCount: prev.followerCount + 1 } : null);
-              Alert.alert('Success', 'Following');
             }
           } catch (error) {
             console.error('[FOLLOW] Error:', error);
@@ -2208,12 +2196,16 @@ export default function RoomScreen() {
         onViewProfile={() => {
           if (!miniProfileData) return;
           setMiniProfileVisible(false);
-          navigation.navigate('Profile', { userId: miniProfileData.userId });
+          navigation.navigate('ProfileViewScreen', { userId: miniProfileData.userId });
         }}
         onMessage={() => {
           if (!miniProfileData) return;
           setMiniProfileVisible(false);
-          navigation.navigate('Chat', { userId: miniProfileData.userId, username: miniProfileData.username });
+          navigation.navigate('IMThreadScreen', { 
+            recipientId: miniProfileData.userId, 
+            recipientUsername: miniProfileData.username,
+            recipientAvatar: miniProfileData.avatarUrl 
+          });
         }}
         onReport={() => {
           if (!miniProfileData) return;
@@ -2228,18 +2220,19 @@ export default function RoomScreen() {
                 onPress: async () => {
                   try {
                     const { error } = await supabase
-                      .from('reports')
+                      .from('user_reports')
                       .insert({
                         reporter_id: user?.id,
-                        reported_user_id: miniProfileData.userId,
+                        reported_id: miniProfileData.userId,
                         reason: 'inappropriate_behavior',
-                        context: 'room',
+                        report_type: 'user',
+                        status: 'pending',
                       });
 
                     if (error) throw error;
 
                     setMiniProfileVisible(false);
-                    Alert.alert('Success', 'User reported');
+                    Alert.alert('Reported', 'Thank you for your report');
                   } catch (error) {
                     console.error('[REPORT] Error:', error);
                     Alert.alert('Error', 'Failed to report user');
@@ -2261,17 +2254,15 @@ export default function RoomScreen() {
                 style: 'destructive',
                 onPress: async () => {
                   try {
-                    const { error } = await supabase
-                      .from('blocked_users')
-                      .insert({
-                        blocker_id: user?.id,
-                        blocked_id: miniProfileData.userId,
-                      });
+                    const { error } = await supabase.rpc('block_user', {
+                      p_blocker_id: user?.id,
+                      p_blocked_id: miniProfileData.userId,
+                    });
 
                     if (error) throw error;
 
                     setMiniProfileVisible(false);
-                    Alert.alert('User blocked');
+                    Alert.alert('Blocked', 'User has been blocked');
                   } catch (error) {
                     console.error('[BLOCK] Error:', error);
                     Alert.alert('Error', 'Failed to block user');
