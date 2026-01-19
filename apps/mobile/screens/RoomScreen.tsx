@@ -1039,14 +1039,24 @@ export default function RoomScreen() {
         const videoTrack = isLocal ? localVideoTrack : participant?.videoTrack;
         
         if (videoTrack) {
-          // Get video dimensions (most cameras are 16:9 or 9:16)
-          const dimensions = (videoTrack as any).dimensions;
-          const isVideoPortrait = dimensions ? dimensions.height > dimensions.width : true;
+          // Try to get dimensions from MediaStreamTrack
+          const mediaStreamTrack = (videoTrack as any).mediaStreamTrack || (videoTrack as any)._mediaStreamTrack;
           
-          // Lock to matching orientation
+          let isVideoPortrait = true; // Default to portrait
+          
+          if (mediaStreamTrack && mediaStreamTrack.getSettings) {
+            const settings = mediaStreamTrack.getSettings();
+            if (settings.width && settings.height) {
+              isVideoPortrait = settings.height > settings.width;
+            }
+          }
+          
+          // Lock to matching orientation - FORCE viewer to rotate device
           if (isVideoPortrait) {
+            // Video is portrait → force portrait
             await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
           } else {
+            // Video is landscape → force landscape
             await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE);
           }
         }
@@ -1441,7 +1451,7 @@ export default function RoomScreen() {
           {/* Fullscreen indicator */}
           <View style={styles.fullscreenIndicator}>
             <Text style={styles.fullscreenIndicatorText}>
-              {fullscreenIsLocal ? 'YOU' : fullscreenParticipant?.identity || 'Participant'}
+              {fullscreenIsLocal ? 'YOU' : 'Viewing'}
             </Text>
             <Text style={styles.fullscreenHint}>Double-tap to exit</Text>
           </View>
