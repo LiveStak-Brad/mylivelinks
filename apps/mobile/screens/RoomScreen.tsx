@@ -58,9 +58,167 @@ interface GridConfig {
 // Drawer panel types
 type DrawerPanel = 'none' | 'chat' | 'gifts' | 'leaderboard' | 'stats' | 'options';
 
+// Mini profile modal state
+interface MiniProfileData {
+  participantId: string;
+  displayName: string;
+  isLocal: boolean;
+  slotIndex: number;
+}
+
 // Volume map for per-participant volume control
 interface VolumeMap {
   [identity: string]: number; // 0-100
+}
+
+// ============================================================================
+// MINI PROFILE MODAL COMPONENT
+// ============================================================================
+
+interface MiniProfileModalProps {
+  visible: boolean;
+  profileData: MiniProfileData | null;
+  onClose: () => void;
+  onFollow: () => void;
+  onViewProfile: () => void;
+  onMessage: () => void;
+  onReport: () => void;
+  onBlock: () => void;
+  onReplace: () => void;
+  bottomInset: number;
+}
+
+function MiniProfileModal({
+  visible,
+  profileData,
+  onClose,
+  onFollow,
+  onViewProfile,
+  onMessage,
+  onReport,
+  onBlock,
+  onReplace,
+  bottomInset,
+}: MiniProfileModalProps) {
+  const [isFollowing, setIsFollowing] = useState(false);
+  const [followerCount, setFollowerCount] = useState(0);
+  const [followingCount, setFollowingCount] = useState(0);
+
+  if (!visible || !profileData) return null;
+
+  const displayName = profileData.isLocal ? 'You' : profileData.displayName;
+
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="fade"
+      onRequestClose={onClose}
+      statusBarTranslucent
+    >
+      <Pressable style={styles.miniProfileOverlay} onPress={onClose}>
+        <Pressable 
+          style={[styles.miniProfileContainer, { paddingBottom: Math.max(bottomInset, 16) }]} 
+          onPress={e => e.stopPropagation()}
+        >
+          {/* Header */}
+          <View style={styles.miniProfileHeader}>
+            <View style={styles.miniProfileAvatar}>
+              <Ionicons name="person-circle" size={60} color="#4a90d9" />
+            </View>
+            <View style={styles.miniProfileInfo}>
+              <Text style={styles.miniProfileName}>{displayName}</Text>
+              <Text style={styles.miniProfileSlot}>Slot {profileData.slotIndex + 1}</Text>
+              
+              {/* Stats */}
+              <View style={styles.miniProfileStats}>
+                <View style={styles.miniProfileStat}>
+                  <Text style={styles.miniProfileStatNumber}>{followerCount}</Text>
+                  <Text style={styles.miniProfileStatLabel}>Followers</Text>
+                </View>
+                <View style={styles.miniProfileStat}>
+                  <Text style={styles.miniProfileStatNumber}>{followingCount}</Text>
+                  <Text style={styles.miniProfileStatLabel}>Following</Text>
+                </View>
+              </View>
+            </View>
+          </View>
+
+          {/* Actions */}
+          {!profileData.isLocal && (
+            <View style={styles.miniProfileActions}>
+              {/* Follow Button */}
+              <TouchableOpacity 
+                style={[styles.miniProfileButton, styles.miniProfileButtonPrimary]}
+                onPress={() => {
+                  setIsFollowing(!isFollowing);
+                  onFollow();
+                }}
+              >
+                <Ionicons name={isFollowing ? "checkmark-circle" : "person-add"} size={20} color="#fff" />
+                <Text style={styles.miniProfileButtonText}>
+                  {isFollowing ? 'Following' : 'Follow'}
+                </Text>
+              </TouchableOpacity>
+
+              {/* View Profile */}
+              <TouchableOpacity 
+                style={styles.miniProfileButton}
+                onPress={onViewProfile}
+              >
+                <Ionicons name="person" size={20} color="#fff" />
+                <Text style={styles.miniProfileButtonText}>Profile</Text>
+              </TouchableOpacity>
+
+              {/* Message */}
+              <TouchableOpacity 
+                style={styles.miniProfileButton}
+                onPress={onMessage}
+              >
+                <Ionicons name="chatbubble" size={20} color="#fff" />
+                <Text style={styles.miniProfileButtonText}>Message</Text>
+              </TouchableOpacity>
+
+              {/* Replace */}
+              <TouchableOpacity 
+                style={styles.miniProfileButton}
+                onPress={onReplace}
+              >
+                <Ionicons name="swap-horizontal" size={20} color="#fff" />
+                <Text style={styles.miniProfileButtonText}>Replace</Text>
+              </TouchableOpacity>
+
+              {/* Report */}
+              <TouchableOpacity 
+                style={[styles.miniProfileButton, styles.miniProfileButtonDanger]}
+                onPress={onReport}
+              >
+                <Ionicons name="flag" size={20} color="#ff6b6b" />
+                <Text style={[styles.miniProfileButtonText, { color: '#ff6b6b' }]}>Report</Text>
+              </TouchableOpacity>
+
+              {/* Block */}
+              <TouchableOpacity 
+                style={[styles.miniProfileButton, styles.miniProfileButtonDanger]}
+                onPress={onBlock}
+              >
+                <Ionicons name="ban" size={20} color="#ff6b6b" />
+                <Text style={[styles.miniProfileButtonText, { color: '#ff6b6b' }]}>Block</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {/* Close Button */}
+          <TouchableOpacity 
+            style={styles.miniProfileCloseButton}
+            onPress={onClose}
+          >
+            <Text style={styles.miniProfileCloseText}>Close</Text>
+          </TouchableOpacity>
+        </Pressable>
+      </Pressable>
+    </Modal>
+  );
 }
 
 // ============================================================================
@@ -425,8 +583,16 @@ const VideoTile = React.memo(({
       onToggleFullscreen(tileId, participant, isLocalTile || false);
       lastTapRef.current = 0; // Reset
     } else {
-      // Single tap → currently does nothing in grid view
+      // Single tap → Show mini profile
       lastTapRef.current = now;
+      // Delay to allow double-tap to cancel this
+      setTimeout(() => {
+        if (lastTapRef.current === now) {
+          // Still a single tap after delay
+          console.log('[TILE_SINGLE_TAP] Show mini profile for:', participantId);
+          onTilePress(slotIndex, participant);
+        }
+      }, 300);
     }
   };
   
@@ -849,6 +1015,10 @@ export default function RoomScreen() {
   // P1: Control bar and drawer state
   const [activeDrawer, setActiveDrawer] = useState<DrawerPanel>('none');
   
+  // Mini profile modal state
+  const [miniProfileVisible, setMiniProfileVisible] = useState(false);
+  const [miniProfileData, setMiniProfileData] = useState<MiniProfileData | null>(null);
+  
   // P2: Tile action sheet state
   const [tileActionTarget, setTileActionTarget] = useState<{
     slotIndex: number;
@@ -1037,20 +1207,19 @@ export default function RoomScreen() {
     }
   }, [user, isPublishing, updateRoomPresence]);
 
-  // Handle tile press - empty slot = join (with confirmation), occupied = show action sheet (P2)
+  // Handle tile press - empty slot = join (with confirmation), occupied = show mini profile
   const handleTilePress = useCallback((slotIndex: number, participant: Participant | null) => {
     const isLocalTile = slotIndex === 0 && localVideoTrack;
 
     if (isLocalTile) {
-      setTileActionTarget({
-        slotIndex,
-        participant: {
-          id: 'local',
-          identity: 'You',
-          videoTrack: localVideoTrack,
-        },
+      // Show mini profile for local user
+      setMiniProfileData({
+        participantId: 'local',
+        displayName: 'You',
         isLocal: true,
+        slotIndex,
       });
+      setMiniProfileVisible(true);
       return;
     }
 
@@ -1082,7 +1251,15 @@ export default function RoomScreen() {
         { cancelable: true }
       );
     } else {
-      setTileActionTarget({ slotIndex, participant, isLocal: false });
+      // Show mini profile for remote participant
+      const displayName = participant.identity.replace(/^u_/, '').split(':')[0] || 'Unknown';
+      setMiniProfileData({
+        participantId: participant.identity,
+        displayName,
+        isLocal: false,
+        slotIndex,
+      });
+      setMiniProfileVisible(true);
     }
   }, [user, isPublishing, startPublishing, localVideoTrack]);
 
@@ -1888,6 +2065,44 @@ export default function RoomScreen() {
         <OptionsContent />
       </BottomDrawer>
 
+      {/* Mini Profile Modal */}
+      <MiniProfileModal
+        visible={miniProfileVisible}
+        profileData={miniProfileData}
+        onClose={() => setMiniProfileVisible(false)}
+        onFollow={() => {
+          console.log('[MINI_PROFILE] Follow:', miniProfileData?.participantId);
+          Alert.alert('Follow', 'Follow functionality will be implemented');
+          setMiniProfileVisible(false);
+        }}
+        onViewProfile={() => {
+          console.log('[MINI_PROFILE] View profile:', miniProfileData?.participantId);
+          Alert.alert('Profile', 'Profile view will be implemented');
+          setMiniProfileVisible(false);
+        }}
+        onMessage={() => {
+          console.log('[MINI_PROFILE] Message:', miniProfileData?.participantId);
+          Alert.alert('Message', 'Messaging will be implemented');
+          setMiniProfileVisible(false);
+        }}
+        onReport={() => {
+          console.log('[MINI_PROFILE] Report:', miniProfileData?.participantId);
+          Alert.alert('Report', 'Report functionality will be implemented');
+          setMiniProfileVisible(false);
+        }}
+        onBlock={() => {
+          console.log('[MINI_PROFILE] Block:', miniProfileData?.participantId);
+          Alert.alert('Block', 'Block functionality will be implemented');
+          setMiniProfileVisible(false);
+        }}
+        onReplace={() => {
+          console.log('[MINI_PROFILE] Replace:', miniProfileData?.participantId);
+          Alert.alert('Replace', 'Replace functionality will be implemented');
+          setMiniProfileVisible(false);
+        }}
+        bottomInset={insets.bottom}
+      />
+
       {/* P2: Tile Action Sheet */}
       <TileActionSheet
         visible={tileActionTarget !== null}
@@ -2403,6 +2618,97 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   // P2: Tile Action Sheet styles
+  // Mini Profile Modal styles
+  miniProfileOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  miniProfileContainer: {
+    backgroundColor: '#1a1a1a',
+    borderRadius: 16,
+    padding: 20,
+    width: '85%',
+    maxWidth: 400,
+  },
+  miniProfileHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  miniProfileAvatar: {
+    marginRight: 16,
+  },
+  miniProfileInfo: {
+    flex: 1,
+  },
+  miniProfileName: {
+    color: '#fff',
+    fontSize: 20,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  miniProfileSlot: {
+    color: '#888',
+    fontSize: 14,
+    marginBottom: 12,
+  },
+  miniProfileStats: {
+    flexDirection: 'row',
+    gap: 20,
+  },
+  miniProfileStat: {
+    alignItems: 'center',
+  },
+  miniProfileStatNumber: {
+    color: '#4a90d9',
+    fontSize: 18,
+    fontWeight: '600',
+  },
+  miniProfileStatLabel: {
+    color: '#888',
+    fontSize: 12,
+    marginTop: 2,
+  },
+  miniProfileActions: {
+    gap: 10,
+  },
+  miniProfileButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#333',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    gap: 8,
+  },
+  miniProfileButtonPrimary: {
+    backgroundColor: '#4a90d9',
+  },
+  miniProfileButtonDanger: {
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: '#ff6b6b',
+  },
+  miniProfileButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  miniProfileCloseButton: {
+    marginTop: 16,
+    paddingVertical: 12,
+    alignItems: 'center',
+    backgroundColor: '#2a2a2a',
+    borderRadius: 8,
+  },
+  miniProfileCloseText: {
+    color: '#888',
+    fontSize: 14,
+    fontWeight: '600',
+  },
   actionSheetContainer: {
     backgroundColor: '#1a1a1a',
     borderTopLeftRadius: 20,
