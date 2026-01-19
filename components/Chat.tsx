@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback, memo } from 'react';
 import { createClient } from '@/lib/supabase';
 import type { GifterStatus } from '@/lib/gifter-status';
 import { fetchGifterStatuses } from '@/lib/gifter-status-client';
@@ -11,6 +11,9 @@ import { getAvatarUrl } from '@/lib/defaultAvatar';
 import SafeRichText from '@/components/SafeRichText';
 import LiveAvatar from '@/components/LiveAvatar';
 import { trackLiveComment } from '@/lib/trending-hooks';
+
+// Module-level singleton to prevent duplicate subscriptions across React Strict Mode re-renders
+const activeChatSubscriptions = new Map<string, { channel: any; refCount: number }>();
 
 interface ChatMessage {
   id: number | string;
@@ -34,8 +37,15 @@ interface ChatProps {
   readOnly?: boolean; // If true, hide input box
 }
 
-export default function Chat({ roomSlug, liveStreamId, onGiftClick, onShareClick, onSettingsClick, readOnly = false }: ChatProps) {
-  console.log('[CHAT] 🎬 Component rendered with:', { roomSlug, liveStreamId, readOnly });
+function Chat({ roomSlug, liveStreamId, onGiftClick, onShareClick, onSettingsClick, readOnly = false }: ChatProps) {
+  // CRITICAL: roomSlug must be in canonical format (underscores, e.g., 'live_central')
+  // LiveRoom.tsx normalizes before passing to ensure single source of truth
+  // Validation: log error if roomSlug is missing when liveStreamId is also missing
+  useEffect(() => {
+    if (!roomSlug && !liveStreamId) {
+      console.error('[CHAT] ❌ CRITICAL: No roomSlug or liveStreamId provided - chat will not work');
+    }
+  }, [roomSlug, liveStreamId]);
   
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [newMessage, setNewMessage] = useState('');
@@ -59,8 +69,8 @@ export default function Chat({ roomSlug, liveStreamId, onGiftClick, onShareClick
   const shouldAutoScrollRef = useRef(true);
   // CRITICAL: Memoize Supabase client to prevent recreation on every render
   const supabase = useMemo(() => createClient(), []);
-  // CRITICAL: Track subscription to prevent duplicates
-  const subscriptionRef = useRef<{ channel: any; subscribed: boolean } | null>(null);
+  // CRITICAL: Track processed message IDs to prevent duplicate processing from multiple subscriptions
+  const processedMessageIdsRef = useRef<Set<number>>(new Set());
 
   useEffect(() => {
     // Get current user ID and profile
@@ -118,6 +128,12 @@ export default function Chat({ roomSlug, liveStreamId, onGiftClick, onShareClick
         throw new Error('Chat requires roomSlug or liveStreamId');
       }
 
+      console.log('[CHAT] 📥 LOADING MESSAGES:', {
+        roomSlug,
+        liveStreamId,
+        scope: roomSlug ? 'ROOM' : 'STREAM',
+      });
+
       // Build query with scope filter
       let query = supabase
         .from('chat_messages')
@@ -137,7 +153,9 @@ export default function Chat({ roomSlug, liveStreamId, onGiftClick, onShareClick
         `);
 
       // Apply scope filter (XOR: exactly one must be set)
+      // roomSlug is already in canonical format (underscores) from LiveRoom.tsx
       if (roomSlug) {
+        console.log('[CHAT] 🎯 Querying room_id =', roomSlug);
         query = query.eq('room_id', roomSlug).is('live_stream_id', null);
       } else if (liveStreamId) {
         query = query.eq('live_stream_id', liveStreamId).is('room_id', null);
@@ -208,7 +226,7 @@ export default function Chat({ roomSlug, liveStreamId, onGiftClick, onShareClick
           )
         `);
 
-      // Apply scope filter
+      // Apply scope filter - roomSlug is canonical format
       if (roomSlug) {
         fallbackQuery = fallbackQuery.eq('room_id', roomSlug).is('live_stream_id', null);
       } else if (liveStreamId) {
@@ -417,68 +435,94 @@ export default function Chat({ roomSlug, liveStreamId, onGiftClick, onShareClick
       return;
     }
 
-    // Prevent duplicate subscriptions
-    if (subscriptionRef.current?.subscribed) {
-      console.log('[CHAT] 🧹 Removing old subscription before creating new one');
-      supabase.removeChannel(subscriptionRef.current.channel);
-      subscriptionRef.current = null;
-    }
-
-    const filterString = roomSlug 
-      ? `room_id=eq.${roomSlug}`
-      : `live_stream_id=eq.${liveStreamId}`;
+    const currentRoomKey = roomSlug || String(liveStreamId);
     
-    console.log('[CHAT] 🔌 Creating realtime subscription', { 
-      roomSlug, 
-      liveStreamId, 
-      channelName: `chat-messages-${roomSlug || liveStreamId}`,
-      filter: filterString 
+    console.log('[CHAT] 🔌 SUBSCRIPTION SETUP:', {
+      roomSlug,
+      liveStreamId,
+      currentRoomKey,
+      scope: roomSlug ? 'ROOM' : 'STREAM',
+      existingSubscriptions: Array.from(activeChatSubscriptions.keys()),
     });
     
-    // Subscribe to new messages (realtime) with scope filter
-    const channel = supabase
-      .channel(`chat-messages-${roomSlug || liveStreamId}`)
-      .on(
+    // CRITICAL: Use module-level singleton to prevent duplicate subscriptions
+    const existingSub = activeChatSubscriptions.get(currentRoomKey);
+    if (existingSub) {
+      console.log('[CHAT] ♻️ REUSING existing subscription for:', currentRoomKey, 'refCount:', existingSub.refCount + 1);
+      existingSub.refCount++;
+      return () => {
+        existingSub.refCount--;
+        console.log('[CHAT] 📉 Decrementing refCount for:', currentRoomKey, 'new refCount:', existingSub.refCount);
+        if (existingSub.refCount <= 0) {
+          console.log('[CHAT] 🧹 REMOVING subscription for:', currentRoomKey);
+          supabase.removeChannel(existingSub.channel);
+          activeChatSubscriptions.delete(currentRoomKey);
+        }
+      };
+    }
+
+    const channelName = `chat-messages-${currentRoomKey}`;
+    
+    console.log('[CHAT] ✨ CREATING NEW subscription:', channelName, 'for room_id:', currentRoomKey);
+    
+    const channel = supabase.channel(channelName);
+    
+    // Register in module-level singleton
+    activeChatSubscriptions.set(currentRoomKey, { channel, refCount: 1 });
+    
+    channel.on(
         'postgres_changes',
         {
           event: 'INSERT',
           schema: 'public',
           table: 'chat_messages',
-          filter: filterString,
         },
         (payload: any) => {
-          console.log('[CHAT] 📨 Realtime event triggered!', { 
-            hasPayload: !!payload, 
-            hasNew: !!payload?.new,
-            payload: payload?.new 
-          });
+          const newMsg = payload?.new as any;
           
-          // Add new message immediately via realtime - use ref to avoid stale closure
-          if (payload?.new) {
-            console.log('[CHAT] ✅ Loading message with profile...');
-            loadMessageWithProfileRef.current(payload.new as any);
-          } else {
+          // Client-side filter: only process messages for this room/stream
+          if (!newMsg) {
             console.warn('[CHAT] ⚠️ Received event but no payload.new');
+            return;
           }
+          
+          // CRITICAL: Deduplicate - skip if we've already processed this message ID
+          if (processedMessageIdsRef.current.has(newMsg.id)) {
+            return; // Already processed by another subscription
+          }
+          processedMessageIdsRef.current.add(newMsg.id);
+          // Keep set from growing indefinitely - remove old IDs after 1000 entries
+          if (processedMessageIdsRef.current.size > 1000) {
+            const idsArray = Array.from(processedMessageIdsRef.current);
+            processedMessageIdsRef.current = new Set(idsArray.slice(-500));
+          }
+          
+          // Check if message belongs to this chat scope
+          const msgRoomId = newMsg.room_id;
+          const msgStreamId = newMsg.live_stream_id;
+          
+          const matchesRoom = roomSlug && msgRoomId === roomSlug;
+          const matchesStream = liveStreamId && msgStreamId === liveStreamId;
+          
+          if (!matchesRoom && !matchesStream) {
+            // Message is for a different room/stream, ignore
+            return;
+          }
+          
+          loadMessageWithProfileRef.current(newMsg);
         }
       )
-      .subscribe((status: string) => {
-        if (status === 'SUBSCRIBED') {
-          console.log('[CHAT] ✅ Realtime subscription active - ONE subscription exists');
-          subscriptionRef.current = { channel, subscribed: true };
-        } else if (status === 'CHANNEL_ERROR') {
-          console.error('[CHAT] ❌ Realtime subscription error:', status);
-          subscriptionRef.current = null;
-        } else {
-          console.log('[CHAT] 📡 Subscription status:', status);
-        }
-      });
+      .subscribe();
 
     return () => {
-      console.log('[CHAT] 🧹 Cleaning up realtime subscription');
-      if (subscriptionRef.current?.channel) {
-        supabase.removeChannel(subscriptionRef.current.channel);
-        subscriptionRef.current = null;
+      // Decrement ref count and only remove if no more refs
+      const sub = activeChatSubscriptions.get(currentRoomKey);
+      if (sub) {
+        sub.refCount--;
+        if (sub.refCount <= 0) {
+          supabase.removeChannel(channel);
+          activeChatSubscriptions.delete(currentRoomKey);
+        }
       }
     };
   }, [supabase, roomSlug, liveStreamId]); // Depend on roomSlug and liveStreamId to recreate subscription
@@ -605,6 +649,7 @@ export default function Chat({ roomSlug, liveStreamId, onGiftClick, onShareClick
         };
         
         // Set ONLY the appropriate scope field (don't set both!)
+        // roomSlug is already in canonical format from LiveRoom.tsx
         if (liveStreamId) {
           insertData.live_stream_id = liveStreamId;
           insertData.room_id = null;
@@ -905,4 +950,6 @@ export default function Chat({ roomSlug, liveStreamId, onGiftClick, onShareClick
   );
 }
 
-
+// Wrap in React.memo to prevent re-renders when parent (LiveRoom) re-renders
+// Only re-render if props actually change
+export default memo(Chat);

@@ -112,10 +112,15 @@ export default function LiveRoom({
   layoutStyle = 'twitch-viewer',
   roomConfig = DEFAULT_ROOM_CONFIG,
 }: LiveRoomProps = {}) {
-  const scopeRoomId = useMemo(
-    () => roomConfig.contentRoomId || roomConfig.roomId || 'live-central',
-    [roomConfig.contentRoomId, roomConfig.roomId]
-  );
+  // CRITICAL: Normalize room IDs to use underscores for consistency across chat, presence, and database
+  // This ensures Chat.tsx receives the canonical format and prevents duplicate subscriptions
+  const scopeRoomId = useMemo(() => {
+    const raw = roomConfig.contentRoomId || roomConfig.roomId || 'live-central';
+    // Normalize live-central to live_central (matches database room_id format)
+    if (raw === 'live-central') return 'live_central';
+    return raw;
+  }, [roomConfig.contentRoomId, roomConfig.roomId]);
+  
   const presenceRoomId = useMemo(() => {
     const raw = roomConfig.roomId || roomConfig.contentRoomId || 'live_central';
     // LiveCentral historically used both "live-central" and "live_central".
