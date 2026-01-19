@@ -1,10 +1,11 @@
 ﻿import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { View, StyleSheet, Text, ActivityIndicator, useWindowDimensions, Pressable, Modal, TouchableOpacity, Alert, Platform, StatusBar as RNStatusBar, Animated, PanResponder, Dimensions, ScrollView, TextInput, NativeModules } from 'react-native';
+import { View, StyleSheet, Text, ActivityIndicator, useWindowDimensions, Pressable, Modal, TouchableOpacity, Alert, Platform, StatusBar as RNStatusBar, Animated, PanResponder, Dimensions, ScrollView, TextInput, NativeModules, Image } from 'react-native';
 import Slider from '@react-native-community/slider';
 import { StatusBar } from 'expo-status-bar';
 import Constants from 'expo-constants';
 import { Ionicons } from '@expo/vector-icons';
 import { useRoute, RouteProp, useFocusEffect, useNavigation } from '@react-navigation/native';
+import type { NavigationProp } from '@react-navigation/native';
 import * as ScreenOrientation from 'expo-screen-orientation';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Room, RoomEvent, RemoteParticipant, RemoteTrackPublication, Track, RemoteTrack } from 'livekit-client';
@@ -61,9 +62,14 @@ type DrawerPanel = 'none' | 'chat' | 'gifts' | 'leaderboard' | 'stats' | 'option
 // Mini profile modal state
 interface MiniProfileData {
   participantId: string;
-  displayName: string;
+  userId: string;
+  username: string;
+  avatarUrl: string | null;
   isLocal: boolean;
   slotIndex: number;
+  followerCount: number;
+  followingCount: number;
+  isFollowing: boolean;
 }
 
 // Volume map for per-participant volume control
@@ -100,13 +106,9 @@ function MiniProfileModal({
   onReplace,
   bottomInset,
 }: MiniProfileModalProps) {
-  const [isFollowing, setIsFollowing] = useState(false);
-  const [followerCount, setFollowerCount] = useState(0);
-  const [followingCount, setFollowingCount] = useState(0);
-
   if (!visible || !profileData) return null;
 
-  const displayName = profileData.isLocal ? 'You' : profileData.displayName;
+  const displayName = profileData.isLocal ? 'You' : profileData.username;
 
   return (
     <Modal
@@ -124,7 +126,14 @@ function MiniProfileModal({
           {/* Header */}
           <View style={styles.miniProfileHeader}>
             <View style={styles.miniProfileAvatar}>
-              <Ionicons name="person-circle" size={60} color="#4a90d9" />
+              {profileData.avatarUrl ? (
+                <Image 
+                  source={{ uri: profileData.avatarUrl }} 
+                  style={{ width: 60, height: 60, borderRadius: 30 }}
+                />
+              ) : (
+                <Ionicons name="person-circle" size={60} color="#4a90d9" />
+              )}
             </View>
             <View style={styles.miniProfileInfo}>
               <Text style={styles.miniProfileName}>{displayName}</Text>
@@ -133,11 +142,11 @@ function MiniProfileModal({
               {/* Stats */}
               <View style={styles.miniProfileStats}>
                 <View style={styles.miniProfileStat}>
-                  <Text style={styles.miniProfileStatNumber}>{followerCount}</Text>
+                  <Text style={styles.miniProfileStatNumber}>{profileData.followerCount}</Text>
                   <Text style={styles.miniProfileStatLabel}>Followers</Text>
                 </View>
                 <View style={styles.miniProfileStat}>
-                  <Text style={styles.miniProfileStatNumber}>{followingCount}</Text>
+                  <Text style={styles.miniProfileStatNumber}>{profileData.followingCount}</Text>
                   <Text style={styles.miniProfileStatLabel}>Following</Text>
                 </View>
               </View>
@@ -149,15 +158,12 @@ function MiniProfileModal({
             <View style={styles.miniProfileActions}>
               {/* Follow Button */}
               <TouchableOpacity 
-                style={[styles.miniProfileButton, styles.miniProfileButtonPrimary]}
-                onPress={() => {
-                  setIsFollowing(!isFollowing);
-                  onFollow();
-                }}
+                style={[styles.miniProfileButton, profileData.isFollowing ? styles.miniProfileButtonSecondary : styles.miniProfileButtonPrimary]}
+                onPress={onFollow}
               >
-                <Ionicons name={isFollowing ? "checkmark-circle" : "person-add"} size={20} color="#fff" />
+                <Ionicons name={profileData.isFollowing ? "checkmark-circle" : "person-add"} size={20} color="#fff" />
                 <Text style={styles.miniProfileButtonText}>
-                  {isFollowing ? 'Following' : 'Follow'}
+                  {profileData.isFollowing ? 'Following' : 'Follow'}
                 </Text>
               </TouchableOpacity>
 
@@ -167,7 +173,7 @@ function MiniProfileModal({
                 onPress={onViewProfile}
               >
                 <Ionicons name="person" size={20} color="#fff" />
-                <Text style={styles.miniProfileButtonText}>Profile</Text>
+                <Text style={styles.miniProfileButtonText}>View Profile</Text>
               </TouchableOpacity>
 
               {/* Message */}
@@ -844,7 +850,7 @@ function GridContainer({
 
 export default function RoomScreen() {
   const route = useRoute<RoomScreenRouteProp>();
-  const navigation = useNavigation();
+  const navigation = useNavigation<NavigationProp<any>>();
   const { user } = useAuth();
   const insets = useSafeAreaInsets();
   
@@ -1208,18 +1214,48 @@ export default function RoomScreen() {
   }, [user, isPublishing, updateRoomPresence]);
 
   // Handle tile press - empty slot = join (with confirmation), occupied = show mini profile
-  const handleTilePress = useCallback((slotIndex: number, participant: Participant | null) => {
+  const handleTilePress = useCallback(async (slotIndex: number, participant: Participant | null) => {
     const isLocalTile = slotIndex === 0 && localVideoTrack;
 
     if (isLocalTile) {
-      // Show mini profile for local user
-      setMiniProfileData({
-        participantId: 'local',
-        displayName: 'You',
-        isLocal: true,
-        slotIndex,
-      });
-      setMiniProfileVisible(true);
+      // Fetch current user's profile data
+      if (!user) return;
+      
+      try {
+        const { data: profile, error } = await supabase
+          .from('profiles')
+          .select('username, avatar_url')
+          .eq('id', user.id)
+          .single();
+
+        if (error) throw error;
+
+        // Get follower/following counts
+        const { count: followerCount } = await supabase
+          .from('followers')
+          .select('*', { count: 'exact', head: true })
+          .eq('following_id', user.id);
+
+        const { count: followingCount } = await supabase
+          .from('followers')
+          .select('*', { count: 'exact', head: true })
+          .eq('follower_id', user.id);
+
+        setMiniProfileData({
+          participantId: 'local',
+          userId: user.id,
+          username: profile?.username || user.email?.split('@')[0] || 'You',
+          avatarUrl: profile?.avatar_url || null,
+          isLocal: true,
+          slotIndex,
+          followerCount: followerCount || 0,
+          followingCount: followingCount || 0,
+          isFollowing: false,
+        });
+        setMiniProfileVisible(true);
+      } catch (error) {
+        console.error('[MINI_PROFILE] Error fetching local profile:', error);
+      }
       return;
     }
 
@@ -1251,15 +1287,79 @@ export default function RoomScreen() {
         { cancelable: true }
       );
     } else {
-      // Show mini profile for remote participant
-      const displayName = participant.identity.replace(/^u_/, '').split(':')[0] || 'Unknown';
-      setMiniProfileData({
-        participantId: participant.identity,
-        displayName,
-        isLocal: false,
-        slotIndex,
-      });
-      setMiniProfileVisible(true);
+      // Extract user ID from participant identity (format: u_<uuid>:platform:...)
+      const identityParts = participant.identity.split(':');
+      const userIdPart = identityParts[0]; // u_<uuid>
+      const userId = userIdPart.replace(/^u_/, ''); // remove u_ prefix
+
+      console.log('[MINI_PROFILE] Fetching profile for:', { participantIdentity: participant.identity, userId });
+
+      try {
+        // Fetch profile data
+        const { data: profile, error: profileError } = await supabase
+          .from('profiles')
+          .select('username, avatar_url')
+          .eq('id', userId)
+          .single();
+
+        if (profileError) {
+          console.error('[MINI_PROFILE] Profile fetch error:', profileError);
+          // Fall back to identity-based username
+          const fallbackUsername = identityParts[0].replace(/^u_/, '').substring(0, 8);
+          setMiniProfileData({
+            participantId: participant.identity,
+            userId,
+            username: fallbackUsername,
+            avatarUrl: null,
+            isLocal: false,
+            slotIndex,
+            followerCount: 0,
+            followingCount: 0,
+            isFollowing: false,
+          });
+          setMiniProfileVisible(true);
+          return;
+        }
+
+        // Get follower/following counts
+        const { count: followerCount } = await supabase
+          .from('followers')
+          .select('*', { count: 'exact', head: true })
+          .eq('following_id', userId);
+
+        const { count: followingCount } = await supabase
+          .from('followers')
+          .select('*', { count: 'exact', head: true })
+          .eq('follower_id', userId);
+
+        // Check if current user is following this person
+        let isFollowing = false;
+        if (user) {
+          const { data: followData } = await supabase
+            .from('followers')
+            .select('id')
+            .eq('follower_id', user.id)
+            .eq('following_id', userId)
+            .single();
+          isFollowing = !!followData;
+        }
+
+        setMiniProfileData({
+          participantId: participant.identity,
+          userId,
+          username: profile?.username || 'Unknown',
+          avatarUrl: profile?.avatar_url || null,
+          isLocal: false,
+          slotIndex,
+          followerCount: followerCount || 0,
+          followingCount: followingCount || 0,
+          isFollowing,
+        });
+        setMiniProfileVisible(true);
+      } catch (error) {
+        console.error('[MINI_PROFILE] Error fetching profile:', error);
+        Alert.alert('Error', 'Failed to load profile');
+      }
     }
   }, [user, isPublishing, startPublishing, localVideoTrack]);
 
@@ -2070,35 +2170,139 @@ export default function RoomScreen() {
         visible={miniProfileVisible}
         profileData={miniProfileData}
         onClose={() => setMiniProfileVisible(false)}
-        onFollow={() => {
-          console.log('[MINI_PROFILE] Follow:', miniProfileData?.participantId);
-          Alert.alert('Follow', 'Follow functionality will be implemented');
-          setMiniProfileVisible(false);
+        onFollow={async () => {
+          if (!user || !miniProfileData) return;
+
+          try {
+            if (miniProfileData.isFollowing) {
+              // Unfollow
+              const { error } = await supabase
+                .from('followers')
+                .delete()
+                .eq('follower_id', user.id)
+                .eq('following_id', miniProfileData.userId);
+
+              if (error) throw error;
+
+              setMiniProfileData(prev => prev ? { ...prev, isFollowing: false, followerCount: prev.followerCount - 1 } : null);
+              Alert.alert('Success', 'Unfollowed');
+            } else {
+              // Follow
+              const { error } = await supabase
+                .from('followers')
+                .insert({
+                  follower_id: user.id,
+                  following_id: miniProfileData.userId,
+                });
+
+              if (error) throw error;
+
+              setMiniProfileData(prev => prev ? { ...prev, isFollowing: true, followerCount: prev.followerCount + 1 } : null);
+              Alert.alert('Success', 'Following');
+            }
+          } catch (error) {
+            console.error('[FOLLOW] Error:', error);
+            Alert.alert('Error', 'Failed to update follow status');
+          }
         }}
         onViewProfile={() => {
-          console.log('[MINI_PROFILE] View profile:', miniProfileData?.participantId);
-          Alert.alert('Profile', 'Profile view will be implemented');
+          if (!miniProfileData) return;
           setMiniProfileVisible(false);
+          navigation.navigate('Profile', { userId: miniProfileData.userId });
         }}
         onMessage={() => {
-          console.log('[MINI_PROFILE] Message:', miniProfileData?.participantId);
-          Alert.alert('Message', 'Messaging will be implemented');
+          if (!miniProfileData) return;
           setMiniProfileVisible(false);
+          navigation.navigate('Chat', { userId: miniProfileData.userId, username: miniProfileData.username });
         }}
         onReport={() => {
-          console.log('[MINI_PROFILE] Report:', miniProfileData?.participantId);
-          Alert.alert('Report', 'Report functionality will be implemented');
-          setMiniProfileVisible(false);
+          if (!miniProfileData) return;
+          Alert.alert(
+            'Report User',
+            'Are you sure you want to report this user?',
+            [
+              { text: 'Cancel', style: 'cancel' },
+              {
+                text: 'Report',
+                style: 'destructive',
+                onPress: async () => {
+                  try {
+                    const { error } = await supabase
+                      .from('reports')
+                      .insert({
+                        reporter_id: user?.id,
+                        reported_user_id: miniProfileData.userId,
+                        reason: 'inappropriate_behavior',
+                        context: 'room',
+                      });
+
+                    if (error) throw error;
+
+                    setMiniProfileVisible(false);
+                    Alert.alert('Success', 'User reported');
+                  } catch (error) {
+                    console.error('[REPORT] Error:', error);
+                    Alert.alert('Error', 'Failed to report user');
+                  }
+                },
+              },
+            ]
+          );
         }}
         onBlock={() => {
-          console.log('[MINI_PROFILE] Block:', miniProfileData?.participantId);
-          Alert.alert('Block', 'Block functionality will be implemented');
-          setMiniProfileVisible(false);
+          if (!miniProfileData) return;
+          Alert.alert(
+            'Block User',
+            'Are you sure you want to block this user?',
+            [
+              { text: 'Cancel', style: 'cancel' },
+              {
+                text: 'Block',
+                style: 'destructive',
+                onPress: async () => {
+                  try {
+                    const { error } = await supabase
+                      .from('blocked_users')
+                      .insert({
+                        blocker_id: user?.id,
+                        blocked_id: miniProfileData.userId,
+                      });
+
+                    if (error) throw error;
+
+                    setMiniProfileVisible(false);
+                    Alert.alert('User blocked');
+                  } catch (error) {
+                    console.error('[BLOCK] Error:', error);
+                    Alert.alert('Error', 'Failed to block user');
+                  }
+                },
+              },
+            ]
+          );
         }}
         onReplace={() => {
-          console.log('[MINI_PROFILE] Replace:', miniProfileData?.participantId);
-          Alert.alert('Replace', 'Replace functionality will be implemented');
-          setMiniProfileVisible(false);
+          if (!miniProfileData || !user) return;
+
+          if (isPublishing) {
+            Alert.alert('Already Streaming', 'You are already streaming in this room.');
+            return;
+          }
+
+          Alert.alert(
+            'Replace Stream',
+            `Take over slot ${miniProfileData.slotIndex + 1} and go live?`,
+            [
+              { text: 'Cancel', style: 'cancel' },
+              {
+                text: 'Replace & Go Live',
+                onPress: () => {
+                  setMiniProfileVisible(false);
+                  startPublishing();
+                },
+              },
+            ]
+          );
         }}
         bottomInset={insets.bottom}
       />
@@ -2686,6 +2890,9 @@ const styles = StyleSheet.create({
   },
   miniProfileButtonPrimary: {
     backgroundColor: '#4a90d9',
+  },
+  miniProfileButtonSecondary: {
+    backgroundColor: '#666',
   },
   miniProfileButtonDanger: {
     backgroundColor: 'transparent',
