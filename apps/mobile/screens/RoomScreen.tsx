@@ -2196,15 +2196,15 @@ export default function RoomScreen() {
         onViewProfile={() => {
           if (!miniProfileData) return;
           setMiniProfileVisible(false);
-          navigation.navigate('ProfileViewScreen', { userId: miniProfileData.userId });
+          navigation.navigate('ProfileViewScreen', { profileId: miniProfileData.userId });
         }}
         onMessage={() => {
           if (!miniProfileData) return;
           setMiniProfileVisible(false);
           navigation.navigate('IMThreadScreen', { 
-            recipientId: miniProfileData.userId, 
-            recipientUsername: miniProfileData.username,
-            recipientAvatar: miniProfileData.avatarUrl 
+            otherProfileId: miniProfileData.userId, 
+            otherDisplayName: miniProfileData.username,
+            otherAvatarUrl: miniProfileData.avatarUrl 
           });
         }}
         onReport={() => {
@@ -2275,24 +2275,70 @@ export default function RoomScreen() {
         onReplace={() => {
           if (!miniProfileData || !user) return;
 
-          if (isPublishing) {
-            Alert.alert('Already Streaming', 'You are already streaming in this room.');
-            return;
+          // Get list of participants with active cameras (excluding the target and current user)
+          const activeStreamers = participants
+            .filter(p => 
+              p.identity !== miniProfileData.participantId &&
+              p.identity !== `u_${user.id}:mobile` &&
+              p.videoTrack
+            )
+            .map(p => ({
+              identity: p.identity,
+              displayName: p.identity.split(':')[0].replace(/^u_/, '').substring(0, 8),
+            }));
+
+          const options: Array<{ text: string; onPress: () => void }> = [
+            {
+              text: 'Replace & Go Live',
+              onPress: () => {
+                if (isPublishing) {
+                  Alert.alert('Already Streaming', 'You are already streaming in this room.');
+                  return;
+                }
+                setMiniProfileVisible(false);
+                startPublishing();
+              },
+            },
+          ];
+
+          // Add "Replace with..." options for each active streamer
+          if (activeStreamers.length > 0) {
+            activeStreamers.forEach((streamer: { identity: string; displayName: string }) => {
+              options.push({
+                text: `Replace with ${streamer.displayName}`,
+                onPress: () => {
+                  Alert.alert(
+                    'Replace Streamer',
+                    `This will move ${streamer.displayName} to slot ${miniProfileData.slotIndex + 1}. Continue?`,
+                    [
+                      { text: 'Cancel', style: 'cancel' },
+                      {
+                        text: 'Replace',
+                        onPress: () => {
+                          // TODO: Implement slot swap logic via RPC
+                          console.log('[REPLACE] Swap:', { 
+                            targetSlot: miniProfileData.slotIndex, 
+                            targetIdentity: miniProfileData.participantId,
+                            replacementIdentity: streamer.identity 
+                          });
+                          setMiniProfileVisible(false);
+                          Alert.alert('Coming Soon', 'Streamer replacement will be implemented');
+                        },
+                      },
+                    ]
+                  );
+                },
+              });
+            });
           }
+
+          options.push({ text: 'Cancel', onPress: () => {} });
 
           Alert.alert(
             'Replace Stream',
-            `Take over slot ${miniProfileData.slotIndex + 1} and go live?`,
-            [
-              { text: 'Cancel', style: 'cancel' },
-              {
-                text: 'Replace & Go Live',
-                onPress: () => {
-                  setMiniProfileVisible(false);
-                  startPublishing();
-                },
-              },
-            ]
+            `Choose how to replace ${miniProfileData.username} in slot ${miniProfileData.slotIndex + 1}`,
+            options as any,
+            { cancelable: true }
           );
         }}
         bottomInset={insets.bottom}
