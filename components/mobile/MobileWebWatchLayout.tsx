@@ -44,6 +44,7 @@ interface MobileWebWatchLayoutProps {
   isRoomConnected: boolean;
   currentUserId: string | null;
   isCurrentUserPublishing: boolean;
+  tracksByStreamerId: Map<string, { video?: any; audio?: any }>; // PHASE 4: Centralized tracks
   viewerCount?: number;
   onGoLive?: (liveStreamId: number, profileId: string) => void;
   publishAllowed?: boolean;
@@ -131,6 +132,7 @@ export default function MobileWebWatchLayout({
   isRoomConnected,
   currentUserId,
   isCurrentUserPublishing,
+  tracksByStreamerId,
   viewerCount = 0,
   onGoLive,
   publishAllowed = true,
@@ -499,6 +501,8 @@ export default function MobileWebWatchLayout({
               sharedRoom={sharedRoom}
               isRoomConnected={isRoomConnected}
               isCurrentUserPublishing={isCurrentUserPublishing}
+              videoTrack={tracksByStreamerId.get(focusedSlot.streamer.profile_id)?.video ?? null}
+              audioTrack={tracksByStreamerId.get(focusedSlot.streamer.profile_id)?.audio ?? null}
               compactMode={false}
               onClose={() => onCloseTile(focusedSlot.slotIndex)}
               onMute={() => onMuteTile(focusedSlot.slotIndex)}
@@ -546,6 +550,8 @@ export default function MobileWebWatchLayout({
                       sharedRoom={sharedRoom}
                       isRoomConnected={isRoomConnected}
                       isCurrentUserPublishing={isCurrentUserPublishing}
+                      videoTrack={tracksByStreamerId.get(slot.streamer.profile_id)?.video ?? null}
+                      audioTrack={tracksByStreamerId.get(slot.streamer.profile_id)?.audio ?? null}
                       compactMode={true}
                       onClose={() => onCloseTile(slot.slotIndex)}
                       onMute={() => onMuteTile(slot.slotIndex)}

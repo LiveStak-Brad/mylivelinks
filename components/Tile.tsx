@@ -215,9 +215,24 @@ export default function Tile({
 
   // PHASE 4: Pure render - simple track attach/detach
   useEffect(() => {
+    // DIAGNOSTIC: Log track state on mobile PWA
+    console.log('[TILE-VIDEO-PWA] Track state:', {
+      slotIndex,
+      streamerId,
+      hasVideoTrack: !!videoTrack,
+      hasVideoRef: !!videoRef.current,
+      trackSid: (videoTrack as any)?.sid,
+      isMobile: /iPhone|iPad|iPod|Android/i.test(navigator.userAgent),
+      isPWA: window.matchMedia('(display-mode: standalone)').matches,
+    });
+    
     if (!videoTrack || !videoRef.current) return;
     videoTrack.attach(videoRef.current);
-    videoRef.current.play().catch(() => {});
+    
+    // iOS-safe play with error handling
+    videoRef.current.play().catch((err) => {
+      console.warn('[TILE-VIDEO-PWA] Play failed:', err);
+    });
     
     const detectAspectRatio = () => {
       const video = videoRef.current;
@@ -433,6 +448,9 @@ export default function Tile({
             autoPlay
             playsInline
             muted={isMuted}
+            controls={false}
+            disablePictureInPicture
+            webkit-playsinline="true"
           />
         )}
 

@@ -2812,6 +2812,7 @@ export default function LiveRoom({
         isRoomConnected={isRoomConnected}
         currentUserId={currentUserId}
         isCurrentUserPublishing={isCurrentUserPublishing}
+        tracksByStreamerId={tracksByStreamerId}
         viewerCount={roomPresenceCountMinusSelf}
         onGoLive={handleGoLive}
         onPublishingChange={setIsCurrentUserPublishing}
