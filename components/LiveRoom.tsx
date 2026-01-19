@@ -3309,7 +3309,9 @@ export default function LiveRoom({
 
               {/* Chat - Middle (fills remaining space) */}
               <div className={`flex-1 min-h-0 h-full overflow-hidden bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 min-w-[350px] md:min-w-[360px] lg:min-w-[400px] xl:min-w-[420px] ${!uiPanels.chatOpen ? 'hidden' : ''}`}>
-                <Chat roomSlug={scopeRoomId} onShareClick={() => setShowShareModal(true)} />
+                <div className="h-full">
+                  <Chat roomSlug={scopeRoomId} onShareClick={() => setShowShareModal(true)} />
+                </div>
               </div>
 
               {/* Viewers + Stats - Right */}
@@ -3406,7 +3408,9 @@ export default function LiveRoom({
               </div>
 
               <div className={`flex-1 min-h-0 overflow-hidden bg-white dark:bg-gray-800 ${!uiPanels.chatOpen ? 'hidden' : ''}`}>
-                <Chat roomSlug={scopeRoomId} onShareClick={() => setShowShareModal(true)} />
+                <div className="h-full">
+                  <Chat roomSlug={scopeRoomId} onShareClick={() => setShowShareModal(true)} />
+                </div>
               </div>
 
               <Drawer
