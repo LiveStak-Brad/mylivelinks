@@ -1,7 +1,8 @@
 ﻿import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { View, StyleSheet, Text, ActivityIndicator, useWindowDimensions, Pressable, Modal, TouchableOpacity, Alert, Platform, StatusBar as RNStatusBar, Animated, PanResponder, Dimensions, ScrollView, TextInput } from 'react-native';
+import { View, StyleSheet, Text, ActivityIndicator, useWindowDimensions, Pressable, Modal, TouchableOpacity, Alert, Platform, StatusBar as RNStatusBar, Animated, PanResponder, Dimensions, ScrollView, TextInput, NativeModules } from 'react-native';
 import Slider from '@react-native-community/slider';
 import { StatusBar } from 'expo-status-bar';
+import Constants from 'expo-constants';
 import { Ionicons } from '@expo/vector-icons';
 import { useRoute, RouteProp, useFocusEffect, useNavigation } from '@react-navigation/native';
 import * as ScreenOrientation from 'expo-screen-orientation';
@@ -408,6 +409,7 @@ const VideoTile = React.memo(({
     
     // Check if we should ignore (speaker icon was pressed)
     if (ignoreNextDoubleTapRef.current) {
+      console.log('[TILE_PRESS] Ignoring - speaker was pressed');
       ignoreNextDoubleTapRef.current = false;
       return;
     }
@@ -415,8 +417,11 @@ const VideoTile = React.memo(({
     const now = Date.now();
     const timeSinceLastTap = now - lastTapRef.current;
     
+    console.log('[TILE_PRESS] tileId:', tileId, 'timeSinceLastTap:', timeSinceLastTap);
+    
     if (timeSinceLastTap < 300) {
       // Double tap detected → FULLSCREEN
+      console.log('[TILE_DOUBLE_TAP] Triggering fullscreen for tile:', tileId);
       onToggleFullscreen(tileId, participant, isLocalTile || false);
       lastTapRef.current = 0; // Reset
     } else {
@@ -433,63 +438,96 @@ const VideoTile = React.memo(({
   };
   
   return (
-    <Pressable 
-      style={[styles.tile, { width, height }]}
-      onPress={handleTilePress}
-    >
-      {hasVideo && videoTrack ? (
-        <>
-          <VideoView
-            style={styles.videoView}
-            videoTrack={videoTrack as any}
-            objectFit="cover"
-            mirror={isLocalTile}
+    <View style={[styles.tile, { width, height }]}>
+      <Pressable 
+        style={StyleSheet.absoluteFillObject}
+        onPress={handleTilePress}
+      >
+        {hasVideo && videoTrack ? (
+          <>
+            <VideoView
+              style={styles.videoView}
+              videoTrack={videoTrack as any}
+              objectFit="cover"
+              mirror={isLocalTile}
+            />
+            
+            {/* Local indicator */}
+            {isLocalTile && (
+              <View style={styles.localIndicator}>
+                <Text style={styles.localIndicatorText}>YOU</Text>
+              </View>
+            )}
+            
+            {/* 🔊 SPEAKER ICON (always visible for remote participants) */}
+            {!isLocalTile && participant && (
+              <Pressable
+                style={styles.speakerIcon}
+                onPress={handleSpeakerPress}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <Ionicons
+                  name={isMuted ? 'volume-mute' : 'volume-high'}
+                  size={24}
+                  color="#ffffff"
+                />
+              </Pressable>
+            )}
+          </>
+        ) : (
+          <View style={styles.tilePlaceholder}>
+            <Ionicons name="add-circle-outline" size={32} color="#666" />
+          </View>
+        )}
+      </Pressable>
+      
+      {/* 🎚️ VOLUME SLIDER (sibling, not child - iOS requirement) */}
+      {showVolumeSlider && !isLocalTile && participant && (
+        <View 
+          style={[styles.volumeSliderContainer, { 
+            zIndex: 20, 
+            elevation: 20, 
+            top: 50,
+            bottom: 50,
+            right: 4,
+            width: 50
+          }]}
+          pointerEvents="auto"
+        >
+          {(() => {
+            console.log('[VOLUME_UI] RENDER slider for tile', tileId, {
+              showVolumeSlider,
+              isLocalTile,
+              hasParticipant: !!participant,
+              participantId,
+              volume,
+            });
+            return null;
+          })()}
+          <Slider
+            style={[styles.volumeSliderFloating, { width: 90 }]}
+            minimumValue={0}
+            maximumValue={100}
+            value={volume}
+            step={1}
+            onSlidingStart={() => {
+              console.log('[SLIDER_START]', { participantId, currentVolume: volume });
+            }}
+            onValueChange={(val) => {
+              console.log('[SLIDER_DRAG]', { participantId, val });
+              onVolumeChange(participantId, val);
+            }}
+            onSlidingComplete={(val) => {
+              console.log('[SLIDER_COMPLETE]', { participantId, val });
+              onVolumeChange(participantId, val);
+            }}
+            minimumTrackTintColor="#ffffff"
+            maximumTrackTintColor="rgba(255, 255, 255, 0.3)"
+            thumbTintColor="#ffffff"
           />
-          
-          {/* Local indicator */}
-          {isLocalTile && (
-            <View style={styles.localIndicator}>
-              <Text style={styles.localIndicatorText}>YOU</Text>
-            </View>
-          )}
-          
-          {/* 🔊 SPEAKER ICON (always visible for remote participants) */}
-          {!isLocalTile && participant && (
-            <Pressable
-              style={styles.speakerIcon}
-              onPress={handleSpeakerPress}
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-            >
-              <Ionicons
-                name={isMuted ? 'volume-mute' : 'volume-high'}
-                size={24}
-                color="#ffffff"
-              />
-            </Pressable>
-          )}
-          
-          {/* 🎚️ VOLUME SLIDER (floating, no background) */}
-          {showVolumeSlider && !isLocalTile && participant && (
-            <View style={styles.volumeSliderContainer}>
-              <Slider
-                style={styles.volumeSliderFloating}
-                minimumValue={0}
-                maximumValue={100}
-                value={volume}
-                onValueChange={(val) => onVolumeChange(participantId, val)}
-                minimumTrackTintColor="#ffffff"
-                maximumTrackTintColor="rgba(255, 255, 255, 0.3)"
-                thumbTintColor="#ffffff"
-              />
-            </View>
-          )}
-        </>
-      ) : (
-        <View style={styles.tilePlaceholder}>
-          <Ionicons name="add-circle-outline" size={32} color="#666" />
         </View>
       )}
-    </Pressable>
+    </View>
   );
 }, (prevProps, nextProps) => {
   // Custom comparison: re-render if any relevant prop changed
@@ -612,6 +650,74 @@ export default function RoomScreen() {
   const { user } = useAuth();
   const insets = useSafeAreaInsets();
   
+  // 🔍 DEV-ONLY DIAGNOSTICS (Remove after testing)
+  useEffect(() => {
+    if (__DEV__) {
+      const webrtc = NativeModules.WebRTCModule;
+      console.log('[LK_NATIVE] Platform', Platform.OS);
+      console.log('[LK_NATIVE] WebRTCModule exists?', !!webrtc);
+      console.log('[LK_NATIVE] mediaStreamTrackSetVolume exists?', !!webrtc?.mediaStreamTrackSetVolume);
+      console.log('[LK_NATIVE] mediaStreamTrackSetEnabled exists?', !!webrtc?.mediaStreamTrackSetEnabled);
+      
+      console.log('[APP] appOwnership:', Constants.appOwnership);
+      console.log('[APP] executionEnvironment:', Constants.executionEnvironment);
+      
+      // Global error handler for uncaught exceptions
+      const ErrorUtils = (global as any).ErrorUtils;
+      if (ErrorUtils) {
+        const originalHandler = ErrorUtils.getGlobalHandler();
+        
+        ErrorUtils.setGlobalHandler((error: Error, isFatal?: boolean) => {
+          console.log('[GLOBAL_ERROR_HANDLER] Uncaught exception:', {
+            message: error.message,
+            name: error.name,
+            stack: error.stack,
+            isFatal,
+          });
+          
+          if (error.message?.includes?.('unimplemented') || error.message?.includes?.('Unimplemented')) {
+            console.log('[GLOBAL_ERROR_HANDLER] 🔴 FOUND "unimplemented" ERROR');
+            console.log('[GLOBAL_ERROR_HANDLER] Call stack:', error.stack);
+          }
+          
+          // Call original handler
+          if (originalHandler) {
+            originalHandler(error, isFatal);
+          }
+        });
+      }
+      
+      // Console interceptors
+      const originalConsoleError = console.error;
+      const originalConsoleWarn = console.warn;
+      
+      console.error = (...args: any[]) => {
+        const msg = String(args[0] || '');
+        if (msg.includes('unimplemented') || msg.includes('Unimplemented')) {
+          console.log('[CONSOLE_ERROR_INTERCEPT] 🔴 Caught "unimplemented"');
+          console.log('[CONSOLE_ERROR_INTERCEPT] Args:', args);
+          console.log('[CONSOLE_ERROR_INTERCEPT] Call stack:', new Error().stack);
+        }
+        originalConsoleError.apply(console, args);
+      };
+      
+      console.warn = (...args: any[]) => {
+        const msg = String(args[0] || '');
+        if (msg.includes('unimplemented') || msg.includes('Unimplemented')) {
+          console.log('[CONSOLE_WARN_INTERCEPT] 🔴 Caught "unimplemented"');
+          console.log('[CONSOLE_WARN_INTERCEPT] Args:', args);
+          console.log('[CONSOLE_WARN_INTERCEPT] Call stack:', new Error().stack);
+        }
+        originalConsoleWarn.apply(console, args);
+      };
+      
+      return () => {
+        console.error = originalConsoleError;
+        console.warn = originalConsoleWarn;
+      };
+    }
+  }, []);
+  
   // Room slug from navigation params (same identifier as web)
   const slug = route.params?.slug || route.params?.roomKey || 'live-central';
 
@@ -723,6 +829,8 @@ export default function RoomScreen() {
   // 🎛️ VOLUME CONTROL STATE (gesture-first)
   const [activeVolumeSliderTileId, setActiveVolumeSliderTileId] = useState<string | null>(null);
   const lastTapTimeRef = useRef<{ [key: string]: number }>({});
+  const previousVolumeRef = useRef<Record<string, number>>({});
+  const lastSliderOpenAtRef = useRef<number>(0);
   
   // 📺 FULLSCREEN STATE (double-tap to maximize)
   const [fullscreenTileId, setFullscreenTileId] = useState<string | null>(null);
@@ -996,91 +1104,162 @@ export default function RoomScreen() {
     });
   }, []);
   
-  // Tap speaker icon → toggle volume slider for that tile
-  const speakerLastTapRef = useRef<{ [key: string]: number }>({});
-  
-  const handleSpeakerIconPress = useCallback((tileId: string, event: any) => {
-    const now = Date.now();
-    const lastTap = speakerLastTapRef.current[tileId] || 0;
-    const timeSinceLastTap = now - lastTap;
-    
-    if (timeSinceLastTap < 300) {
-      // Double tap on speaker → MUTE/UNMUTE
-      const participantId = event; // Actually the participantId is passed as second param from VideoTile
-      if (participantId) {
-        setMutedParticipants(prev => {
-          const next = new Set(prev);
-          if (next.has(participantId)) {
-            next.delete(participantId);
-          } else {
-            next.add(participantId);
-          }
-          return next;
-        });
-      }
-      speakerLastTapRef.current[tileId] = 0; // Reset
-    } else {
-      // Single tap on speaker → TOGGLE SLIDER
-      setActiveVolumeSliderTileId(prev => prev === tileId ? null : tileId);
-      speakerLastTapRef.current[tileId] = now;
-    }
-  }, []);
-  
   // Drag volume slider → update volume
   const handleVolumeChangeGesture = useCallback((participantId: string, volume: number) => {
-    if (!participantId) return;
+    console.log('[VOLUME_DIAG] ENTER', { participantId, volume });
+    
+    if (!participantId) {
+      console.warn('[VOLUME_DIAG] No participantId');
+      return;
+    }
     
     // Update volume map for UI
     setVolumeMap(prev => ({ ...prev, [participantId]: volume }));
     
-    // Apply volume to the actual audio track
+    // Apply volume using LiveKit's RemoteAudioTrack.setVolume()
     if (roomRef.current) {
       const remoteParticipant = Array.from(roomRef.current.remoteParticipants.values()).find(
         (p) => p.identity === participantId
       );
       
-      if (remoteParticipant) {
-        // Find audio track and set volume
-        remoteParticipant.audioTrackPublications.forEach((pub) => {
-          if (pub.audioTrack) {
-            try {
-              // Try to set volume property directly (0-1 range, so divide by 100)
-              (pub.audioTrack as any).volume = volume / 100;
-            } catch (err) {
-              // If that doesn't work, try accessing the underlying MediaStreamTrack
-              try {
-                const mediaStreamTrack = (pub.audioTrack as any).mediaStreamTrack;
-                if (mediaStreamTrack) {
-                  // Note: Web Audio API needed for actual volume control
-                  // This is a limitation - mobile might not support per-track volume
-                }
-              } catch (innerErr) {
-                // Volume control not supported on this track
-              }
-            }
-          }
-        });
+      console.log('[VOLUME_DIAG] Found participant?', !!remoteParticipant);
+      
+      if (!remoteParticipant) {
+        console.warn('[VOLUME_DIAG] Participant not found for identity:', participantId);
+        return;
       }
-    }
-    
-    // Auto-unmute if volume is increased from 0
-    if (volume > 0) {
-      setMutedParticipants(prev => {
-        const next = new Set(prev);
-        next.delete(participantId);
-        return next;
+      
+      remoteParticipant.audioTrackPublications.forEach((pub) => {
+        console.log('[VOLUME_DIAG] Publication:', {
+          trackSid: pub.trackSid,
+          kind: pub.kind,
+          isSubscribed: pub.isSubscribed,
+          hasAudioTrack: !!pub.audioTrack,
+        });
+        
+        // STRICT GUARDS: Check subscription + track + method
+        if (pub.isSubscribed && pub.audioTrack && typeof (pub.audioTrack as any).setVolume === 'function') {
+          const volumeValue = volume / 100; // 0-1 range
+          
+          try {
+            console.log('[VOLUME_DIAG] Calling setVolume with', volumeValue);
+            (pub.audioTrack as any).setVolume(volumeValue);
+            console.log('[VOLUME_DIAG] ✅ SUCCESS');
+          } catch (err) {
+            console.error('[VOLUME_DIAG] ❌ EXCEPTION:', {
+              message: (err as Error).message,
+              name: (err as Error).name,
+              stack: (err as Error).stack,
+            });
+            // Don't rethrow - error already logged
+          }
+        } else {
+          console.warn('[VOLUME_DIAG] Skipped - not ready:', {
+            isSubscribed: pub.isSubscribed,
+            hasAudioTrack: !!pub.audioTrack,
+            hasSetVolume: pub.audioTrack ? typeof (pub.audioTrack as any).setVolume : 'N/A',
+          });
+        }
       });
     }
     
-    // Auto-mute if volume reaches 0
+    // Update mute state based on volume for UI consistency
     if (volume === 0) {
       setMutedParticipants(prev => {
         const next = new Set(prev);
         next.add(participantId);
         return next;
       });
+    } else {
+      setMutedParticipants(prev => {
+        const next = new Set(prev);
+        next.delete(participantId);
+        return next;
+      });
     }
   }, []);
+  
+  // Tap speaker icon → toggle volume slider for that tile
+  const speakerLastTapRef = useRef<Record<string, number>>({});
+  
+  const handleSpeakerIconPress = useCallback((tileId: string, participantId: string) => {
+    const now = Date.now();
+    const last = speakerLastTapRef.current[tileId] ?? 0;
+    const delta = now - last;
+    
+    console.log('[SPEAKER_TAP]', { tileId, participantId, last, now, delta });
+    
+    if (delta > 0 && delta < 400) {
+      // Double tap on speaker → MUTE/UNMUTE via volume control
+      speakerLastTapRef.current[tileId] = 0; // Reset after double tap
+      console.log('[SPEAKER_DOUBLE_TAP] mute toggle', { tileId, participantId });
+      console.log('[MUTE_DIAG] ENTER', { participantId });
+      
+      if (!participantId) {
+        console.warn('[MUTE_DIAG] No participantId');
+        return;
+      }
+      
+      const isMuted = mutedParticipants.has(participantId);
+      const newMuted = !isMuted;
+      
+      console.log('[MUTE_DIAG] Current muted:', isMuted, '→ New:', newMuted);
+      
+      if (newMuted) {
+        // MUTE: Store current volume, then set to 0
+        const currentVolume = volumeMap[participantId] ?? 100;
+        if (currentVolume > 0) {
+          previousVolumeRef.current[participantId] = currentVolume;
+        }
+        console.log('[MUTE_DIAG] Muting - stored previous volume:', previousVolumeRef.current[participantId]);
+        handleVolumeChangeGesture(participantId, 0);
+      } else {
+        // UNMUTE: Restore previous volume (or default to 100)
+        const restoreVolume = previousVolumeRef.current[participantId] ?? 100;
+        console.log('[MUTE_DIAG] Unmuting - restoring volume:', restoreVolume);
+        handleVolumeChangeGesture(participantId, restoreVolume);
+      }
+      
+      // Update mute state
+      setMutedParticipants(prev => {
+        const next = new Set(prev);
+        if (newMuted) {
+          next.add(participantId);
+        } else {
+          next.delete(participantId);
+        }
+        return next;
+      });
+      
+      // Close slider if it's open
+      if (activeVolumeSliderTileId === tileId) {
+        setActiveVolumeSliderTileId(null);
+      }
+      
+      return; // Exit after double tap (prevent fullscreen trigger)
+    } else {
+      // Single tap on speaker → TOGGLE SLIDER (only if not a potential double-tap)
+      speakerLastTapRef.current[tileId] = now; // CRITICAL: Set timestamp for next tap
+      
+      // Wait briefly to see if this is actually a double-tap
+      setTimeout(() => {
+        const currentLast = speakerLastTapRef.current[tileId];
+        // If timestamp hasn't changed, this was a true single tap
+        if (currentLast === now) {
+          const nextValue = activeVolumeSliderTileId === tileId ? null : tileId;
+          console.log('[SPEAKER_SINGLE_TAP] toggle slider', { tileId });
+          console.log('[VOLUME_UI] activeVolumeSliderTileId =>', nextValue);
+          
+          // Record when slider was opened to prevent immediate overlay close
+          if (nextValue !== null) {
+            lastSliderOpenAtRef.current = Date.now();
+          }
+          
+          setActiveVolumeSliderTileId(prev => prev === tileId ? null : tileId);
+        }
+      }, 250);
+    }
+  }, [mutedParticipants, volumeMap, handleVolumeChangeGesture, activeVolumeSliderTileId]);
   
   // Close volume slider when tapping elsewhere (handled by grid wrapper)
   
@@ -1467,28 +1646,53 @@ export default function RoomScreen() {
   // Always render the grid - overlay loading/error states on top
   // Grid MUST respect all safe area insets (notch, home bar, left/right in landscape)
   return (
-    <View style={styles.container} {...panResponder.panHandlers}>
+    <View style={styles.container} {...(activeVolumeSliderTileId ? {} : panResponder.panHandlers)}>
       <StatusBar
         style="light"
         backgroundColor="#000000"
         hidden={false}
         translucent={true}
       />
-      {/* Grid wrapper with safe area padding for notch + home bar + control bar */}
-      {/* 🎛️ TouchableWithoutFeedback to close volume slider when tapping outside */}
-      <TouchableOpacity
-        activeOpacity={1}
-        onPress={() => {
-          if (activeVolumeSliderTileId) {
+      {/* Full-screen overlay to close slider when tapping outside (only when slider is open) */}
+      {/* MUST be rendered BEFORE grid so slider (which is inside grid) can be above it */}
+      {activeVolumeSliderTileId && (
+        <Pressable
+          style={[StyleSheet.absoluteFillObject, { zIndex: 5, backgroundColor: 'rgba(0,0,0,0.3)' }]}
+          pointerEvents="box-none"
+          onPress={() => {
+            // Guard against instant close from the same tap that opened slider
+            const now = Date.now();
+            const timeSinceOpen = now - lastSliderOpenAtRef.current;
+            if (timeSinceOpen < 250) {
+              console.log('[OVERLAY_TAP] Ignoring (just opened)', timeSinceOpen, 'ms ago');
+              return;
+            }
+            console.log('[OVERLAY_TAP] Closing slider');
             setActiveVolumeSliderTileId(null);
-          }
-        }}
+          }}
+        >
+          <View style={StyleSheet.absoluteFillObject} pointerEvents="auto" onTouchEnd={() => {
+            const now = Date.now();
+            const timeSinceOpen = now - lastSliderOpenAtRef.current;
+            if (timeSinceOpen < 250) {
+              console.log('[OVERLAY_TOUCH] Ignoring (just opened)');
+              return;
+            }
+            console.log('[OVERLAY_TOUCH] Closing slider');
+            setActiveVolumeSliderTileId(null);
+          }} />
+        </Pressable>
+      )}
+      
+      {/* Grid wrapper with safe area padding for notch + home bar + control bar */}
+      <View 
         style={[styles.gridWrapper, {
           paddingTop: gridPaddingTop,
           paddingBottom: gridPaddingBottom,
           paddingLeft: gridPaddingLeft,
           paddingRight: gridPaddingRight
         }]}
+        pointerEvents={activeVolumeSliderTileId ? "box-none" : "auto"}
       >
         <GridContainer
           participants={participants}
@@ -1506,7 +1710,7 @@ export default function RoomScreen() {
           onVolumeChange={handleVolumeChangeGesture}
           onToggleFullscreen={handleToggleFullscreen}
         />
-      </TouchableOpacity>
+      </View>
       
       {/* 📺 FULLSCREEN OVERLAY (when double-tapped) */}
       {fullscreenTileId && (
@@ -1533,8 +1737,8 @@ export default function RoomScreen() {
           {!fullscreenIsLocal && fullscreenParticipant && (
             <Pressable
               style={styles.speakerIconFullscreen}
-              onPress={(e) => {
-                handleSpeakerIconPress(fullscreenTileId, e);
+              onPress={() => {
+                handleSpeakerIconPress(`fullscreen-${fullscreenTileId}`, fullscreenParticipant.identity);
               }}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             >
@@ -1558,7 +1762,6 @@ export default function RoomScreen() {
                 minimumTrackTintColor="#ffffff"
                 maximumTrackTintColor="rgba(255, 255, 255, 0.3)"
                 thumbTintColor="#ffffff"
-                vertical={true}
               />
             </View>
           )}
@@ -1698,7 +1901,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#000000',
   },
   tile: {
-    overflow: 'hidden',
+    // overflow: 'hidden', // REMOVED - was clipping absolutely positioned slider
     // Remove borders for seamless full-screen video grid
   },
   tilePlaceholder: {
@@ -2256,11 +2459,10 @@ const styles = StyleSheet.create({
   volumeSliderContainer: {
     position: 'absolute',
     right: 8,
-    top: 0,
-    bottom: 0,
+    // top/bottom set inline based on speaker icon position (42px from top/bottom)
     justifyContent: 'center',
     alignItems: 'center',
-    zIndex: 20,
+    zIndex: 100,
     width: 40,
   },
   volumeSliderFloating: {
