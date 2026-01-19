@@ -459,20 +459,52 @@ const VideoTile = React.memo(({
               </View>
             )}
             
-            {/* 🔊 SPEAKER ICON (always visible for remote participants) */}
-            {!isLocalTile && participant && (
-              <Pressable
-                style={styles.speakerIcon}
-                onPress={handleSpeakerPress}
-                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-              >
-                <Ionicons
-                  name={isMuted ? 'volume-mute' : 'volume-high'}
-                  size={24}
-                  color="#ffffff"
-                />
-              </Pressable>
-            )}
+          {/* 🔊 SPEAKER ICON (always visible for remote participants) - LEFT SIDE */}
+          {!isLocalTile && participant && (
+            <Pressable
+              style={styles.speakerIcon}
+              onPress={handleSpeakerPress}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <Ionicons
+                name={isMuted ? 'volume-mute' : 'volume-high'}
+                size={24}
+                color="#ffffff"
+              />
+            </Pressable>
+          )}
+          
+          {/* ❌ CLOSE ICON (remove participant from view) - RIGHT SIDE */}
+          {!isLocalTile && participant && (
+            <Pressable
+              style={styles.closeIcon}
+              onPress={() => {
+                console.log('[CLOSE_STREAM]', { participantId });
+                // TODO: Implement stream close/hide functionality
+                Alert.alert(
+                  'Close Stream',
+                  `Hide this participant's stream?`,
+                  [
+                    { text: 'Cancel', style: 'cancel' },
+                    { 
+                      text: 'Hide', 
+                      onPress: () => {
+                        // For now just log - can implement hide logic later
+                        console.log('[HIDE_PARTICIPANT]', participantId);
+                      }
+                    }
+                  ]
+                );
+              }}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <Ionicons
+                name="close-circle"
+                size={24}
+                color="#ffffff"
+              />
+            </Pressable>
+          )}
           </>
         ) : (
           <View style={styles.tilePlaceholder}>
@@ -481,7 +513,7 @@ const VideoTile = React.memo(({
         )}
       </Pressable>
       
-      {/* 🎚️ VOLUME SLIDER (sibling, not child - iOS requirement) */}
+      {/* 🎚️ VOLUME SLIDER (sibling, not child - iOS requirement) - LEFT SIDE */}
       {showVolumeSlider && !isLocalTile && participant && (
         <View 
           style={[styles.volumeSliderContainer, { 
@@ -489,7 +521,7 @@ const VideoTile = React.memo(({
             elevation: 20, 
             top: 50,
             bottom: 50,
-            right: 4,
+            left: 4,
             width: 50
           }]}
           pointerEvents="auto"
@@ -2452,14 +2484,21 @@ const styles = StyleSheet.create({
   speakerIcon: {
     position: 'absolute',
     top: 8,
+    left: 8,
+    padding: 4,
+    zIndex: 10,
+  },
+  closeIcon: {
+    position: 'absolute',
+    top: 8,
     right: 8,
     padding: 4,
     zIndex: 10,
   },
   volumeSliderContainer: {
     position: 'absolute',
-    right: 8,
-    // top/bottom set inline based on speaker icon position (42px from top/bottom)
+    left: 8,
+    // top/bottom set inline based on speaker icon position (50px from top/bottom)
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 100,
