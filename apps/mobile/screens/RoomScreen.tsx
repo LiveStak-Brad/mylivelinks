@@ -356,19 +356,67 @@ interface VideoTileProps {
   height: number;
   slotIndex: number;
   onTilePress: (slotIndex: number, participant: Participant | null) => void;
+  // 🎛️ Volume control props
+  volumeMap: VolumeMap;
+  mutedParticipants: Set<string>;
+  activeVolumeSliderTileId: string | null;
+  onDoubleTap: (participantId: string) => void;
+  onSpeakerIconPress: (participantId: string, event: any) => void;
+  onVolumeChange: (participantId: string, volume: number) => void;
 }
 
 // FIX #2: Memoize VideoTile to prevent re-renders when other tiles change
-const VideoTile = React.memo(({ participant, localVideoTrack, isLocalTile, width, height, slotIndex, onTilePress }: VideoTileProps) => {
-  // VideoTile - renders video if participant exists, local preview if publishing, otherwise empty slot
+const VideoTile = React.memo(({ 
+  participant, 
+  localVideoTrack, 
+  isLocalTile, 
+  width, 
+  height, 
+  slotIndex, 
+  onTilePress,
+  volumeMap,
+  mutedParticipants,
+  activeVolumeSliderTileId,
+  onDoubleTap,
+  onSpeakerIconPress,
+  onVolumeChange,
+}: VideoTileProps) => {
   const hasVideo = participant?.videoTrack || (isLocalTile && localVideoTrack);
   const videoTrack = participant?.videoTrack || localVideoTrack;
+  const participantId = participant?.identity || '';
+  const tileId = `tile-${slotIndex}`;
+  
+  // Volume state for this tile
+  const volume = volumeMap[participantId] ?? 100;
+  const isMuted = mutedParticipants.has(participantId) || volume === 0;
+  const showVolumeSlider = activeVolumeSliderTileId === tileId;
+  
+  // Double-tap detection
+  const lastTapRef = useRef(0);
+  const handleTilePress = () => {
+    if (!participant) {
+      onTilePress(slotIndex, null);
+      return;
+    }
+    
+    const now = Date.now();
+    const timeSinceLastTap = now - lastTapRef.current;
+    
+    if (timeSinceLastTap < 300) {
+      // Double tap detected
+      onDoubleTap(participantId);
+      lastTapRef.current = 0; // Reset to prevent triple-tap
+    } else {
+      // Single tap - currently does nothing, preserving for future use
+      lastTapRef.current = now;
+    }
+  };
   
   return (
     <TouchableOpacity 
       style={[styles.tile, { width, height }]}
       activeOpacity={0.7}
-      onPress={() => onTilePress(slotIndex, participant)}
+      onPress={handleTilePress}
     >
       {hasVideo && videoTrack ? (
         <>
@@ -376,27 +424,60 @@ const VideoTile = React.memo(({ participant, localVideoTrack, isLocalTile, width
             style={styles.videoView}
             videoTrack={videoTrack as any}
             objectFit="cover"
-            mirror={isLocalTile} // Mirror local video (front camera)
+            mirror={isLocalTile}
           />
+          
           {/* Local indicator */}
           {isLocalTile && (
             <View style={styles.localIndicator}>
               <Text style={styles.localIndicatorText}>YOU</Text>
             </View>
           )}
-          {/* Invisible overlay to capture touches */}
-          <View style={StyleSheet.absoluteFill} />
+          
+          {/* 🔊 SPEAKER ICON (always visible for remote participants) */}
+          {!isLocalTile && participant && (
+            <TouchableOpacity
+              style={styles.speakerIcon}
+              onPress={(e) => {
+                e.stopPropagation();
+                onSpeakerIconPress(tileId, e);
+              }}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <Ionicons
+                name={isMuted ? 'volume-mute' : 'volume-high'}
+                size={24}
+                color="#ffffff"
+              />
+            </TouchableOpacity>
+          )}
+          
+          {/* 🎚️ VOLUME SLIDER (floating, no background) */}
+          {showVolumeSlider && !isLocalTile && participant && (
+            <View style={styles.volumeSliderContainer}>
+              <Slider
+                style={styles.volumeSliderFloating}
+                minimumValue={0}
+                maximumValue={100}
+                value={volume}
+                onValueChange={(val) => onVolumeChange(participantId, val)}
+                minimumTrackTintColor="#ffffff"
+                maximumTrackTintColor="rgba(255, 255, 255, 0.3)"
+                thumbTintColor="#ffffff"
+                vertical={true}
+              />
+            </View>
+          )}
         </>
       ) : (
         <View style={styles.tilePlaceholder}>
-          {/* Plus icon for empty slots */}
           <Ionicons name="add-circle-outline" size={32} color="#666" />
         </View>
       )}
     </TouchableOpacity>
   );
 }, (prevProps, nextProps) => {
-  // Custom comparison: only re-render if this tile's props actually changed
+  // Custom comparison: re-render if any relevant prop changed
   return (
     prevProps.participant?.id === nextProps.participant?.id &&
     prevProps.participant?.videoTrack === nextProps.participant?.videoTrack &&
@@ -404,8 +485,10 @@ const VideoTile = React.memo(({ participant, localVideoTrack, isLocalTile, width
     prevProps.isLocalTile === nextProps.isLocalTile &&
     prevProps.width === nextProps.width &&
     prevProps.height === nextProps.height &&
-    prevProps.slotIndex === nextProps.slotIndex
-    // onTilePress is stable from useCallback
+    prevProps.slotIndex === nextProps.slotIndex &&
+    prevProps.volumeMap === nextProps.volumeMap &&
+    prevProps.mutedParticipants === nextProps.mutedParticipants &&
+    prevProps.activeVolumeSliderTileId === nextProps.activeVolumeSliderTileId
   );
 });
 
@@ -421,9 +504,30 @@ interface GridContainerProps {
   onTilePress: (slotIndex: number, participant: Participant | null) => void;
   localVideoTrack?: LocalVideoTrack | null;
   localAudioTrack?: LocalAudioTrack | null;
+  // 🎛️ Volume control props
+  volumeMap: VolumeMap;
+  mutedParticipants: Set<string>;
+  activeVolumeSliderTileId: string | null;
+  onDoubleTap: (participantId: string) => void;
+  onSpeakerIconPress: (tileId: string, event: any) => void;
+  onVolumeChange: (participantId: string, volume: number) => void;
 }
 
-function GridContainer({ participants, screenWidth, screenHeight, isLandscape, onTilePress, localVideoTrack, localAudioTrack }: GridContainerProps & { localVideoTrack?: LocalVideoTrack | null; localAudioTrack?: LocalAudioTrack | null }) {
+function GridContainer({ 
+  participants, 
+  screenWidth, 
+  screenHeight, 
+  isLandscape, 
+  onTilePress, 
+  localVideoTrack, 
+  localAudioTrack,
+  volumeMap,
+  mutedParticipants,
+  activeVolumeSliderTileId,
+  onDoubleTap,
+  onSpeakerIconPress,
+  onVolumeChange,
+}: GridContainerProps) {
   const { rows, cols } = getGridConfig(isLandscape);
   const tileWidth = screenWidth / cols;
   const tileHeight = screenHeight / rows;
@@ -459,6 +563,12 @@ function GridContainer({ participants, screenWidth, screenHeight, isLandscape, o
           height={tileHeight}
           slotIndex={currentSlotIndex}
           onTilePress={onTilePress}
+          volumeMap={volumeMap}
+          mutedParticipants={mutedParticipants}
+          activeVolumeSliderTileId={activeVolumeSliderTileId}
+          onDoubleTap={onDoubleTap}
+          onSpeakerIconPress={onSpeakerIconPress}
+          onVolumeChange={onVolumeChange}
         />
       );
       slotIndex++;
@@ -590,6 +700,10 @@ export default function RoomScreen() {
   } | null>(null);
   const [volumeMap, setVolumeMap] = useState<VolumeMap>({});
   const [mutedParticipants, setMutedParticipants] = useState<Set<string>>(new Set());
+  
+  // 🎛️ VOLUME CONTROL STATE (gesture-first)
+  const [activeVolumeSliderTileId, setActiveVolumeSliderTileId] = useState<string | null>(null);
+  const lastTapTimeRef = useRef<{ [key: string]: number }>({});
 
   // P1: Swipe gesture handling
   const swipeThreshold = 50;
@@ -825,6 +939,55 @@ export default function RoomScreen() {
   const handleViewProfile = useCallback(() => {
     setTileActionTarget(null);
   }, [tileActionTarget]);
+
+  // 🎛️ VOLUME CONTROL HANDLERS (gesture-first, zero UI chrome)
+  
+  // Double-tap on tile → toggle mute/unmute
+  const handleDoubleTap = useCallback((participantId: string) => {
+    if (!participantId) return;
+    
+    setMutedParticipants(prev => {
+      const next = new Set(prev);
+      if (next.has(participantId)) {
+        next.delete(participantId);
+      } else {
+        next.add(participantId);
+      }
+      return next;
+    });
+  }, []);
+  
+  // Tap speaker icon → toggle volume slider for that tile
+  const handleSpeakerIconPress = useCallback((tileId: string, event: any) => {
+    setActiveVolumeSliderTileId(prev => prev === tileId ? null : tileId);
+  }, []);
+  
+  // Drag volume slider → update volume
+  const handleVolumeChangeGesture = useCallback((participantId: string, volume: number) => {
+    if (!participantId) return;
+    
+    setVolumeMap(prev => ({ ...prev, [participantId]: volume }));
+    
+    // Auto-unmute if volume is increased from 0
+    if (volume > 0) {
+      setMutedParticipants(prev => {
+        const next = new Set(prev);
+        next.delete(participantId);
+        return next;
+      });
+    }
+    
+    // Auto-mute if volume reaches 0
+    if (volume === 0) {
+      setMutedParticipants(prev => {
+        const next = new Set(prev);
+        next.add(participantId);
+        return next;
+      });
+    }
+  }, []);
+  
+  // Close volume slider when tapping elsewhere (handled by grid wrapper)
 
   // Fetch room config from same RPC as web
   const fetchRoomConfig = useCallback(async () => {
@@ -1153,12 +1316,21 @@ export default function RoomScreen() {
         translucent={true}
       />
       {/* Grid wrapper with safe area padding for notch + home bar + control bar */}
-      <View style={[styles.gridWrapper, {
-        paddingTop: gridPaddingTop,
-        paddingBottom: gridPaddingBottom,
-        paddingLeft: gridPaddingLeft,
-        paddingRight: gridPaddingRight
-      }]}>
+      {/* 🎛️ TouchableWithoutFeedback to close volume slider when tapping outside */}
+      <TouchableOpacity
+        activeOpacity={1}
+        onPress={() => {
+          if (activeVolumeSliderTileId) {
+            setActiveVolumeSliderTileId(null);
+          }
+        }}
+        style={[styles.gridWrapper, {
+          paddingTop: gridPaddingTop,
+          paddingBottom: gridPaddingBottom,
+          paddingLeft: gridPaddingLeft,
+          paddingRight: gridPaddingRight
+        }]}
+      >
         <GridContainer
           participants={participants}
           screenWidth={safeGridWidth}
@@ -1167,8 +1339,14 @@ export default function RoomScreen() {
           onTilePress={handleTilePress}
           localVideoTrack={localVideoTrack}
           localAudioTrack={localAudioTrack}
+          volumeMap={volumeMap}
+          mutedParticipants={mutedParticipants}
+          activeVolumeSliderTileId={activeVolumeSliderTileId}
+          onDoubleTap={handleDoubleTap}
+          onSpeakerIconPress={handleSpeakerIconPress}
+          onVolumeChange={handleVolumeChangeGesture}
         />
-      </View>
+      </TouchableOpacity>
       
       {/* Loading overlay */}
       {loading && (
@@ -1847,5 +2025,28 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 10,
     fontWeight: '700',
+  },
+  // 🎛️ VOLUME CONTROL STYLES (invisible UI, no chrome)
+  speakerIcon: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    padding: 4,
+    zIndex: 10,
+  },
+  volumeSliderContainer: {
+    position: 'absolute',
+    right: 8,
+    top: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 20,
+    width: 40,
+  },
+  volumeSliderFloating: {
+    width: 150, // Height when vertical (rotated 90deg)
+    height: 40,
+    transform: [{ rotate: '-90deg' }],
   },
 });
