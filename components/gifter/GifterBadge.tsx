@@ -23,7 +23,7 @@ export interface GifterBadgeProps {
  * 
  * Features:
  * - Tier-colored background with icon
- * - Level display ("Lv X")
+ * - Level display (number only)
  * - Diamond tier has animated shimmer effect
  * - Scales slightly with tier importance
  * - Respects reduced motion preferences
@@ -42,7 +42,7 @@ export default function GifterBadge({
     return (
       <span className={`gifter-badge gifter-badge-${size} ${className}`}>
         <span className="gifter-badge-icon">?</span>
-        {showLevel && <span className="gifter-badge-level">Lv {level}</span>}
+        {showLevel && <span className="gifter-badge-level">{level}</span>}
       </span>
     );
   }
@@ -89,7 +89,7 @@ export default function GifterBadge({
       </span>
       {showLevel && (
         <span className="font-bold tracking-tight">
-          Lv {level}
+          {level}
         </span>
       )}
     </span>
