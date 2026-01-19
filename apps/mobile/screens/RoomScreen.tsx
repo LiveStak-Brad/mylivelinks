@@ -808,6 +808,27 @@ const VideoTile = React.memo(({
               />
             </Pressable>
           )}
+          
+          {/* ❌ CLOSE/HIDE ICON for remote participants - RIGHT SIDE */}
+          {!isLocalTile && participant && (
+            <Pressable
+              style={styles.closeIcon}
+              onPress={() => {
+                console.log('[HIDE_PARTICIPANT]', { participantId });
+                // Mute this participant completely
+                const identity = participant.identity;
+                onDoubleTap(identity); // Toggle mute
+                Alert.alert('Muted', 'Participant audio muted');
+              }}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <Ionicons
+                name="close-circle"
+                size={24}
+                color="#ffffff"
+              />
+            </Pressable>
+          )}
           </>
         ) : (
           <View style={styles.tilePlaceholder}>
@@ -2530,22 +2551,39 @@ export default function RoomScreen() {
           startPublishing();
         }}
         onReplaceWithStreamer={(streamer) => {
+          if (!replaceModalData) return;
+          
           Alert.alert(
             'Replace Streamer',
-            `Move ${streamer.username} to slot ${(replaceModalData?.targetSlotIndex || 0) + 1}?`,
+            `Kick ${replaceModalData.targetUsername} so ${streamer.username} can take their spot?`,
             [
               { text: 'Cancel', style: 'cancel' },
               {
-                text: 'Replace',
-                onPress: () => {
-                  // TODO: Implement slot swap logic via RPC
-                  console.log('[REPLACE] Swap:', { 
-                    targetSlot: replaceModalData?.targetSlotIndex, 
-                    targetIdentity: replaceModalData?.targetParticipantId,
-                    replacementIdentity: streamer.identity 
-                  });
-                  setReplaceModalVisible(false);
-                  Alert.alert('Coming Soon', 'Streamer replacement will be implemented');
+                text: 'Kick & Replace',
+                style: 'destructive',
+                onPress: async () => {
+                  try {
+                    setReplaceModalVisible(false);
+                    
+                    // In LiveKit, we can't directly swap participants without server-side kick
+                    // This requires room admin permissions
+                    // For now, log the intent and show message
+                    console.log('[REPLACE] Kick request:', {
+                      targetIdentity: replaceModalData.targetParticipantId,
+                      targetUsername: replaceModalData.targetUsername,
+                      keepIdentity: streamer.identity,
+                      keepUsername: streamer.username,
+                    });
+                    
+                    Alert.alert(
+                      'Admin Action Required',
+                      'Kicking participants requires room moderator permissions. This will be available to room admins and moderators.',
+                      [{ text: 'OK' }]
+                    );
+                  } catch (error) {
+                    console.error('[REPLACE] Error:', error);
+                    Alert.alert('Error', 'Failed to process replace request');
+                  }
                 },
               },
             ]
