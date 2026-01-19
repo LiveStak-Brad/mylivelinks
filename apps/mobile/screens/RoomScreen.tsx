@@ -762,6 +762,38 @@ const VideoTile = React.memo(({
               </View>
             )}
             
+            {/* ❌ CLOSE ICON (stop your own stream) - LOCAL TILE ONLY */}
+            {isLocalTile && (
+              <Pressable
+                style={styles.closeIcon}
+                onPress={() => {
+                  console.log('[STOP_MY_STREAM]');
+                  Alert.alert(
+                    'Stop Streaming',
+                    'Are you sure you want to stop streaming?',
+                    [
+                      { text: 'Cancel', style: 'cancel' },
+                      { 
+                        text: 'Stop', 
+                        style: 'destructive',
+                        onPress: () => {
+                          // Call stopPublishing from parent via callback
+                          onTilePress(-1, null); // Special signal to stop publishing
+                        }
+                      }
+                    ]
+                  );
+                }}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <Ionicons
+                  name="close-circle"
+                  size={24}
+                  color="#ffffff"
+                />
+              </Pressable>
+            )}
+            
           {/* 🔊 SPEAKER ICON (always visible for remote participants) - LEFT SIDE */}
           {!isLocalTile && participant && (
             <Pressable
@@ -771,38 +803,6 @@ const VideoTile = React.memo(({
             >
               <Ionicons
                 name={isMuted ? 'volume-mute' : 'volume-high'}
-                size={24}
-                color="#ffffff"
-              />
-            </Pressable>
-          )}
-          
-          {/* ❌ CLOSE ICON (remove participant from view) - RIGHT SIDE */}
-          {!isLocalTile && participant && (
-            <Pressable
-              style={styles.closeIcon}
-              onPress={() => {
-                console.log('[CLOSE_STREAM]', { participantId });
-                // TODO: Implement stream close/hide functionality
-                Alert.alert(
-                  'Close Stream',
-                  `Hide this participant's stream?`,
-                  [
-                    { text: 'Cancel', style: 'cancel' },
-                    { 
-                      text: 'Hide', 
-                      onPress: () => {
-                        // For now just log - can implement hide logic later
-                        console.log('[HIDE_PARTICIPANT]', participantId);
-                      }
-                    }
-                  ]
-                );
-              }}
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-            >
-              <Ionicons
-                name="close-circle"
                 size={24}
                 color="#ffffff"
               />
@@ -1346,15 +1346,64 @@ export default function RoomScreen() {
       updateRoomPresence(true, true);
 
       Alert.alert('Live!', 'You are now streaming in the room!');
-    } catch (err: any) {
-      Alert.alert('Error', err?.message || 'Failed to start streaming. Please try again.');
+    } catch (error: any) {
       setIsPublishing(false);
       isPublishingRef.current = false;
+      Alert.alert('Publishing Error', error?.message || 'Failed to start streaming');
     }
   }, [user, isPublishing, updateRoomPresence]);
 
+  // Stop publishing and unpublish tracks
+  const stopPublishing = useCallback(async () => {
+    const room = roomRef.current;
+    
+    if (!room || !isPublishing) {
+      return;
+    }
+
+    try {
+      // Unpublish all local tracks
+      const localParticipant = room.localParticipant;
+      
+      // Unpublish and stop video track
+      if (localVideoTrack) {
+        await localParticipant.unpublishTrack(localVideoTrack);
+        localVideoTrack.stop();
+        setLocalVideoTrack(null);
+      }
+
+      // Unpublish and stop audio track
+      if (localAudioTrack) {
+        await localParticipant.unpublishTrack(localAudioTrack);
+        localAudioTrack.stop();
+        setLocalAudioTrack(null);
+      }
+
+      // End live stream record
+      if (user && groupLiveStreamIdRef.current) {
+        await endLiveStreamRecord(user.id);
+        groupLiveStreamIdRef.current = null;
+      }
+
+      // Update room presence
+      updateRoomPresence(true, false);
+
+      setIsPublishing(false);
+      isPublishingRef.current = false;
+    } catch (error: any) {
+      console.error('[STOP_PUBLISHING] Error:', error);
+      Alert.alert('Error', 'Failed to stop streaming');
+    }
+  }, [isPublishing, localVideoTrack, localAudioTrack, user, updateRoomPresence]);
+
   // Handle tile press - empty slot = join (with confirmation), occupied = show mini profile
   const handleTilePress = useCallback(async (slotIndex: number, participant: Participant | null) => {
+    // Special signal from local tile close button (-1) to stop publishing
+    if (slotIndex === -1) {
+      stopPublishing();
+      return;
+    }
+
     const isLocalTile = slotIndex === 0 && localVideoTrack;
 
     if (isLocalTile) {
@@ -1491,7 +1540,7 @@ export default function RoomScreen() {
         Alert.alert('Error', 'Failed to load profile');
       }
     }
-  }, [user, isPublishing, startPublishing, localVideoTrack]);
+  }, [user, isPublishing, startPublishing, stopPublishing, localVideoTrack]);
 
   // P2: Tile action handlers
   const handleMuteToggle = useCallback(() => {
