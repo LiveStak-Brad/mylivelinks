@@ -726,6 +726,73 @@ END;
 $$;
 
 -- =============================================================================
+-- 11. RPC to convert battle cooldown back to cohost (never auto-kick)
+-- =============================================================================
+
+CREATE OR REPLACE FUNCTION public.rpc_cooldown_to_cohost(
+  p_session_id UUID
+)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_user_id UUID := auth.uid();
+  v_session live_sessions%ROWTYPE;
+  v_is_participant BOOLEAN;
+BEGIN
+  IF v_user_id IS NULL THEN
+    RAISE EXCEPTION 'Not authenticated';
+  END IF;
+  
+  -- Fetch the session
+  SELECT * INTO v_session
+  FROM live_sessions
+  WHERE id = p_session_id
+    AND status = 'cooldown'
+  FOR UPDATE;
+  
+  IF v_session IS NULL THEN
+    RAISE EXCEPTION 'Session not found or not in cooldown';
+  END IF;
+  
+  -- Verify user is a participant
+  SELECT EXISTS(
+    SELECT 1 FROM live_session_participants
+    WHERE session_id = p_session_id
+      AND profile_id = v_user_id
+      AND left_at IS NULL
+  ) INTO v_is_participant;
+  
+  IF NOT v_is_participant THEN
+    RAISE EXCEPTION 'You are not in this session';
+  END IF;
+  
+  -- Convert battle back to cohost session
+  UPDATE live_sessions
+  SET 
+    type = 'cohost',
+    status = 'active',
+    ends_at = NULL,
+    cooldown_ends_at = NULL
+  WHERE id = p_session_id;
+  
+  -- Reset all participants to team 'A' (cohost mode)
+  UPDATE live_session_participants
+  SET team = 'A'
+  WHERE session_id = p_session_id AND left_at IS NULL;
+  
+  RETURN jsonb_build_object(
+    'status', 'converted_to_cohost',
+    'session_id', p_session_id
+  );
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.rpc_cooldown_to_cohost(UUID) TO authenticated;
+
+-- =============================================================================
 -- Verification
 -- =============================================================================
 

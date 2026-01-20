@@ -194,6 +194,25 @@ export async function startRematch(sessionId: string): Promise<string> {
 }
 
 /**
+ * Convert a battle in cooldown back to cohost session
+ * Called when cooldown timer expires - keeps everyone together
+ */
+export async function cooldownToCohost(sessionId: string): Promise<{ status: string }> {
+  const supabase = createClient();
+  
+  const { data, error } = await supabase.rpc('rpc_cooldown_to_cohost', {
+    p_session_id: sessionId,
+  });
+  
+  if (error) {
+    console.error('[battle-session] cooldownToCohost error:', error);
+    throw error;
+  }
+  
+  return data as { status: string };
+}
+
+/**
  * Join the speed battle pool
  */
 export async function joinBattlePool(): Promise<boolean> {

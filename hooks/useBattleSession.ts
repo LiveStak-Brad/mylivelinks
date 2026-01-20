@@ -23,6 +23,7 @@ import {
   respondToInvite,
   endSession,
   startRematch,
+  cooldownToCohost,
   getSessionRoomName,
   getRemainingSeconds,
 } from '@/lib/battle-session';
@@ -241,9 +242,12 @@ export function useBattleSession({
           // Timer expired - if we're in active state, transition to cooldown
           if (session.type === 'battle' && session.status === 'active' && isParticipant) {
             transitionToCooldown().catch(console.error);
-          } else if (session.status === 'cooldown') {
-            // Cooldown expired - refresh to see ended state
-            refresh().catch(console.error);
+          } else if (session.status === 'cooldown' && isParticipant) {
+            // Cooldown expired - convert back to cohost (never auto-kick)
+            console.log('[useBattleSession] Cooldown expired, converting to cohost...');
+            cooldownToCohost(session.session_id)
+              .then(() => refresh())
+              .catch(console.error);
           }
           return 0;
         }
