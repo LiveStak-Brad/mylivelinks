@@ -78,8 +78,14 @@ export default function BattleScoreSlider({
       const maxScore = Math.max(...Array.from(teamScores.values()).map(t => t.score));
       const hostTeamData = teamScores.get(hostTeamId);
       
-      // Convert to segments, sorted by team ID for consistent order (A, B, C)
-      const teamEntries = Array.from(teamScores.entries()).sort((a, b) => a[0].localeCompare(b[0]));
+      // Convert to segments - host's team always first (left), then others
+      const teamEntries = Array.from(teamScores.entries()).sort((a, b) => {
+        // Host team comes first
+        if (a[1].isHost && !b[1].isHost) return -1;
+        if (!a[1].isHost && b[1].isHost) return 1;
+        // Otherwise alphabetical
+        return a[0].localeCompare(b[0]);
+      });
       
       if (totalScore === 0) {
         const equalPct = 100 / teamEntries.length;
