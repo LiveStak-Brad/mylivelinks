@@ -10,54 +10,45 @@
 - Explain your OBSERVATIONS clearly, then provide REASONING to identify the exact issue. Add console logs when needed to gather more information.
 
 
-## Core Business Domain
-Live streaming platform with integrated virtual economy and multi-participant battle system
+## Core Business Components
 
-## Primary Business Components
+### Gifting Economy System
+Located in `apps/mobile/screens/GifterLevelsScreen.tsx`
+- 10-tier reward program based on lifetime coin contributions
+- Diamond tier system with unlimited progression
+- Dynamic badge scaling tied to tier advancement
+Importance Score: 85/100
 
-### Live Room Management (mobile/screens/LiveRoomScreen.tsx)
-Importance Score: 85
-- Multi-participant streaming with role-based permissions
-- Slot-based participant system with dynamic audio mixing
-- Battle mode vs Solo mode configurations
-- Custom gesture control system for room overlays
+### Content Management
+Located in `apps/mobile/screens/CreatorStudioUploadScreen.tsx`
+- Content type classification (music, podcasts, movies, series) 
+- Rights verification workflow
+- Type-specific validation rules
+- Public/private visibility controls
+Importance Score: 75/100
 
-### Virtual Economy (mobile/screens/FeedScreen.tsx)
-Importance Score: 75
-- Dual currency system (coins/diamonds) with conversion rules
-- Gift economy with real-time transactions
-- Content monetization through viewer interactions
-- Profile-based content recommendations
+### Curator Playlists
+Located in `apps/mobile/screens/CuratorPlaylistPlayerScreen.tsx`
+- Curator-specific playlist management
+- Sequential content progression
+- Attribution system for curators
+Importance Score: 70/100
 
-### Operations Management (mobile/screens/LiveOpsScreen.tsx)
-Importance Score: 70
-- Multi-region stream monitoring dashboard
-- Stream health tracking and operational controls
-- Region/status-based filtering system
-- Real-time stream status management
+### User Relationships
+Located in `apps/mobile/screens/BlockedUsersScreen.tsx`
+- Block/unblock workflow affecting gifts and messages
+- Blocked user list management
+Importance Score: 60/100
 
-### Profile System (mobile/screens/EditProfileScreen.tsx)
-Importance Score: 65
-- Role-based feature access controls
-- Module-based profile customization
-- Location privacy management rules
-- Visibility controls based on user types
+## Business Domain Integration
 
-## Business Integration Points
+Primary business domains interconnect through:
+1. Content creator monetization via gifting economy
+2. Content rights and curation workflow
+3. User relationship management affecting gift capabilities
+4. Multi-tier progression system driving engagement
 
-### Key Domain Patterns
-1. Real-time participant management with custom controls
-2. Virtual economy transactions (coins/diamonds/gifts)
-3. Multi-mode content creation workflows
-4. Role-based access control system
-5. Location-aware privacy rules
-6. Operational monitoring system
-
-### Core Business Rules
-- Stream monetization requires active participant slots
-- Gift transactions validate sender balance and recipient status
-- Profile features unlock based on user role/type
-- Stream categorization affects discovery and recommendations
+The platform emphasizes creator monetization through an integrated gifting economy, with content management and curation systems supporting the core value proposition.
 
 $END$
 

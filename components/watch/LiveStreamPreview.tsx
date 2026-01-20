@@ -5,14 +5,17 @@ import { useRouter } from 'next/navigation';
 import { Volume2, VolumeX } from 'lucide-react';
 import { Room, RoomEvent, Track, RemoteTrack } from 'livekit-client';
 import { createClient } from '@/lib/supabase';
+import { parseLiveLocation, getLiveJoinTargetWeb } from '@/lib/liveJoinTarget';
 
 interface LiveStreamPreviewProps {
   streamerProfileId: string;
   streamerUsername: string;
   displayName: string;
+  streamingMode: 'solo' | 'group';
+  roomKey?: string; // For group streams
 }
 
-export function LiveStreamPreview({ streamerProfileId, streamerUsername, displayName }: LiveStreamPreviewProps) {
+export function LiveStreamPreview({ streamerProfileId, streamerUsername, displayName, streamingMode, roomKey }: LiveStreamPreviewProps) {
   const router = useRouter();
   const videoRef = useRef<HTMLVideoElement>(null);
   const roomRef = useRef<Room | null>(null);
@@ -23,7 +26,26 @@ export function LiveStreamPreview({ streamerProfileId, streamerUsername, display
   const supabase = useMemo(() => createClient(), []);
 
   const handleEnterLive = () => {
-    router.push(`/live/${streamerUsername}`);
+    // Use canonical routing logic
+    const location = parseLiveLocation({
+      streamingMode,
+      username: streamerUsername,
+      authorId: streamerProfileId,
+      roomKey,
+    });
+
+    if (!location) {
+      console.error('[LiveStreamPreview] Failed to parse live location');
+      return;
+    }
+
+    const target = getLiveJoinTargetWeb(location);
+    if (!target) {
+      console.error('[LiveStreamPreview] Failed to get join target');
+      return;
+    }
+
+    router.push(target.path);
   };
 
   useEffect(() => {
@@ -75,8 +97,8 @@ export function LiveStreamPreview({ streamerProfileId, streamerUsername, display
           return;
         }
 
-        // Room name format: solo_<profile_id>
-        const roomName = `solo_${streamerProfileId}`;
+        // Room name format: solo_<profile_id> for solo, live_central for group
+        const roomName = streamingMode === 'group' ? 'live_central' : `solo_${streamerProfileId}`;
         const participantName = `preview_${user.id.slice(0, 8)}_${Date.now()}`;
 
         console.log('[LiveStreamPreview] Connecting to room:', roomName);

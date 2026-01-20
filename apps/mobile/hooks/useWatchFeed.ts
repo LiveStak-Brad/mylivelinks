@@ -9,6 +9,8 @@ export interface WatchItem {
   type: 'video' | 'live';
   postId: string | null;
   liveStreamId: number | null;
+  streamingMode?: 'solo' | 'group'; // For live streams: solo or group
+  roomKey?: string; // For group live streams: room key/slug (e.g., 'live_central')
   createdAt: string;
   authorId: string;
   username: string;
@@ -69,6 +71,8 @@ function mapRpcRowToWatchItem(row: any): WatchItem {
     type: row.item_type === 'live' ? 'live' : 'video',
     postId: row.post_id || null,
     liveStreamId: row.live_stream_id || null,
+    streamingMode: row.streaming_mode as 'solo' | 'group' | undefined,
+    roomKey: row.room_key || undefined,
     createdAt: row.created_at,
     authorId: row.author_id,
     username: row.author_username || '',

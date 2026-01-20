@@ -473,9 +473,12 @@ export async function POST(request: NextRequest) {
           const effectiveDeviceId = deviceId || 'unknown';
           const effectiveSessionId = sessionId || Date.now().toString();
 
-          // P0 FIX: Stable identity per profile to prevent duplicate LiveKit participants
-          // For guests, use guest_ prefix so their tracks can be filtered to guest boxes only
-          const identity = isAcceptedGuest ? `guest_${userId}` : `u_${userId}`;
+          // Generate device-scoped identity to prevent conflicts and enable proper track routing
+          // Format: [guest_]u_<userId>:platform:deviceId:sessionId
+          const platform = isMobileRequest ? 'mobile' : 'web';
+          const identity = isAcceptedGuest
+            ? `guest_${userId}:${platform}:${effectiveDeviceId}:${effectiveSessionId}`
+            : `u_${userId}:${platform}:${effectiveDeviceId}:${effectiveSessionId}`;
 
           const at = new AccessToken(LIVEKIT_API_KEY, LIVEKIT_API_SECRET, {
             identity,

@@ -6,6 +6,9 @@ import { GifterBadge as TierBadge } from '@/components/gifter';
 import type { GifterStatus } from '@/lib/gifter-status';
 import { fetchGifterStatuses } from '@/lib/gifter-status-client';
 
+// Module-level singleton to prevent duplicate subscriptions
+const activeBalanceSubscriptions = new Map<string, { channel: any; refCount: number; callbacks: Set<Function> }>();
+
 export default function UserStatsSection() {
   const [coinBalance, setCoinBalance] = useState<number>(0);
   const [diamondBalance, setDiamondBalance] = useState<number>(0);
@@ -19,49 +22,75 @@ export default function UserStatsSection() {
     loadUserStats();
   }, []);
 
-  // Real-time subscription for balance updates
+  // Real-time subscription for balance updates with singleton pattern
   useEffect(() => {
-    let channel: any = null;
+    let userId: string | null = null;
+    let myCallback: Function | null = null;
 
     const setupRealtimeSubscription = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
+      
+      userId = user.id;
+      const existing = activeBalanceSubscriptions.get(userId);
 
-      // Subscribe to profile changes for this user
-      channel = supabase
-        .channel(`user-balance-updates:${user.id}`)
+      // Create callback for this component instance
+      myCallback = (payload: any) => {
+        const updatedProfile = payload.new;
+        setCoinBalance(updatedProfile.coin_balance || 0);
+        setDiamondBalance(updatedProfile.earnings_balance || 0);
+        fetchGifterStatuses([userId!]).then((m) => {
+          setGifterStatus(m[userId!] || null);
+        });
+      };
+
+      if (existing) {
+        // Reuse existing subscription
+        existing.refCount++;
+        existing.callbacks.add(myCallback);
+        return;
+      }
+
+      // Create new subscription
+      const channel = supabase
+        .channel(`user-balance-updates:${userId}`)
         .on(
           'postgres_changes',
           {
             event: 'UPDATE',
             schema: 'public',
             table: 'profiles',
-            filter: `id=eq.${user.id}`,
+            filter: `id=eq.${userId}`,
           },
           (payload: any) => {
-            // Update balances in realtime when profile changes
-            const updatedProfile = payload.new;
-            setCoinBalance(updatedProfile.coin_balance || 0);
-            setDiamondBalance(updatedProfile.earnings_balance || 0);
-            fetchGifterStatuses([user.id]).then((m) => {
-              setGifterStatus(m[user.id] || null);
-            });
-            
-            console.log('[BALANCE] Real-time update:', {
-              coins: updatedProfile.coin_balance,
-              diamonds: updatedProfile.earnings_balance,
-              level: updatedProfile.gifter_level,
-            });
+            const sub = activeBalanceSubscriptions.get(userId!);
+            if (sub) {
+              sub.callbacks.forEach(cb => cb(payload));
+            }
           }
         )
         .subscribe();
+
+      activeBalanceSubscriptions.set(userId, {
+        channel,
+        refCount: 1,
+        callbacks: new Set([myCallback])
+      });
     };
 
     setupRealtimeSubscription();
 
     return () => {
-      if (channel) {
-        supabase.removeChannel(channel);
+      if (userId && myCallback) {
+        const existing = activeBalanceSubscriptions.get(userId);
+        if (existing) {
+          existing.callbacks.delete(myCallback);
+          existing.refCount--;
+          if (existing.refCount === 0) {
+            supabase.removeChannel(existing.channel);
+            activeBalanceSubscriptions.delete(userId);
+          }
+        }
       }
     };
   }, [supabase]);

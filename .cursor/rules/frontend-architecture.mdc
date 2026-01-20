@@ -1,70 +1,72 @@
 ---
-description: Frontend architecture specification for live streaming platform with gifting, battles and social features
+description: Specifies frontend architecture patterns, component organization, and state management for React Native mobile app
 ---
 
 
 # frontend-architecture
 
-## Core Components Architecture
+## Core Component Architecture
 
-### Live Streaming Management
-`mobile/screens/LiveRoomScreen.tsx` (Score: 85)
-- Multi-participant streaming room orchestration
-- Slot-based participant management with dynamic audio mixing
-- Battle vs Solo mode configurations  
-- Role-based publishing permissions system
-- Custom gesture overlay navigation (swipe UP/DOWN/LEFT/RIGHT)
+The frontend is organized around several key business domains:
 
-### Virtual Economy System  
-`mobile/overlays/GiftOverlay.tsx` (Score: 80)
-- Dual currency system (coins/diamonds)
-- Gift transaction workflow
-- Real-time balance management
-- Multi-participant gifting
+1. Gifter Tier System (85/100)
+- Centralized state management for gifter progression
+- Badge component hierarchy reflecting 10 unique tiers
+- Diamond tier infinite progression system
+- Gifter profile customization based on tier level
+Paths: apps/mobile/screens/GifterLevels/*, apps/mobile/components/GifterBadge/*
 
-### Profile Management
-`mobile/config/profileTypeConfig.ts` (Score: 70)
-- Role-based profile types (streamer, musician, comedian)
-- Feature availability matrix per profile type
-- Module-based customization system
-- Location privacy rules
+2. Live Content System (80/100)
+- Split view architecture for battle mode streaming
+- Viewer count aggregation components 
+- Real-time gift animation system
+- Platform-aware video layout engine
+Paths: apps/mobile/screens/Live/*, apps/mobile/components/LiveStream/*
 
-### Live Operations
-`mobile/screens/LiveOpsScreen.tsx` (Score: 75)
-- Real-time stream monitoring dashboard
-- Multi-region stream management
-- Stream health tracking
-- Operational control interfaces
+3. Dating Feature System (75/100)
+- Profile card component architecture
+- Two-way matching state management
+- Preference-based filtering components
+- Privacy-aware profile display system
+Paths: apps/mobile/screens/Dating/*, apps/mobile/components/ProfileCard/*
+
+4. Multi-Currency Wallet (70/100)
+- Unified wallet interface for coins/diamonds
+- Transaction history virtualization
+- Currency conversion components
+- Purchase flow state machine
+Paths: apps/mobile/screens/Wallet/*, apps/mobile/components/Transaction/*
 
 ## State Management
 
-### Room State
-`mobile/state/liveRoomUI.ts` (Score: 80)
-- Participant state tracking
-- Audio/video publishing permissions
-- Role-based feature access
-- Stream mode transitions
+1. Profile Context (75/100)
+- Centralized profile type management
+- Feature flag system by profile type
+- Module visibility control
+- Cross-platform feature parity handling
+Paths: apps/mobile/state/ProfileContext.tsx
 
-### Social Interactions
-`mobile/overlays/ChatOverlay.tsx` (Score: 75)
-- Chat level system
-- Gift integration
-- Moderation controls
-- Real-time participant lists
+2. Battle Context (70/100)
+- Real-time battle state synchronization
+- Team scoring management
+- Gift contribution tracking
+- Layout mode coordination
+Paths: apps/mobile/state/BattleContext.tsx
 
 ## UI Patterns
 
-### Stream Layouts
-- Dynamic grid system for battle mode
-- Solo streaming interface
-- Picture-in-picture support
-- Platform-specific optimizations
+1. Feed Systems (65/100)
+- Vertical scroll content feeds
+- Mode-based content filtering
+- Interaction tracking system
+- Delayed view counting
+Paths: apps/mobile/components/Feed/*
 
-### Overlay System
-- Gesture-based navigation
-- Context-aware controls
-- Multi-layer management
-- Permission-based visibility
+2. Gift Animation System (60/100)
+- Queue-based gift display
+- Multi-tier animation complexity
+- Performance-aware rendering
+Paths: apps/mobile/components/GiftAnimation/*
 
 $END$
 

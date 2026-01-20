@@ -113,8 +113,11 @@ serve(async (req: Request) => {
       });
     }
 
-    // Generate LiveKit token
-    const participantIdentity = `u_${user.id}`;
+    // Generate LiveKit token with device-scoped identity
+    // Format: u_<userId>:mobile:<deviceId>:<sessionId>
+    const deviceId = 'mobile_' + Date.now().toString().slice(-6); // Simple device ID for mobile
+    const sessionId = Date.now().toString();
+    const participantIdentity = `u_${user.id}:mobile:${deviceId}:${sessionId}`;
     const participantName = name || user.email?.split('@')[0] || 'User';
 
     const at = new AccessToken(LIVEKIT_API_KEY, LIVEKIT_API_SECRET, {

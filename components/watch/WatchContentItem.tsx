@@ -11,6 +11,8 @@ import { useViewTracking } from '@/hooks/useViewTracking';
 export interface WatchItemData {
   id: string;
   type: 'video' | 'live';
+  streamingMode?: 'solo' | 'group'; // For live streams: solo or group
+  roomKey?: string; // For group live streams: room key/slug (e.g., 'live_central')
   username: string;
   displayName?: string;
   avatarUrl?: string;
@@ -260,6 +262,8 @@ export function WatchContentItem({
               streamerProfileId={item.authorId}
               streamerUsername={username}
               displayName={displayName || username}
+              streamingMode={item.streamingMode || 'solo'}
+              roomKey={item.roomKey}
             />
           )}
         </>

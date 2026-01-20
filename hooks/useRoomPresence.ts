@@ -18,7 +18,9 @@ export function useRoomPresence({ userId, username, roomId, enabled = true }: Us
   const presenceRef = useRef(false);
   const heartbeatIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const cleanupTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const normalizedRoomId = roomId || 'live_central';
+  // CRITICAL: roomId is REQUIRED for group rooms. Do not write presence without it.
+  // This prevents 'global' or undefined room_id from being written.
+  const normalizedRoomId = roomId || null;
   const roomPresenceTableAvailableRef = useRef<boolean | null>(null);
   const hasRoomIdColumnRef = useRef<boolean | null>(null);
 
@@ -32,6 +34,8 @@ export function useRoomPresence({ userId, username, roomId, enabled = true }: Us
   const updatePresence = useCallback(
     async (isPresent: boolean, isLiveAvailable: boolean = false) => {
       if (!userId || !username || !enabled) return;
+      // CRITICAL: Do not write presence without a valid room_id
+      if (!normalizedRoomId) return;
       if (roomPresenceTableAvailableRef.current === false) return;
 
       try {
@@ -74,7 +78,12 @@ export function useRoomPresence({ userId, username, roomId, enabled = true }: Us
           presenceRef.current = true;
           roomPresenceTableAvailableRef.current = true;
         } else {
-          const { error } = await supabase.from('room_presence').delete().eq('profile_id', userId);
+          // CRITICAL: Include room_id in delete to only remove THIS room's presence
+          const { error } = await supabase
+            .from('room_presence')
+            .delete()
+            .eq('profile_id', userId)
+            .eq('room_id', normalizedRoomId);
           if (error) {
             if (missingTableError(error)) {
               roomPresenceTableAvailableRef.current = false;
@@ -153,9 +162,10 @@ export function useRoomPresence({ userId, username, roomId, enabled = true }: Us
   // Handle window/tab closing
   useEffect(() => {
     const handleBeforeUnload = () => {
-      if (userId && enabled && presenceRef.current) {
+      if (userId && enabled && presenceRef.current && normalizedRoomId) {
         // Use navigator.sendBeacon for best effort to send data on unload
-        const payload = JSON.stringify({ profile_id: userId });
+        // CRITICAL: Include room_id to only remove THIS room's presence
+        const payload = JSON.stringify({ profile_id: userId, room_id: normalizedRoomId });
         const blob = new Blob([payload], { type: 'application/json' });
         navigator.sendBeacon('/api/room-presence/remove', blob);
       }

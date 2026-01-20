@@ -349,7 +349,27 @@ export default function WatchScreen() {
 
   const handleLiveItemPress = useCallback((item: WatchItem) => {
     if (item.type === 'live') {
-      (navigation as any).navigate('LiveUserScreen', { username: item.username });
+      // Use canonical routing logic
+      const { parseLiveLocation, getLiveJoinTargetMobile } = require('../lib/liveJoinTarget');
+      const location = parseLiveLocation({
+        streamingMode: item.streamingMode,
+        username: item.username,
+        authorId: item.authorId,
+        roomKey: item.roomKey,
+      });
+
+      if (!location) {
+        console.error('[WatchScreen] Failed to parse live location');
+        return;
+      }
+
+      const target = getLiveJoinTargetMobile(location);
+      if (!target) {
+        console.error('[WatchScreen] Failed to get join target');
+        return;
+      }
+
+      (navigation as any).navigate(target.screen, target.params);
     }
   }, [navigation]);
 

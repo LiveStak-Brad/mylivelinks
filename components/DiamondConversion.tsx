@@ -6,6 +6,9 @@ import { Gem, Coins, AlertCircle, CheckCircle2, Info } from 'lucide-react';
 import { Button, Input, Card, CardContent } from '@/components/ui';
 import { Tooltip } from '@/components/ui/Tooltip';
 
+// Module-level singleton to prevent duplicate subscriptions (shared with UserStatsSection)
+const activeConversionSubscriptions = new Map<string, { channel: any; refCount: number; callbacks: Set<Function> }>();
+
 export default function DiamondConversion() {
   const [diamondBalance, setDiamondBalance] = useState<number>(0);
   const [coinBalance, setCoinBalance] = useState<number>(0);
@@ -22,45 +25,72 @@ export default function DiamondConversion() {
     loadBalances();
   }, []);
 
-  // Real-time subscription for balance updates
+  // Real-time subscription for balance updates with singleton pattern
   useEffect(() => {
-    let channel: any = null;
+    let userId: string | null = null;
+    let myCallback: Function | null = null;
 
     const setupRealtimeSubscription = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
+      
+      userId = user.id;
+      const existing = activeConversionSubscriptions.get(userId);
 
-      // Subscribe to profile changes for this user
-      channel = supabase
-        .channel(`conversion-balance-updates:${user.id}`)
+      // Create callback for this component instance
+      myCallback = (payload: any) => {
+        const updatedProfile = payload.new;
+        setCoinBalance(updatedProfile.coin_balance || 0);
+        setDiamondBalance(updatedProfile.earnings_balance || 0);
+      };
+
+      if (existing) {
+        // Reuse existing subscription
+        existing.refCount++;
+        existing.callbacks.add(myCallback);
+        return;
+      }
+
+      // Create new subscription
+      const channel = supabase
+        .channel(`conversion-balance-updates:${userId}`)
         .on(
           'postgres_changes',
           {
             event: 'UPDATE',
             schema: 'public',
             table: 'profiles',
-            filter: `id=eq.${user.id}`,
+            filter: `id=eq.${userId}`,
           },
           (payload: any) => {
-            // Update balances in realtime when profile changes
-            const updatedProfile = payload.new;
-            setCoinBalance(updatedProfile.coin_balance || 0);
-            setDiamondBalance(updatedProfile.earnings_balance || 0);
-            
-            console.log('[CONVERSION] Real-time balance update:', {
-              coins: updatedProfile.coin_balance,
-              diamonds: updatedProfile.earnings_balance,
-            });
+            const sub = activeConversionSubscriptions.get(userId!);
+            if (sub) {
+              sub.callbacks.forEach(cb => cb(payload));
+            }
           }
         )
         .subscribe();
+
+      activeConversionSubscriptions.set(userId, {
+        channel,
+        refCount: 1,
+        callbacks: new Set([myCallback])
+      });
     };
 
     setupRealtimeSubscription();
 
     return () => {
-      if (channel) {
-        supabase.removeChannel(channel);
+      if (userId && myCallback) {
+        const existing = activeConversionSubscriptions.get(userId);
+        if (existing) {
+          existing.callbacks.delete(myCallback);
+          existing.refCount--;
+          if (existing.refCount === 0) {
+            supabase.removeChannel(existing.channel);
+            activeConversionSubscriptions.delete(userId);
+          }
+        }
       }
     };
   }, [supabase]);

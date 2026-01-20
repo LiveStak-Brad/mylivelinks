@@ -71,7 +71,6 @@ export default function RoomPage() {
       if (roomError || !roomConfig) {
         // If room not found but it's Live Central, use default config
         if (isLiveCentral) {
-          console.log('[ROOM PAGE] Using default Live Central config');
           setRoom({
             id: 'live-central-default',
             room_key: 'live_central',
@@ -98,7 +97,6 @@ export default function RoomPage() {
           return;
         }
         
-        console.error('[ROOM PAGE] Error fetching room config:', roomError);
         setError('Room not found');
         return;
       }
@@ -128,7 +126,6 @@ export default function RoomPage() {
         setHasAccess(false);
       }
     } catch (err) {
-      console.error('[ROOM PAGE] Error:', err);
       setError('Failed to load room');
     } finally {
       setLoading(false);

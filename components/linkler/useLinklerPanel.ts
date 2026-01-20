@@ -78,7 +78,7 @@ export function useLinklerPanel(): LinklerPanelState {
     }
     return parsed;
   });
-  const [heartbeat, setHeartbeat] = useState(Date.now());
+  // Removed heartbeat state - no longer needed without 1s timer
   const [supportSessionId, setSupportSessionIdState] = useState(() => {
     if (!isBrowser()) return generateSessionId();
     const stored = window.localStorage.getItem(STORAGE_KEYS.SUPPORT_SESSION_ID);
@@ -117,23 +117,27 @@ export function useLinklerPanel(): LinklerPanelState {
     }
   }, [cooldownEndsAt]);
 
-  useEffect(() => {
-    const interval = setInterval(() => setHeartbeat(Date.now()), 1000);
-    return () => clearInterval(interval);
-  }, []);
+  // Removed 1-second heartbeat timer - cooldown is checked on-demand via useEffect below
 
   useEffect(() => {
     if (!cooldownEndsAt) return;
     if (cooldownEndsAt - Date.now() <= 0) {
       setCooldownEndsAt(null);
+      return;
     }
-  }, [cooldownEndsAt, heartbeat]);
+    // Check cooldown expiry with a single timeout instead of polling
+    const timeoutMs = cooldownEndsAt - Date.now();
+    const timeout = setTimeout(() => {
+      setCooldownEndsAt(null);
+    }, timeoutMs);
+    return () => clearTimeout(timeout);
+  }, [cooldownEndsAt]);
 
   const cooldownRemaining = useMemo(() => {
     if (!cooldownEndsAt) return 0;
-    const diff = cooldownEndsAt - heartbeat;
+    const diff = cooldownEndsAt - Date.now();
     return diff <= 0 ? 0 : Math.ceil(diff / 1000);
-  }, [cooldownEndsAt, heartbeat]);
+  }, [cooldownEndsAt]);
 
   const appendSupportMessage = useCallback((entry: CompanionEntry) => {
     setSupportMessages((prev) => {

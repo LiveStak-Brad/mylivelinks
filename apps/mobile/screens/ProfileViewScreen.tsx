@@ -118,6 +118,31 @@ export default function ProfileViewScreen({ routeParams }: ProfileViewScreenProp
       const b = parseInt(cleanHex.substring(4, 6), 16) || 255;
       return `rgba(${r}, ${g}, ${b}, ${alpha})`;
     };
+
+    const parseHexColor = (hex: string) => {
+      const cleanHex = hex.replace('#', '');
+      if (cleanHex.length === 3) {
+        const r = parseInt(cleanHex[0] + cleanHex[0], 16);
+        const g = parseInt(cleanHex[1] + cleanHex[1], 16);
+        const b = parseInt(cleanHex[2] + cleanHex[2], 16);
+        if (Number.isNaN(r) || Number.isNaN(g) || Number.isNaN(b)) return null;
+        return { r, g, b };
+      }
+      if (cleanHex.length !== 6) return null;
+      const r = parseInt(cleanHex.substring(0, 2), 16);
+      const g = parseInt(cleanHex.substring(2, 4), 16);
+      const b = parseInt(cleanHex.substring(4, 6), 16);
+      if (Number.isNaN(r) || Number.isNaN(g) || Number.isNaN(b)) return null;
+      return { r, g, b };
+    };
+
+    const isLightColor = (hex?: string | null) => {
+      if (!hex) return false;
+      const rgb = parseHexColor(hex);
+      if (!rgb) return false;
+      const luminance = (0.2126 * rgb.r + 0.7152 * rgb.g + 0.0722 * rgb.b) / 255;
+      return luminance > 0.72;
+    };
     
     // Border radius mapping (matches web)
     const radiusMap: Record<string, number> = {
@@ -143,13 +168,31 @@ export default function ProfileViewScreen({ routeParams }: ProfileViewScreenProp
     const fontPreset = profile?.font_preset || 'modern';
     const fontStyle = fontPresetMap[fontPreset] || {};
 
+    const cardIsLight = isLightColor(cardColor) && cardOpacity >= 0.5;
+    const safeTextOnLight = '#0F172A';
+    const safeMutedOnLight = '#64748B';
+    const safeTextOnDark = '#F1F5F9';
+    const safeMutedOnDark = 'rgba(241,245,249,0.78)';
+    const resolveReadableText = (candidate?: string | null) => {
+      if (!candidate) {
+        return cardIsLight ? safeTextOnLight : safeTextOnDark;
+      }
+      const candidateIsLight = isLightColor(candidate);
+      if (cardIsLight) {
+        return candidateIsLight ? safeTextOnLight : candidate;
+      }
+      return candidateIsLight ? candidate : safeTextOnDark;
+    };
+
     return {
       cardBg: hexToRgba(cardColor, cardOpacity),
       cardRadius: radiusMap[cardBorderRadius] ?? 16,
       accent: accentColor,
       // Text colors from profile customization
-      contentTextColor: profile?.content_text_color || stylesVars.text,
-      uiTextColor: profile?.ui_text_color || stylesVars.text,
+      contentTextColor: resolveReadableText(profile?.content_text_color),
+      uiTextColor: resolveReadableText(profile?.ui_text_color),
+      contentMutedTextColor: cardIsLight ? safeMutedOnLight : safeMutedOnDark,
+      uiMutedTextColor: cardIsLight ? safeMutedOnLight : safeMutedOnDark,
       // Additional fields
       buttonColor: profile?.button_color || null,
       linkColor: profile?.link_color || accentColor,
@@ -157,6 +200,22 @@ export default function ProfileViewScreen({ routeParams }: ProfileViewScreenProp
       fontStyle,
     };
   }, [profileData?.profile, stylesVars.primary, stylesVars.text]);
+
+  const cardTextColor = effectiveCustomization.contentTextColor;
+  const cardMutedTextColor = effectiveCustomization.contentMutedTextColor;
+  const cardUiTextColor = effectiveCustomization.uiTextColor;
+  const cardUiMutedTextColor = effectiveCustomization.uiMutedTextColor;
+
+  const cardColors = useMemo(
+    () => ({
+      ...stylesVars,
+      text: cardTextColor,
+      mutedText: cardMutedTextColor,
+      textSecondary: cardMutedTextColor,
+      icon: cardUiTextColor,
+    }),
+    [stylesVars, cardTextColor, cardMutedTextColor, cardUiTextColor]
+  );
 
   const isOwnProfile = useMemo(() => {
     if (!currentUser.userId || !profileData?.profile?.id) return false;
@@ -549,8 +608,24 @@ export default function ProfileViewScreen({ routeParams }: ProfileViewScreenProp
       <View style={styles.container}>
         {profile.is_live && (
           <LiveIndicatorBanner
-              onWatchLive={() => navigation.navigate('LiveUserScreen', { username: profile.username })}
-              colors={stylesVars}
+              onWatchLive={() => {
+                // Use canonical routing logic
+                const { parseLiveLocation, getLiveJoinTargetMobile } = require('../lib/liveJoinTarget');
+                const location = parseLiveLocation({
+                  streamingMode: (profile as any).streaming_mode || 'solo',
+                  username: profile.username,
+                  authorId: profile.id,
+                  roomKey: (profile as any).room_key,
+                });
+
+                if (location) {
+                  const target = getLiveJoinTargetMobile(location);
+                  if (target) {
+                    navigation.navigate(target.screen as never, target.params as never);
+                  }
+                }
+              }}
+              colors={cardColors}
             />
           )}
 
@@ -566,7 +641,7 @@ export default function ProfileViewScreen({ routeParams }: ProfileViewScreenProp
 
               <View style={styles.heroInfoCol}>
                 <View style={styles.heroNameRow}>
-                  <Text style={[styles.heroNameSmall, { color: stylesVars.text }]} numberOfLines={1}>
+                  <Text style={[styles.heroNameSmall, { color: cardTextColor }]} numberOfLines={1}>
                     {displayName}
                   </Text>
                   {profile.is_mll_pro && <MllProBadge size="md" />}
@@ -575,7 +650,7 @@ export default function ProfileViewScreen({ routeParams }: ProfileViewScreenProp
 
                 <View style={styles.heroMetaRow}>
                   {profile.username ? (
-                    <Text style={[styles.heroUsernameSmall, { color: stylesVars.mutedText }]} numberOfLines={1}>
+                    <Text style={[styles.heroUsernameSmall, { color: cardMutedTextColor }]} numberOfLines={1}>
                       @{profile.username}
                     </Text>
                   ) : null}
@@ -596,7 +671,7 @@ export default function ProfileViewScreen({ routeParams }: ProfileViewScreenProp
                   streakDays={profileData.streak_days}
                   gifterRank={profileData.gifter_rank}
                   streamerRank={profileData.streamer_rank}
-                  colors={stylesVars}
+                  colors={cardColors}
                 />
               </View>
             </View>
@@ -624,8 +699,8 @@ export default function ProfileViewScreen({ routeParams }: ProfileViewScreenProp
                     otherAvatarUrl: profile.avatar_url,
                   })}
                 >
-                  <Feather name="message-circle" size={16} color={stylesVars.text} />
-                  <Text style={[styles.buttonSecondaryText, { color: stylesVars.text }]}>Message</Text>
+                  <Feather name="message-circle" size={16} color={cardUiTextColor} />
+                  <Text style={[styles.buttonSecondaryText, { color: cardTextColor }]}>Message</Text>
                 </Pressable>
               )}
 
@@ -634,8 +709,8 @@ export default function ProfileViewScreen({ routeParams }: ProfileViewScreenProp
                   style={[styles.button, styles.buttonSecondary, { backgroundColor: stylesVars.card, borderColor: stylesVars.border }]}
                   onPress={() => navigation.navigate('SettingsProfileScreen')}
                 >
-                  <Feather name="edit-3" size={16} color={stylesVars.text} />
-                  <Text style={[styles.buttonSecondaryText, { color: stylesVars.text }]}>Edit Profile</Text>
+                  <Feather name="edit-3" size={16} color={cardUiTextColor} />
+                  <Text style={[styles.buttonSecondaryText, { color: cardTextColor }]}>Edit Profile</Text>
                 </Pressable>
               )}
 
@@ -643,8 +718,8 @@ export default function ProfileViewScreen({ routeParams }: ProfileViewScreenProp
                 style={[styles.button, styles.buttonSecondary, { backgroundColor: stylesVars.card, borderColor: stylesVars.border }]}
                 onPress={() => setShowShareModal(true)}
               >
-                <Feather name="share-2" size={16} color={stylesVars.text} />
-                <Text style={[styles.buttonSecondaryText, { color: stylesVars.text }]}>Share</Text>
+                <Feather name="share-2" size={16} color={cardUiTextColor} />
+                <Text style={[styles.buttonSecondaryText, { color: cardTextColor }]}>Share</Text>
               </Pressable>
 
               {!isOwnProfile && (
@@ -654,9 +729,9 @@ export default function ProfileViewScreen({ routeParams }: ProfileViewScreenProp
                   disabled={blockLoading}
                 >
                   {blockLoading ? (
-                    <ActivityIndicator size="small" color={stylesVars.text} />
+                    <ActivityIndicator size="small" color={cardUiTextColor} />
                   ) : (
-                    <Feather name="more-vertical" size={18} color={stylesVars.text} />
+                    <Feather name="more-vertical" size={18} color={cardUiTextColor} />
                   )}
                 </Pressable>
               )}
@@ -669,21 +744,21 @@ export default function ProfileViewScreen({ routeParams }: ProfileViewScreenProp
                 <Text style={[styles.countValue, { color: effectiveCustomization.accent }]}>
                   {profileData.follower_count.toLocaleString()}
                 </Text>
-                <Text style={[styles.countLabel, { color: stylesVars.mutedText }]}>Followers</Text>
+                <Text style={[styles.countLabel, { color: cardMutedTextColor }]}>Followers</Text>
               </Pressable>
 
               <Pressable style={styles.countChip} onPress={() => { setConnectionsInitialTab('following'); setShowConnectionsModal(true); }}>
                 <Text style={[styles.countValue, { color: effectiveCustomization.accent }]}>
                   {profileData.following_count.toLocaleString()}
                 </Text>
-                <Text style={[styles.countLabel, { color: stylesVars.mutedText }]}>Following</Text>
+                <Text style={[styles.countLabel, { color: cardMutedTextColor }]}>Following</Text>
               </Pressable>
 
               <Pressable style={styles.countChip} onPress={() => { setConnectionsInitialTab('friends'); setShowConnectionsModal(true); }}>
                 <Text style={[styles.countValue, { color: effectiveCustomization.accent }]}>
                   {profileData.friends_count.toLocaleString()}
                 </Text>
-                <Text style={[styles.countLabel, { color: stylesVars.mutedText }]}>Friends</Text>
+                <Text style={[styles.countLabel, { color: cardMutedTextColor }]}>Friends</Text>
               </Pressable>
             </View>
           </View>
@@ -704,7 +779,7 @@ export default function ProfileViewScreen({ routeParams }: ProfileViewScreenProp
               onlyfans={profile.social_onlyfans}
               isOwnProfile={isOwnProfile}
               onManage={() => navigation.navigate('SettingsProfileScreen')}
-              colors={stylesVars}
+              colors={cardColors}
               cardStyle={{
                 backgroundColor: effectiveCustomization.cardBg,
                 borderRadius: effectiveCustomization.cardRadius,
@@ -716,7 +791,7 @@ export default function ProfileViewScreen({ routeParams }: ProfileViewScreenProp
           {shouldShowSection('links') && (
             (profileData.links && profileData.links.length > 0) ? (
               <View style={[styles.card, { backgroundColor: effectiveCustomization.cardBg, borderColor: stylesVars.border, borderRadius: effectiveCustomization.cardRadius }]}>
-                <Text style={[styles.sectionTitle, { color: stylesVars.text }]}>
+                <Text style={[styles.sectionTitle, { color: cardTextColor }]}>
                   {profile.links_section_title || 'Links'}
                 </Text>
                 {profileData.links.map((link) => (
@@ -727,23 +802,23 @@ export default function ProfileViewScreen({ routeParams }: ProfileViewScreenProp
                   >
                     <View style={styles.linkRowLeft}>
                       <Feather name="link" size={16} color={effectiveCustomization.linkColor} />
-                      <Text style={[styles.linkTitle, { color: stylesVars.text }]} numberOfLines={1}>
+                      <Text style={[styles.linkTitle, { color: cardTextColor }]} numberOfLines={1}>
                         {link.title}
                       </Text>
                     </View>
-                    <Feather name="external-link" size={16} color={stylesVars.mutedText} />
+                    <Feather name="external-link" size={16} color={cardUiMutedTextColor} />
                   </Pressable>
                 ))}
               </View>
             ) : isOwnProfile ? (
               <View style={[styles.card, { backgroundColor: effectiveCustomization.cardBg, borderColor: stylesVars.border, borderRadius: effectiveCustomization.cardRadius }]}>
-                <Text style={[styles.sectionTitle, { color: stylesVars.text }]}>
+                <Text style={[styles.sectionTitle, { color: cardTextColor }]}>
                   {profile.links_section_title || 'Links'}
                 </Text>
                 <View style={styles.emptyStateContainer}>
-                  <Feather name="link" size={32} color={stylesVars.mutedText} style={{ opacity: 0.5 }} />
-                  <Text style={[styles.emptyStateTitle, { color: stylesVars.text }]}>No Links Yet</Text>
-                  <Text style={[styles.emptyStateText, { color: stylesVars.mutedText }]}>
+                  <Feather name="link" size={32} color={cardUiMutedTextColor} style={{ opacity: 0.5 }} />
+                  <Text style={[styles.emptyStateTitle, { color: cardTextColor }]}>No Links Yet</Text>
+                  <Text style={[styles.emptyStateText, { color: cardMutedTextColor }]}>
                     Add links to share with your visitors
                   </Text>
                   <Pressable
@@ -768,7 +843,7 @@ export default function ProfileViewScreen({ routeParams }: ProfileViewScreenProp
               avatarStyle={profile.top_friends_avatar_style}
               maxCount={profile.top_friends_max_count}
               onManage={() => setShowTopFriendsManager(true)}
-              colors={stylesVars}
+              colors={cardColors}
               cardStyle={{
                 backgroundColor: effectiveCustomization.cardBg,
                 borderRadius: effectiveCustomization.cardRadius,
@@ -782,7 +857,7 @@ export default function ProfileViewScreen({ routeParams }: ProfileViewScreenProp
               tabs={enabledTabs}
               activeTab={activeTab}
               onTabChange={setActiveTab}
-              colors={stylesVars}
+              colors={cardColors}
               cardStyle={{
                 backgroundColor: effectiveCustomization.cardBg,
                 borderRadius: effectiveCustomization.cardRadius,
@@ -795,7 +870,7 @@ export default function ProfileViewScreen({ routeParams }: ProfileViewScreenProp
             <InfoTab
               profile={profile}
               locationText={locationText}
-              colors={stylesVars}
+              colors={cardColors}
               cardStyle={{
                 backgroundColor: effectiveCustomization.cardBg,
                 borderRadius: effectiveCustomization.cardRadius,
@@ -813,7 +888,7 @@ export default function ProfileViewScreen({ routeParams }: ProfileViewScreenProp
                   supporters={profileData.top_supporters}
                   gifterStatuses={profileData.gifter_statuses}
                   onPressProfile={navigateToProfile}
-                  colors={stylesVars}
+                  colors={cardColors}
                   cardStyle={{
                     backgroundColor: effectiveCustomization.cardBg,
                     borderRadius: effectiveCustomization.cardRadius,
@@ -824,10 +899,10 @@ export default function ProfileViewScreen({ routeParams }: ProfileViewScreenProp
                 <View style={[styles.card, { backgroundColor: effectiveCustomization.cardBg, borderColor: stylesVars.border, borderRadius: effectiveCustomization.cardRadius, marginBottom: 16 }]}>
                   <View style={styles.sectionHeader}>
                     <Feather name="heart" size={20} color={stylesVars.primary} />
-                    <Text style={[styles.sectionTitle, { color: stylesVars.text, marginBottom: 0 }]}>Top Supporters</Text>
+                    <Text style={[styles.sectionTitle, { color: cardTextColor, marginBottom: 0 }]}>Top Supporters</Text>
                   </View>
                   <View style={styles.emptyStateContainer}>
-                    <Text style={[styles.emptyStateText, { color: stylesVars.mutedText }]}>
+                    <Text style={[styles.emptyStateText, { color: cardMutedTextColor }]}>
                       No supporters yet. Go live to receive gifts!
                     </Text>
                   </View>
@@ -839,7 +914,7 @@ export default function ProfileViewScreen({ routeParams }: ProfileViewScreenProp
                 <TopStreamersSection
                   streamers={profileData.top_streamers}
                   onPressProfile={navigateToProfile}
-                  colors={stylesVars}
+                  colors={cardColors}
                   cardStyle={{
                     backgroundColor: effectiveCustomization.cardBg,
                     borderRadius: effectiveCustomization.cardRadius,
@@ -850,10 +925,10 @@ export default function ProfileViewScreen({ routeParams }: ProfileViewScreenProp
                 <View style={[styles.card, { backgroundColor: effectiveCustomization.cardBg, borderColor: stylesVars.border, borderRadius: effectiveCustomization.cardRadius, marginBottom: 16 }]}>
                   <View style={styles.sectionHeader}>
                     <Feather name="video" size={20} color={stylesVars.primary} />
-                    <Text style={[styles.sectionTitle, { color: stylesVars.text, marginBottom: 0 }]}>Top Streamers</Text>
+                    <Text style={[styles.sectionTitle, { color: cardTextColor, marginBottom: 0 }]}>Top Streamers</Text>
                   </View>
                   <View style={styles.emptyStateContainer}>
-                    <Text style={[styles.emptyStateText, { color: stylesVars.mutedText }]}>
+                    <Text style={[styles.emptyStateText, { color: cardMutedTextColor }]}>
                       No streamers supported yet. Watch streams and send gifts!
                     </Text>
                   </View>
@@ -866,7 +941,7 @@ export default function ProfileViewScreen({ routeParams }: ProfileViewScreenProp
                   profileId={profile.id}
                   isOwnProfile={isOwnProfile}
                   onAddItem={() => {}}
-                  colors={stylesVars}
+                  colors={cardColors}
                   cardStyle={{
                     backgroundColor: effectiveCustomization.cardBg,
                     borderRadius: effectiveCustomization.cardRadius,
@@ -881,7 +956,7 @@ export default function ProfileViewScreen({ routeParams }: ProfileViewScreenProp
                   profileId={profile.id}
                   isOwnProfile={isOwnProfile}
                   onEdit={() => navigation.navigate('CreatorStudioUploadScreen', { defaultType: 'business' })}
-                  colors={stylesVars}
+                  colors={cardColors}
                   cardStyle={{
                     backgroundColor: effectiveCustomization.cardBg,
                     borderRadius: effectiveCustomization.cardRadius,
@@ -896,7 +971,7 @@ export default function ProfileViewScreen({ routeParams }: ProfileViewScreenProp
                   profileId={profile.id}
                   isOwnProfile={isOwnProfile}
                   onAddItem={() => setShowPortfolioManager(true)}
-                  colors={stylesVars}
+                  colors={cardColors}
                   cardStyle={{
                     backgroundColor: effectiveCustomization.cardBg,
                     borderRadius: effectiveCustomization.cardRadius,
@@ -911,7 +986,7 @@ export default function ProfileViewScreen({ routeParams }: ProfileViewScreenProp
                   profileId={profile.id}
                   isOwnProfile={isOwnProfile}
                   onAddEvent={() => {}}
-                  colors={stylesVars}
+                  colors={cardColors}
                   cardStyle={{
                     backgroundColor: effectiveCustomization.cardBg,
                     borderRadius: effectiveCustomization.cardRadius,
@@ -926,7 +1001,7 @@ export default function ProfileViewScreen({ routeParams }: ProfileViewScreenProp
                   profileId={profile.id}
                   isOwnProfile={isOwnProfile}
                   onEdit={() => {}}
-                  colors={stylesVars}
+                  colors={cardColors}
                   cardStyle={{
                     backgroundColor: effectiveCustomization.cardBg,
                     borderRadius: effectiveCustomization.cardRadius,
@@ -941,7 +1016,7 @@ export default function ProfileViewScreen({ routeParams }: ProfileViewScreenProp
                   profileId={profile.id}
                   isOwnProfile={isOwnProfile}
                   onEdit={() => navigation.navigate('CreatorStudioUploadScreen', { defaultType: 'music_video' })}
-                  colors={stylesVars}
+                  colors={cardColors}
                   cardStyle={{
                     backgroundColor: effectiveCustomization.cardBg,
                     borderRadius: effectiveCustomization.cardRadius,
@@ -955,7 +1030,7 @@ export default function ProfileViewScreen({ routeParams }: ProfileViewScreenProp
                 <StreamingStatsSection
                   stats={profileData.stream_stats}
                   isOwnProfile={isOwnProfile}
-                  colors={stylesVars}
+                  colors={cardColors}
                   cardStyle={{
                     backgroundColor: effectiveCustomization.cardBg,
                     borderRadius: effectiveCustomization.cardRadius,
@@ -968,7 +1043,7 @@ export default function ProfileViewScreen({ routeParams }: ProfileViewScreenProp
               {shouldShowSection('referral_network') && isOwnProfile && (
                 <ReferralNetworkSection
                   profileId={profile.id}
-                  colors={stylesVars}
+                  colors={cardColors}
                   cardStyle={{
                     backgroundColor: effectiveCustomization.cardBg,
                     borderRadius: effectiveCustomization.cardRadius,
@@ -981,7 +1056,7 @@ export default function ProfileViewScreen({ routeParams }: ProfileViewScreenProp
         <FeedTab 
           profileId={profile.id} 
           isOwnProfile={isOwnProfile}
-          colors={stylesVars}
+          colors={cardColors}
           cardStyle={{
             backgroundColor: effectiveCustomization.cardBg,
             borderRadius: effectiveCustomization.cardRadius,
@@ -992,7 +1067,7 @@ export default function ProfileViewScreen({ routeParams }: ProfileViewScreenProp
         <MediaTab 
           profileId={profile.id} 
           isOwnProfile={isOwnProfile}
-          colors={stylesVars}
+          colors={cardColors}
           cardStyle={{
             backgroundColor: effectiveCustomization.cardBg,
             borderRadius: effectiveCustomization.cardRadius,
@@ -1002,7 +1077,7 @@ export default function ProfileViewScreen({ routeParams }: ProfileViewScreenProp
       ) : activeTab === 'music_videos' ? (
         <MusicVideosTab 
           profileId={profile.id} 
-          colors={stylesVars}
+          colors={cardColors}
           isOwner={isOwnProfile}
           cardStyle={{
             backgroundColor: effectiveCustomization.cardBg,
@@ -1013,7 +1088,7 @@ export default function ProfileViewScreen({ routeParams }: ProfileViewScreenProp
       ) : activeTab === 'music' ? (
         <MusicTab 
           profileId={profile.id} 
-          colors={stylesVars}
+          colors={cardColors}
           isOwnProfile={isOwnProfile}
           cardStyle={{
             backgroundColor: effectiveCustomization.cardBg,
@@ -1025,7 +1100,7 @@ export default function ProfileViewScreen({ routeParams }: ProfileViewScreenProp
         <EventsTab 
           profileId={profile.id} 
           isOwnProfile={isOwnProfile}
-          colors={stylesVars}
+          colors={cardColors}
           cardStyle={{
             backgroundColor: effectiveCustomization.cardBg,
             borderRadius: effectiveCustomization.cardRadius,
@@ -1037,7 +1112,7 @@ export default function ProfileViewScreen({ routeParams }: ProfileViewScreenProp
           profileId={profile.id} 
           isOwnProfile={isOwnProfile}
           onAddItem={() => setShowPortfolioManager(true)}
-          colors={stylesVars}
+          colors={cardColors}
           cardStyle={{
             backgroundColor: effectiveCustomization.cardBg,
             borderRadius: effectiveCustomization.cardRadius,
@@ -1049,7 +1124,7 @@ export default function ProfileViewScreen({ routeParams }: ProfileViewScreenProp
           profileId={profile.id} 
           isOwnProfile={isOwnProfile}
           onAddVlog={() => navigation.navigate('CreatorStudioUploadScreen', { defaultType: 'vlog' })}
-          colors={stylesVars}
+          colors={cardColors}
           cardStyle={{
             backgroundColor: effectiveCustomization.cardBg,
             borderRadius: effectiveCustomization.cardRadius,
@@ -1062,7 +1137,7 @@ export default function ProfileViewScreen({ routeParams }: ProfileViewScreenProp
           username={profile.username} 
           displayName={profile.display_name}
           channelBannerUrl={profile.channel_banner_url}
-          colors={stylesVars} 
+          colors={cardColors} 
           isOwnProfile={isOwnProfile}
           cardStyle={{
             backgroundColor: effectiveCustomization.cardBg,
@@ -1079,7 +1154,7 @@ export default function ProfileViewScreen({ routeParams }: ProfileViewScreenProp
       ) : activeTab === 'podcasts' ? (
         <PodcastsTab 
           profileId={profile.id} 
-          colors={stylesVars} 
+          colors={cardColors} 
           isOwnProfile={isOwnProfile}
           cardStyle={{
             backgroundColor: effectiveCustomization.cardBg,
@@ -1090,7 +1165,7 @@ export default function ProfileViewScreen({ routeParams }: ProfileViewScreenProp
       ) : activeTab === 'movies' ? (
         <MoviesTab 
           profileId={profile.id} 
-          colors={stylesVars} 
+          colors={cardColors} 
           isOwnProfile={isOwnProfile}
           cardStyle={{
             backgroundColor: effectiveCustomization.cardBg,
@@ -1101,7 +1176,7 @@ export default function ProfileViewScreen({ routeParams }: ProfileViewScreenProp
       ) : activeTab === 'series' ? (
         <SeriesTab 
           profileId={profile.id} 
-          colors={stylesVars} 
+          colors={cardColors} 
           isOwnProfile={isOwnProfile}
           cardStyle={{
             backgroundColor: effectiveCustomization.cardBg,
@@ -1112,7 +1187,7 @@ export default function ProfileViewScreen({ routeParams }: ProfileViewScreenProp
       ) : activeTab === 'education' ? (
         <EducationTab 
           profileId={profile.id} 
-          colors={stylesVars} 
+          colors={cardColors} 
           isOwnProfile={isOwnProfile}
           cardStyle={{
             backgroundColor: effectiveCustomization.cardBg,
@@ -1123,7 +1198,7 @@ export default function ProfileViewScreen({ routeParams }: ProfileViewScreenProp
       ) : activeTab === 'comedy' ? (
         <ComedyTab 
           profileId={profile.id} 
-          colors={stylesVars} 
+          colors={cardColors} 
           isOwnProfile={isOwnProfile}
           cardStyle={{
             backgroundColor: effectiveCustomization.cardBg,
@@ -1135,7 +1210,7 @@ export default function ProfileViewScreen({ routeParams }: ProfileViewScreenProp
         <PlaylistsTab 
           profileId={profile.id}
           username={profile.username}
-          colors={stylesVars} 
+          colors={cardColors} 
           isOwnProfile={isOwnProfile}
           cardStyle={{
             backgroundColor: effectiveCustomization.cardBg,

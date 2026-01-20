@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { createClient } from '@/lib/supabase';
 import { isBlockedBidirectional } from '@/lib/blocks';
 import { Eye } from 'lucide-react';
@@ -10,6 +10,9 @@ import type { GifterStatus } from '@/lib/gifter-status';
 import { fetchGifterStatuses } from '@/lib/gifter-status-client';
 import UserActionCardV2 from './UserActionCardV2';
 import LiveAvatar from './LiveAvatar';
+
+// Module-level singleton to prevent duplicate subscriptions across React Strict Mode re-renders
+const activeViewerListSubscriptions = new Map<string, { channel: any; refCount: number }>();
 
 interface Viewer {
   profile_id: string;
@@ -41,10 +44,10 @@ export default function ViewerList({ roomId, onDragStart }: ViewerListProps) {
     gifterStatus?: GifterStatus | null;
     isLive?: boolean;
   } | null>(null);
-  const supabase = createClient();
+  // CRITICAL: Memoize Supabase client to prevent recreation on every render
+  const supabase = useMemo(() => createClient(), []);
 
   const normalizedRoomId = roomId || 'live_central';
-  const [hasRoomIdColumn, setHasRoomIdColumn] = useState<boolean>(true);
   
   // Debounce timer ref to prevent excessive API calls
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -76,6 +79,19 @@ export default function ViewerList({ roomId, onDragStart }: ViewerListProps) {
   }, []);
 
   useEffect(() => {
+    // CRITICAL: Use module-level singleton to prevent duplicate subscriptions
+    const existingSub = activeViewerListSubscriptions.get(normalizedRoomId);
+    if (existingSub) {
+      existingSub.refCount++;
+      return () => {
+        existingSub.refCount--;
+        if (existingSub.refCount <= 0) {
+          supabase.removeChannel(existingSub.channel);
+          activeViewerListSubscriptions.delete(normalizedRoomId);
+        }
+      };
+    }
+    
     // Get current user ID and load viewers
     const initViewers = async () => {
       const { data: { user } } = await supabase.auth.getUser();
@@ -88,26 +104,156 @@ export default function ViewerList({ roomId, onDragStart }: ViewerListProps) {
     
     initViewers();
 
-    // Realtime subscriptions for room_presence (global room presence)
-    const roomPresenceChannel = supabase
-      .channel(`room-presence-realtime-${normalizedRoomId}`)
+    // Helper to fetch profile for a new viewer
+    const fetchViewerProfile = async (profileId: string, presenceRow: any): Promise<Viewer | null> => {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('id, username, avatar_url')
+        .eq('id', profileId)
+        .single();
+      
+      if (!profile) return null;
+
+      // Check if they're live
+      const { data: liveStreams } = await supabase
+        .from('live_streams')
+        .select('id, live_available')
+        .eq('profile_id', profileId)
+        .eq('live_available', true)
+        .limit(1);
+
+      const liveStream = liveStreams?.[0];
+
+      return {
+        profile_id: profileId,
+        username: presenceRow?.username || profile.username,
+        avatar_url: profile.avatar_url ?? undefined,
+        is_active: true,
+        last_active_at: presenceRow?.last_seen_at || new Date().toISOString(),
+        is_live_available: presenceRow?.is_live_available || liveStream?.live_available || false,
+        is_published: false,
+        live_stream_id: liveStream?.id ?? undefined,
+      };
+    };
+
+    // INCREMENTAL realtime updates for room_presence
+    // No server-side filter - client-side filtering to avoid CHANNEL_ERROR
+    const channelName = `room-presence-${normalizedRoomId}`;
+    const roomPresenceChannel = supabase.channel(channelName);
+    
+    // Register in module-level singleton
+    activeViewerListSubscriptions.set(normalizedRoomId, { channel: roomPresenceChannel, refCount: 1 });
+    
+    roomPresenceChannel
       .on(
         'postgres_changes',
         {
-          event: '*',
+          event: 'INSERT',
           schema: 'public',
           table: 'room_presence',
-          ...(hasRoomIdColumn ? { filter: `room_id=eq.${normalizedRoomId}` } : {}),
         },
-        () => {
-          // Debounced reload when room presence changes
-          debouncedLoadViewers();
+        async (payload) => {
+          const newRow = payload.new as any;
+          if (!newRow?.profile_id) return;
+          
+          // Client-side filter: only process for this room
+          if (newRow.room_id !== normalizedRoomId) return;
+          
+          // Fetch full profile and add to list
+          const newViewer = await fetchViewerProfile(newRow.profile_id, newRow);
+          if (newViewer) {
+            setViewers(prev => {
+              // Don't add duplicates
+              if (prev.some(v => v.profile_id === newViewer.profile_id)) return prev;
+              // Add and re-sort (live users first)
+              const updated = [...prev, newViewer];
+              return updated.sort((a, b) => {
+                if (a.is_live_available && !b.is_live_available) return -1;
+                if (!a.is_live_available && b.is_live_available) return 1;
+                return new Date(b.last_active_at).getTime() - new Date(a.last_active_at).getTime();
+              });
+            });
+            
+            // Fetch gifter status for new viewer
+            fetchGifterStatuses([newViewer.profile_id]).then(statusMap => {
+              setGifterStatusMap(prev => ({ ...prev, ...statusMap }));
+            });
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'DELETE',
+          schema: 'public',
+          table: 'room_presence',
+        },
+        (payload) => {
+          const oldRow = payload.old as any;
+          if (!oldRow?.profile_id) return;
+          
+          // Client-side filter: only process for this room
+          if (oldRow.room_id !== normalizedRoomId) return;
+          
+          // Remove from list
+          setViewers(prev => prev.filter(v => v.profile_id !== oldRow.profile_id));
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'room_presence',
+        },
+        (payload) => {
+          const updatedRow = payload.new as any;
+          if (!updatedRow?.profile_id) return;
+          
+          // Client-side filter: only process for this room
+          if (updatedRow.room_id !== normalizedRoomId) return;
+          
+          // Only update if meaningful data changed (not just heartbeat timestamp)
+          setViewers(prev => {
+            const existingViewer = prev.find(v => v.profile_id === updatedRow.profile_id);
+            if (!existingViewer) return prev; // Not in list, ignore
+            
+            // Check if anything meaningful changed
+            const usernameChanged = updatedRow.username && updatedRow.username !== existingViewer.username;
+            const liveStatusChanged = updatedRow.is_live_available !== undefined && 
+                                      updatedRow.is_live_available !== existingViewer.is_live_available;
+            
+            // Skip update if only timestamp changed (heartbeat)
+            if (!usernameChanged && !liveStatusChanged) {
+              return prev; // No meaningful change, skip re-render
+            }
+            
+            const updated = prev.map(v => {
+              if (v.profile_id !== updatedRow.profile_id) return v;
+              return {
+                ...v,
+                username: updatedRow.username || v.username,
+                is_live_available: updatedRow.is_live_available ?? v.is_live_available,
+                last_active_at: updatedRow.last_seen_at || v.last_active_at,
+              };
+            });
+            // Re-sort only when live status changes
+            if (liveStatusChanged) {
+              return updated.sort((a, b) => {
+                if (a.is_live_available && !b.is_live_available) return -1;
+                if (!a.is_live_available && b.is_live_available) return 1;
+                return new Date(b.last_active_at).getTime() - new Date(a.last_active_at).getTime();
+              });
+            }
+            return updated;
+          });
         }
       )
       .subscribe();
 
+    // Live streams channel - only for live status changes (incremental)
     const liveStreamsChannel = supabase
-      .channel('live-streams-realtime')
+      .channel(`live-streams-viewer-${normalizedRoomId}`)
       .on(
         'postgres_changes',
         {
@@ -115,21 +261,50 @@ export default function ViewerList({ roomId, onDragStart }: ViewerListProps) {
           schema: 'public',
           table: 'live_streams',
         },
-        () => {
-          // Debounced reload when live status changes
-          debouncedLoadViewers();
+        (payload) => {
+          const record = (payload.new || payload.old) as any;
+          if (!record?.profile_id) return;
+          
+          // Update live status for matching viewer
+          setViewers(prev => {
+            const hasViewer = prev.some(v => v.profile_id === record.profile_id);
+            if (!hasViewer) return prev;
+            
+            const updated = prev.map(v => {
+              if (v.profile_id !== record.profile_id) return v;
+              return {
+                ...v,
+                is_live_available: record.live_available ?? false,
+                live_stream_id: record.id ?? v.live_stream_id,
+              };
+            });
+            // Re-sort after live status change
+            return updated.sort((a, b) => {
+              if (a.is_live_available && !b.is_live_available) return -1;
+              if (!a.is_live_available && b.is_live_available) return 1;
+              return new Date(b.last_active_at).getTime() - new Date(a.last_active_at).getTime();
+            });
+          });
         }
       )
       .subscribe();
 
     return () => {
-      supabase.removeChannel(roomPresenceChannel);
-      supabase.removeChannel(liveStreamsChannel);
+      // Decrement ref count and only remove if no more refs
+      const sub = activeViewerListSubscriptions.get(normalizedRoomId);
+      if (sub) {
+        sub.refCount--;
+        if (sub.refCount <= 0) {
+          supabase.removeChannel(roomPresenceChannel);
+          supabase.removeChannel(liveStreamsChannel);
+          activeViewerListSubscriptions.delete(normalizedRoomId);
+        }
+      }
       if (debounceTimerRef.current) {
         clearTimeout(debounceTimerRef.current);
       }
     };
-  }, [normalizedRoomId, supabase, hasRoomIdColumn, debouncedLoadViewers]);
+  }, [normalizedRoomId]); // Remove supabase from deps - it's now memoized
 
   const loadViewers = async () => {
     try {
@@ -160,38 +335,14 @@ export default function ViewerList({ roomId, onDragStart }: ViewerListProps) {
         // ignore
       }
 
-      // Get viewers from room_presence (global room presence, NOT tile watching)
-      // This shows everyone currently on /live page, regardless of what tiles they're watching
-      let presenceData: any[] | null = null;
-      let error: any = null;
-
-      if (hasRoomIdColumn) {
-        const scoped = await supabase
-          .from('room_presence')
-          .select('profile_id, username, is_live_available, last_seen_at, room_id')
-          .eq('room_id', normalizedRoomId)
-          .gt('last_seen_at', new Date(Date.now() - 60000).toISOString())
-          .order('is_live_available', { ascending: false })
-          .order('last_seen_at', { ascending: false });
-
-        if (scoped.error?.code === '42703') {
-          setHasRoomIdColumn(false);
-        } else {
-          presenceData = scoped.data;
-          error = scoped.error;
-        }
-      }
-
-      if (!hasRoomIdColumn || error?.code === '42703' || presenceData == null) {
-        const unscoped = await supabase
-          .from('room_presence')
-          .select('profile_id, username, is_live_available, last_seen_at')
-          .gt('last_seen_at', new Date(Date.now() - 60000).toISOString())
-          .order('is_live_available', { ascending: false })
-          .order('last_seen_at', { ascending: false });
-        presenceData = unscoped.data;
-        error = unscoped.error;
-      }
+      // Get viewers from room_presence scoped by room_id (canonical key)
+      const { data: presenceData, error } = await supabase
+        .from('room_presence')
+        .select('profile_id, username, is_live_available, last_seen_at, room_id')
+        .eq('room_id', normalizedRoomId)
+        .gt('last_seen_at', new Date(Date.now() - 90000).toISOString()) // 90s threshold for WiFi lag tolerance
+        .order('is_live_available', { ascending: false })
+        .order('last_seen_at', { ascending: false });
 
       if (error) throw error;
 
@@ -286,8 +437,7 @@ export default function ViewerList({ roomId, onDragStart }: ViewerListProps) {
       const statusMap = await fetchGifterStatuses(sortedViewers.map((v) => v.profile_id));
       setGifterStatusMap(statusMap);
     } catch (error) {
-      console.error('Error loading viewers:', error);
-      // No fallback needed - room_presence is the source of truth for viewer list
+      // Silently fail - room_presence is the source of truth for viewer list
     } finally {
       setLoading(false);
     }

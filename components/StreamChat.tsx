@@ -44,10 +44,7 @@ interface ChatProps {
 }
 
 export default function StreamChat({ liveStreamId, onGiftClick, onShareClick, onSettingsClick, readOnly = false, alwaysAutoScroll = false, onRequestGuestClick, showRequestGuestButton = false, onLikeClick, isLiked = false, likesCount = 0, showLikePop = false }: ChatProps) {
-  console.log('[STREAMCHAT] 🎬 StreamChat rendered with liveStreamId:', liveStreamId, 'readOnly:', readOnly, 'alwaysAutoScroll:', alwaysAutoScroll);
-  
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  console.log('[STREAMCHAT] 📊 Current messages in state:', messages.length);
   const [giftPopup, setGiftPopup] = useState<{
     message: string;
     emoji: string;
@@ -211,7 +208,6 @@ export default function StreamChat({ liveStreamId, onGiftClick, onShareClick, on
     
     settingsChannel.onmessage = (event) => {
       if (event.data.type === 'settings-updated') {
-        console.log('[STREAMCHAT] 📻 Received settings update broadcast:', event.data);
         const { profile_id, chat_bubble_color, chat_font } = event.data;
         
         // Update cache
@@ -228,8 +224,6 @@ export default function StreamChat({ liveStreamId, onGiftClick, onShareClick, on
               : msg
           )
         );
-        
-        console.log('[STREAMCHAT] ✅ Applied settings update to messages');
       }
     };
 
@@ -270,7 +264,6 @@ export default function StreamChat({ liveStreamId, onGiftClick, onShareClick, on
                 chat_bubble_color: settings.chat_bubble_color,
                 chat_font: settings.chat_font,
               };
-              console.log('[STREAMCHAT] 💾 Pre-loaded current user chat settings into cache:', settings);
             }
           });
       } else {
@@ -669,21 +662,8 @@ export default function StreamChat({ liveStreamId, onGiftClick, onShareClick, on
     }
   }, [supabase, scrollToBottom]); // Only depend on stable references
 
-  // Fallback polling (P0 reliability): if realtime misses events, this keeps Host+Viewer consistent.
-  // Primary updates come from realtime subscription; this is safety net only.
-  useEffect(() => {
-    if (!liveStreamId) return;
-    let cancelled = false;
-    const interval = setInterval(() => {
-      if (cancelled) return;
-      // Best-effort refresh without showing a spinner (isInitialLoad will be false if we already have messages)
-      void loadMessages();
-    }, 30000); // Increased from 4s to 30s - realtime is primary
-    return () => {
-      cancelled = true;
-      clearInterval(interval);
-    };
-  }, [liveStreamId, loadMessages]);
+  // Event-driven updates only - NO POLLING
+  // Messages update via realtime subscription only (see realtime subscription below)
 
   // CRITICAL: Use useCallback to prevent stale closures
   const loadMessageWithProfile = useCallback(async (message: any) => {

@@ -68,6 +68,8 @@ export function useWatchFeed(options: UseWatchFeedOptions = {}): WatchFeedResult
     return {
       id: row.item_id,
       type: row.item_type === 'live' ? 'live' : 'video',
+      streamingMode: row.streaming_mode as 'solo' | 'group' | undefined,
+      roomKey: row.room_key || undefined,
       username: row.author_username,
       displayName: row.author_display_name,
       avatarUrl: row.author_avatar_url || undefined,

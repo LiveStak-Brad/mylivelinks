@@ -122,7 +122,8 @@ export function useStreamTopGifters({
     // Initial load
     void load(true);
 
-    // Realtime subscription on gifts table for INSERT events
+    // Event-driven updates only - NO POLLING
+    // Subscribe to gift INSERT events for this stream
     const giftChannel = supabase
       .channel(`gifts-stream-${liveStreamId}`)
       .on(
@@ -136,7 +137,7 @@ export function useStreamTopGifters({
         (payload) => {
           if (cancelled) return;
           // New gift received - reload to get accurate aggregation
-          // (Could do incremental update but reload is simpler and ensures accuracy)
+          // Updates ONLY on gift INSERT events
           void load(false);
         }
       )
@@ -144,14 +145,8 @@ export function useStreamTopGifters({
         console.log('[useStreamTopGifters] Realtime subscription:', status);
       });
 
-    // Fallback polling (increased from 7s to 30s - realtime is primary)
-    const interval = setInterval(() => {
-      if (!cancelled) void load(false);
-    }, Math.max(10000, pollIntervalMs));
-
     return () => {
       cancelled = true;
-      clearInterval(interval);
       giftChannel.unsubscribe();
     };
   }, [enabled, liveStreamId, limit, pollIntervalMs, supabase, load]);

@@ -372,7 +372,6 @@ interface ControlBarProps {
   isLandscape: boolean;
   onExitPress: () => void;
   onChatPress: () => void;
-  onGiftsPress: () => void;
   onLeaderboardPress: () => void;
   onStatsPress: () => void;
   onOptionsPress: () => void;
@@ -384,7 +383,6 @@ function ControlBar({
   isLandscape, 
   onExitPress, 
   onChatPress, 
-  onGiftsPress, 
   onLeaderboardPress, 
   onStatsPress, 
   onOptionsPress,
@@ -394,7 +392,6 @@ function ControlBar({
   const buttons = [
     { icon: 'arrow-back', label: 'Exit', onPress: onExitPress, active: false },
     { icon: 'chatbubble-ellipses', label: 'Chat', onPress: onChatPress },
-    { icon: 'gift', label: 'Gifts', onPress: onGiftsPress },
     { icon: 'trophy', label: 'Board', onPress: onLeaderboardPress },
     { icon: 'stats-chart', label: 'Stats', onPress: onStatsPress },
     { icon: 'settings', label: 'Options', onPress: onOptionsPress },
@@ -691,6 +688,10 @@ interface VideoTileProps {
   onToggleFullscreen: (tileId: string, participant: Participant | null, isLocal: boolean) => void;
   // 👁️ Hide participant
   onHideParticipant: (identity: string) => void;
+  // 💎 Gift / ❤️ Like actions
+  onGiftPress: (participant: Participant) => void;
+  onLikePress: (participant: Participant) => void;
+  isLiked?: boolean;
 }
 
 // FIX #2: Memoize VideoTile to prevent re-renders when other tiles change
@@ -710,6 +711,9 @@ const VideoTile = React.memo(({
   onVolumeChange,
   onToggleFullscreen,
   onHideParticipant,
+  onGiftPress,
+  onLikePress,
+  isLiked,
 }: VideoTileProps) => {
   const hasVideo = participant?.videoTrack || (isLocalTile && localVideoTrack);
   const videoTrack = participant?.videoTrack || localVideoTrack;
@@ -769,6 +773,22 @@ const VideoTile = React.memo(({
     ignoreNextDoubleTapRef.current = true;
     // Pass participantId as second param for mute/unmute detection
     onSpeakerIconPress(tileId, participantId);
+  };
+
+  const handleGiftPress = (e: any) => {
+    e?.stopPropagation?.();
+    ignoreNextDoubleTapRef.current = true;
+    if (participant) {
+      onGiftPress(participant);
+    }
+  };
+
+  const handleLikePress = (e: any) => {
+    e?.stopPropagation?.();
+    ignoreNextDoubleTapRef.current = true;
+    if (participant) {
+      onLikePress(participant);
+    }
   };
   
   return (
@@ -833,9 +853,35 @@ const VideoTile = React.memo(({
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             >
               <Ionicons
-                name={isMuted ? 'volume-mute' : 'volume-high'}
+                name={isMuted ? 'volume-mute-outline' : 'volume-high-outline'}
                 size={24}
                 color="#ffffff"
+              />
+            </Pressable>
+          )}
+          
+          {/* 🎁 GIFT BUTTON - BOTTOM LEFT (remote only) */}
+          {!isLocalTile && participant && (
+            <Pressable
+              style={styles.tileGiftButton}
+              onPress={handleGiftPress}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Ionicons name="gift-outline" size={18} color="#ffffff" />
+            </Pressable>
+          )}
+          
+          {/* ❤️ LIKE BUTTON - BOTTOM RIGHT (remote only) */}
+          {!isLocalTile && participant && (
+            <Pressable
+              style={styles.tileLikeButton}
+              onPress={handleLikePress}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Ionicons
+                name={isLiked ? 'heart' : 'heart-outline'}
+                size={18}
+                color={isLiked ? '#FF4458' : '#ffffff'}
               />
             </Pressable>
           )}
@@ -939,7 +985,8 @@ const VideoTile = React.memo(({
     prevProps.slotIndex === nextProps.slotIndex &&
     prevProps.volumeMap === nextProps.volumeMap &&
     prevProps.mutedParticipants === nextProps.mutedParticipants &&
-    prevProps.activeVolumeSliderTileId === nextProps.activeVolumeSliderTileId
+    prevProps.activeVolumeSliderTileId === nextProps.activeVolumeSliderTileId &&
+    prevProps.isLiked === nextProps.isLiked
   );
 });
 
@@ -966,6 +1013,10 @@ interface GridContainerProps {
   onToggleFullscreen: (tileId: string, participant: Participant | null, isLocal: boolean) => void;
   // 👁️ Hide participant
   onHideParticipant: (identity: string) => void;
+  // 💎 Gift / ❤️ Like actions
+  onGiftPress: (participant: Participant) => void;
+  onLikePress: (participant: Participant) => void;
+  isLikedForIdentity: (identity: string) => boolean;
   hiddenParticipants: Set<string>;
   slotAssignments: Map<number, string>;
 }
@@ -986,6 +1037,9 @@ function GridContainer({
   onVolumeChange,
   onToggleFullscreen,
   onHideParticipant,
+  onGiftPress,
+  onLikePress,
+  isLikedForIdentity,
   hiddenParticipants,
   slotAssignments,
 }: GridContainerProps) {
@@ -1049,6 +1103,8 @@ function GridContainer({
         }
       }
 
+      const isLiked = participant ? isLikedForIdentity(participant.identity) : false;
+
       rowTiles.push(
         <VideoTile
           key={`slot-${currentSlotIndex}`}
@@ -1067,6 +1123,9 @@ function GridContainer({
           onVolumeChange={onVolumeChange}
           onToggleFullscreen={onToggleFullscreen}
           onHideParticipant={onHideParticipant}
+          onGiftPress={onGiftPress}
+          onLikePress={onLikePress}
+          isLiked={isLiked}
         />
       );
       slotIndex++;
@@ -1254,6 +1313,7 @@ export default function RoomScreen() {
 
   // Group live stream state
   const groupLiveStreamIdRef = useRef<number | null>(null);
+  const [groupLiveStreamId, setGroupLiveStreamId] = useState<number | null>(null);
 
   // P1: Control bar and drawer state
   const [activeDrawer, setActiveDrawer] = useState<DrawerPanel>('none');
@@ -1267,6 +1327,80 @@ export default function RoomScreen() {
   // Mini profile modal state
   const [miniProfileVisible, setMiniProfileVisible] = useState(false);
   const [miniProfileData, setMiniProfileData] = useState<MiniProfileData | null>(null);
+  const [tileLikeMap, setTileLikeMap] = useState<Record<string, boolean>>({});
+
+  const getProfileIdFromIdentity = useCallback((identity: string | undefined | null): string | null => {
+    if (!identity) return null;
+    let raw = identity;
+    if (raw.startsWith('guest_')) raw = raw.slice('guest_'.length);
+    if (raw.startsWith('u_')) raw = raw.slice('u_'.length);
+    return raw.split(':')[0] || null;
+  }, []);
+
+  const handleTileGiftPress = useCallback((participant: Participant) => {
+    console.log('[TILE_GIFT] Open gift drawer for', participant.identity);
+    setActiveDrawer('gifts');
+  }, []);
+
+  const handleTileLikePress = useCallback(async (participant: Participant) => {
+    const profileId = getProfileIdFromIdentity(participant.identity);
+    if (!profileId) return;
+
+    if (!user) {
+      setTileLikeMap((prev) => ({ ...prev, [profileId]: !prev[profileId] }));
+      return;
+    }
+
+    const { data: liveStream } = await supabase
+      .from('live_streams')
+      .select('id')
+      .eq('profile_id', profileId)
+      .eq('live_available', true)
+      .order('started_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (!liveStream?.id) {
+      return;
+    }
+
+    let wasLiked = tileLikeMap[profileId];
+    if (typeof wasLiked !== 'boolean') {
+      const { data: existingLike } = await supabase
+        .from('stream_likes')
+        .select('id')
+        .eq('live_stream_id', liveStream.id)
+        .eq('profile_id', user.id)
+        .maybeSingle();
+      wasLiked = !!existingLike;
+    }
+
+    setTileLikeMap((prev) => ({ ...prev, [profileId]: !wasLiked }));
+
+    try {
+      if (wasLiked) {
+        await supabase
+          .from('stream_likes')
+          .delete()
+          .eq('live_stream_id', liveStream.id)
+          .eq('profile_id', user.id);
+      } else {
+        await supabase
+          .from('stream_likes')
+          .insert({
+            live_stream_id: liveStream.id,
+            profile_id: user.id,
+          });
+      }
+    } catch (err) {
+      setTileLikeMap((prev) => ({ ...prev, [profileId]: wasLiked }));
+    }
+  }, [getProfileIdFromIdentity, tileLikeMap, user, supabase]);
+
+  const isLikedForIdentity = useCallback((identity: string) => {
+    const profileId = getProfileIdFromIdentity(identity);
+    return profileId ? !!tileLikeMap[profileId] : false;
+  }, [getProfileIdFromIdentity, tileLikeMap]);
 
   // Replace streamer modal state
   const [replaceModalVisible, setReplaceModalVisible] = useState(false);
@@ -1464,6 +1598,7 @@ export default function RoomScreen() {
       const { liveStreamId, error: streamError } = await startLiveStreamRecord(user.id, 'group');
       if (!streamError && liveStreamId) {
         groupLiveStreamIdRef.current = liveStreamId;
+        setGroupLiveStreamId(liveStreamId);
       }
 
       updateRoomPresence(true, true);
@@ -1506,6 +1641,7 @@ export default function RoomScreen() {
       if (user && groupLiveStreamIdRef.current) {
         await endLiveStreamRecord(user.id);
         groupLiveStreamIdRef.current = null;
+        setGroupLiveStreamId(null);
       }
 
       // Update room presence
@@ -1995,6 +2131,11 @@ export default function RoomScreen() {
       setFullscreenParticipant(participant);
       setFullscreenIsLocal(isLocal);
       
+      // If device is already in landscape, avoid forcing orientation (prevents crashes)
+      if (isLandscape) {
+        return;
+      }
+
       // Determine video orientation from track dimensions
       try {
         const videoTrack = isLocal ? localVideoTrack : participant?.videoTrack;
@@ -2027,7 +2168,7 @@ export default function RoomScreen() {
         // Silently fail - worst case user can rotate manually
       }
     }
-  }, [fullscreenTileId, localVideoTrack]);
+  }, [fullscreenTileId, localVideoTrack, isLandscape]);
   
   // Close fullscreen when exiting (also unlock orientation)
   useEffect(() => {
@@ -2215,6 +2356,7 @@ export default function RoomScreen() {
         if (groupLiveStreamIdRef.current && currentUser) {
           endLiveStreamRecord(currentUser.id);
           groupLiveStreamIdRef.current = null;
+          setGroupLiveStreamId(null);
         }
         
         setIsPublishing(false);
@@ -2319,6 +2461,7 @@ export default function RoomScreen() {
       if (groupLiveStreamIdRef.current && currentUser) {
         endLiveStreamRecord(currentUser.id);
         groupLiveStreamIdRef.current = null;
+        setGroupLiveStreamId(null);
       }
       
       if (currentUser && presenceActiveRef.current && currentRoomConfig?.room_key) {
@@ -2425,6 +2568,9 @@ export default function RoomScreen() {
           onHideParticipant={(identity) => {
             setHiddenParticipants(prev => new Set([...prev, identity]));
           }}
+          onGiftPress={handleTileGiftPress}
+          onLikePress={handleTileLikePress}
+          isLikedForIdentity={isLikedForIdentity}
           hiddenParticipants={hiddenParticipants}
           slotAssignments={slotAssignments}
         />
@@ -2514,7 +2660,6 @@ export default function RoomScreen() {
           isLandscape={isLandscape}
           onExitPress={() => navigation.goBack()}
           onChatPress={() => setActiveDrawer('chat')}
-          onGiftsPress={() => setActiveDrawer('gifts')}
           onLeaderboardPress={() => setActiveDrawer('leaderboard')}
           onStatsPress={() => setActiveDrawer('stats')}
           onOptionsPress={() => setActiveDrawer('options')}
@@ -2533,7 +2678,6 @@ export default function RoomScreen() {
         scrollable={false}
         hideHeader={true}
         contentStyle={styles.chatDrawerContent}
-        containerStyle={styles.chatDrawerContainer}
       >
         <ChatContent roomSlug={chatRoomId} />
       </BottomDrawer>
@@ -2555,7 +2699,7 @@ export default function RoomScreen() {
         bottomInset={insets.bottom}
         isLandscape={isLandscape}
       >
-        <LeaderboardContent />
+        <LeaderboardContent roomSlug={chatRoomId} roomName={roomConfig?.name} />
       </BottomDrawer>
 
       <BottomDrawer
@@ -2565,7 +2709,7 @@ export default function RoomScreen() {
         bottomInset={insets.bottom}
         isLandscape={isLandscape}
       >
-        <StatsContent />
+        <StatsContent liveStreamId={groupLiveStreamId} />
       </BottomDrawer>
 
       <BottomDrawer
@@ -3090,7 +3234,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#1a1a1a',
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
-    maxHeight: '70%',
+    height: '60%',
+    maxHeight: '60%',
     minHeight: 200,
   },
   drawerContainerLandscape: {
@@ -3103,10 +3248,6 @@ const styles = StyleSheet.create({
     bottom: 0,
     width: '60%',
     maxWidth: 400,
-  },
-  chatDrawerContainer: {
-    maxHeight: '80%',
-    minHeight: '60%',
   },
   drawerHeader: {
     flexDirection: 'row',
@@ -3711,6 +3852,21 @@ const styles = StyleSheet.create({
     top: 8,
     right: 8,
     padding: 4,
+    zIndex: 10,
+  },
+  tileGiftButton: {
+    position: 'absolute',
+    bottom: 8,
+    left: 8,
+    padding: 4,
+    zIndex: 10,
+  },
+  tileLikeButton: {
+    position: 'absolute',
+    bottom: 8,
+    right: 8,
+    padding: 4,
+    borderRadius: 14,
     zIndex: 10,
   },
   volumeSliderContainer: {

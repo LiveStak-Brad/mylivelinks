@@ -346,8 +346,20 @@ export function WatchScreen({
               }}
               onCommentClick={() => {
                 if (item.type === 'live') {
-                  // For live streams, navigate to live room to comment
-                  window.location.href = `/live/${item.username}`;
+                  // For live streams, navigate to correct live destination to comment
+                  const { parseLiveLocation, getLiveJoinTargetWeb } = require('@/lib/liveJoinTarget');
+                  const location = parseLiveLocation({
+                    streamingMode: item.streamingMode,
+                    username: item.username,
+                    authorId: item.authorId,
+                    roomKey: (item as any).roomKey,
+                  });
+                  if (location) {
+                    const target = getLiveJoinTargetWeb(location);
+                    if (target) {
+                      window.location.href = target.path;
+                    }
+                  }
                 } else {
                   onComment?.((item as any).postId || item.id);
                 }

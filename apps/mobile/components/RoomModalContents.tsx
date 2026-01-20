@@ -3,8 +3,8 @@ import { View, StyleSheet, Text, ActivityIndicator, ScrollView, TextInput, Touch
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../state/AuthContext';
 import { getSupabaseClient } from '../lib/supabase';
-import { getAvatarSource } from '../lib/defaultAvatar';
-import { getGifterTierFromCoins, getTierByKey } from './live/ChatOverlay';
+import { getAvatarSource, getAvatarUrl } from '../lib/defaultAvatar';
+import { getTierByKey } from './live/ChatOverlay';
 import MllProBadge from './shared/MllProBadge';
 
 // ============================================================================
@@ -27,9 +27,15 @@ interface ChatMessage {
   is_mll_pro?: boolean;
 }
 
+type GifterStatusLite = {
+  tier_key: string;
+  level_in_tier: number;
+};
+
 export function ChatContent({ roomSlug }: { roomSlug?: string }) {
   const { user } = useAuth();
   const supabase = getSupabaseClient();
+  const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'https://www.mylivelinks.com';
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(true);
@@ -37,6 +43,8 @@ export function ChatContent({ roomSlug }: { roomSlug?: string }) {
   const listRef = useRef<FlatList<ChatMessage>>(null);
   const shouldAutoScrollRef = useRef(true);
   const initialScrollDoneRef = useRef(false);
+  const [gifterStatusMap, setGifterStatusMap] = useState<Record<string, GifterStatusLite>>({});
+  const gifterStatusCacheRef = useRef<Record<string, GifterStatusLite>>({});
   
   // FIX #3: Profile cache to prevent repeated fetches for same user
   const profileCacheRef = useRef<Map<string, {
@@ -48,6 +56,29 @@ export function ChatContent({ roomSlug }: { roomSlug?: string }) {
     is_mll_pro?: boolean;
   }>>(new Map());
   const chatRoomId = roomSlug;
+
+  const loadGifterStatuses = useCallback(async (profileIds: string[]) => {
+    const unique = Array.from(new Set(profileIds.filter((id) => typeof id === 'string' && id.length > 0)));
+    const missing = unique.filter((id) => !gifterStatusCacheRef.current[id]);
+    if (missing.length === 0) return;
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/gifter-status/batch`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ profileIds: missing }),
+      });
+
+      if (!response.ok) return;
+      const json = await response.json();
+      const statuses = (json?.statuses || {}) as Record<string, GifterStatusLite>;
+
+      gifterStatusCacheRef.current = { ...gifterStatusCacheRef.current, ...statuses };
+      setGifterStatusMap((prev) => ({ ...prev, ...statuses }));
+    } catch {
+      // ignore
+    }
+  }, [API_BASE_URL]);
 
   // Load initial messages
   const loadMessages = useCallback(async () => {
@@ -122,6 +153,11 @@ export function ChatContent({ roomSlug }: { roomSlug?: string }) {
         };
       });
 
+      const profileIds = messagesWithProfiles
+        .map((msg) => msg.profile_id)
+        .filter((id): id is string => typeof id === 'string');
+      void loadGifterStatuses(profileIds);
+
       setMessages(messagesWithProfiles);
       setInitialLoaded(true);
     } catch (error) {
@@ -181,6 +217,9 @@ export function ChatContent({ roomSlug }: { roomSlug?: string }) {
               total_spent: cachedProfile.total_spent || 0,
               is_mll_pro: cachedProfile.is_mll_pro || false,
             });
+            if (newMsg.profile_id) {
+              void loadGifterStatuses([newMsg.profile_id]);
+            }
           } else {
             // Cache miss - fetch and cache profile
             const { data: profile } = await supabase
@@ -213,6 +252,9 @@ export function ChatContent({ roomSlug }: { roomSlug?: string }) {
                 total_spent: profile.total_spent || 0,
                 is_mll_pro: profile.is_mll_pro || false,
               });
+              if (newMsg.profile_id) {
+                void loadGifterStatuses([newMsg.profile_id]);
+              }
             }
           }
         }
@@ -327,10 +369,11 @@ export function ChatContent({ roomSlug }: { roomSlug?: string }) {
                 </Text>
                 {msg.is_mll_pro ? <MllProBadge size="md" /> : null}
                 {(() => {
-                  const lifetime = Number(msg.total_spent ?? 0);
-                  if (lifetime <= 0) return null;
-                  const { tierKey, levelInTier } = getGifterTierFromCoins(lifetime);
-                  const tier = getTierByKey(tierKey);
+                  const profileId = msg.profile_id;
+                  if (!profileId) return null;
+                  const status = gifterStatusMap[profileId];
+                  if (!status) return null;
+                  const tier = getTierByKey(status.tier_key);
                   if (!tier) return null;
                   return (
                     <View style={[
@@ -339,7 +382,7 @@ export function ChatContent({ roomSlug }: { roomSlug?: string }) {
                     ]}>
                       <Text style={styles.gifterBadgeIcon}>{tier.icon}</Text>
                       <Text style={[styles.gifterBadgeLevel, { color: tier.color }]}>
-                        {levelInTier}
+                        {status.level_in_tier}
                       </Text>
                     </View>
                   );
@@ -381,7 +424,7 @@ export function ChatContent({ roomSlug }: { roomSlug?: string }) {
 // USER STATS CONTENT - Match web UserStatsSection.tsx exactly
 // ============================================================================
 
-export function StatsContent() {
+export function StatsContent({ liveStreamId }: { liveStreamId?: number | null }) {
   const { user } = useAuth();
   const supabase = getSupabaseClient();
   const [stats, setStats] = useState({
@@ -390,6 +433,13 @@ export function StatsContent() {
     username: '',
     avatarUrl: '',
     gifterLevel: 0,
+  });
+  const [sessionStats, setSessionStats] = useState({
+    startedAt: null as string | null,
+    viewerCount: 0,
+    likesCount: 0,
+    diamondsEarned: 0,
+    elapsedSeconds: 0,
   });
   const [loading, setLoading] = useState(true);
 
@@ -457,6 +507,85 @@ export function StatsContent() {
     }
   };
 
+  const loadSessionStats = useCallback(async () => {
+    if (!liveStreamId) {
+      setSessionStats({
+        startedAt: null,
+        viewerCount: 0,
+        likesCount: 0,
+        diamondsEarned: 0,
+        elapsedSeconds: 0,
+      });
+      return;
+    }
+
+    const { data: stream } = await supabase
+      .from('live_streams')
+      .select('started_at, viewer_count')
+      .eq('id', liveStreamId)
+      .maybeSingle();
+
+    const startedAt = (stream as any)?.started_at ?? null;
+    const viewerCount = Number((stream as any)?.viewer_count ?? 0);
+
+    const { count: likesCount } = await supabase
+      .from('stream_likes')
+      .select('id', { count: 'exact', head: true })
+      .eq('live_stream_id', liveStreamId);
+
+    const { data: gifts } = await supabase
+      .from('gifts')
+      .select('diamonds_awarded')
+      .eq('live_stream_id', liveStreamId);
+
+    const diamondsEarned = (gifts || []).reduce((sum, g) => sum + Number(g?.diamonds_awarded ?? 0), 0);
+
+    const elapsedSeconds = startedAt
+      ? Math.max(0, Math.floor((Date.now() - new Date(startedAt).getTime()) / 1000))
+      : 0;
+
+    setSessionStats({
+      startedAt,
+      viewerCount,
+      likesCount: likesCount ?? 0,
+      diamondsEarned,
+      elapsedSeconds,
+    });
+  }, [liveStreamId, supabase]);
+
+  useEffect(() => {
+    loadSessionStats();
+  }, [loadSessionStats]);
+
+  useEffect(() => {
+    if (!liveStreamId) return;
+    const interval = setInterval(() => {
+      loadSessionStats();
+    }, 20000);
+    return () => clearInterval(interval);
+  }, [liveStreamId, loadSessionStats]);
+
+  useEffect(() => {
+    if (!liveStreamId || !sessionStats.startedAt) return;
+    const interval = setInterval(() => {
+      setSessionStats(prev => ({
+        ...prev,
+        elapsedSeconds: Math.max(0, Math.floor((Date.now() - new Date(prev.startedAt!).getTime()) / 1000)),
+      }));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [liveStreamId, sessionStats.startedAt]);
+
+  const formatDuration = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const hrs = Math.floor(mins / 60);
+    const mm = mins % 60;
+    const ss = seconds % 60;
+    if (hrs > 0) return `${hrs}h ${mm}m`;
+    if (mins > 0) return `${mins}m ${ss}s`;
+    return `${ss}s`;
+  };
+
   if (loading) {
     return (
       <View style={styles.loading}>
@@ -503,6 +632,30 @@ export function StatsContent() {
           <Text style={styles.statLabel}>Diamonds</Text>
         </View>
       </View>
+
+      {liveStreamId && (
+        <View style={styles.sessionStatsContainer}>
+          <Text style={styles.sessionStatsTitle}>Session Stats</Text>
+          <View style={styles.sessionStatsGrid}>
+            <View style={styles.sessionStatItem}>
+              <Text style={styles.sessionStatValue}>{formatDuration(sessionStats.elapsedSeconds)}</Text>
+              <Text style={styles.sessionStatLabel}>Time Live</Text>
+            </View>
+            <View style={styles.sessionStatItem}>
+              <Text style={styles.sessionStatValue}>{sessionStats.diamondsEarned}</Text>
+              <Text style={styles.sessionStatLabel}>Earnings</Text>
+            </View>
+            <View style={styles.sessionStatItem}>
+              <Text style={styles.sessionStatValue}>{sessionStats.viewerCount}</Text>
+              <Text style={styles.sessionStatLabel}>Views</Text>
+            </View>
+            <View style={styles.sessionStatItem}>
+              <Text style={styles.sessionStatValue}>{sessionStats.likesCount}</Text>
+              <Text style={styles.sessionStatLabel}>Likes</Text>
+            </View>
+          </View>
+        </View>
+      )}
     </View>
   );
 }
@@ -515,96 +668,233 @@ interface LeaderboardEntry {
   profile_id: string;
   username: string;
   avatar_url?: string;
+  is_live?: boolean;
   rank: number;
   metric_value: number;
-  gifter_level?: number;
+  is_mll_pro?: boolean;
 }
 
-export function LeaderboardContent() {
+type LeaderboardType = 'top_streamers' | 'top_gifters';
+type Period = 'daily' | 'weekly' | 'monthly' | 'alltime';
+type LeaderboardScope = 'room' | 'global';
+
+export function LeaderboardContent({ roomSlug, roomName }: { roomSlug?: string; roomName?: string }) {
   const supabase = getSupabaseClient();
-  const [type, setType] = useState<'top_streamers' | 'top_gifters'>('top_streamers');
-  const [period, setPeriod] = useState<'daily' | 'weekly' | 'alltime'>('daily');
+  const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'https://www.mylivelinks.com';
+  const [type, setType] = useState<LeaderboardType>('top_streamers');
+  const [period, setPeriod] = useState<Period>('daily');
+  const [scope, setScope] = useState<LeaderboardScope>(roomSlug ? 'room' : 'global');
   const [entries, setEntries] = useState<LeaderboardEntry[]>([]);
   const [loading, setLoading] = useState(true);
+  const [gifterStatusMap, setGifterStatusMap] = useState<Record<string, GifterStatusLite>>({});
+  const gifterStatusCacheRef = useRef<Record<string, GifterStatusLite>>({});
+
+  useEffect(() => {
+    setScope(roomSlug ? 'room' : 'global');
+  }, [roomSlug]);
 
   useEffect(() => {
     loadLeaderboard();
-  }, [type, period]);
+  }, [type, period, scope, roomSlug]);
 
-  const loadLeaderboard = async () => {
-    setLoading(true);
+  useEffect(() => {
+    let reloadTimer: NodeJS.Timeout | null = null;
+
+    const debouncedReload = () => {
+      if (reloadTimer) clearTimeout(reloadTimer);
+      reloadTimer = setTimeout(() => {
+        loadLeaderboard(false);
+      }, 1000);
+    };
+
+    const entryTypeFilter =
+      type === 'top_streamers'
+        ? 'entry_type=like.diamond_earn%'
+        : 'entry_type=like.coin_spend%';
+
+    const ledgerChannel = supabase
+      .channel('leaderboard-ledger-updates')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'ledger_entries',
+          filter: entryTypeFilter,
+        },
+        () => {
+          debouncedReload();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      if (reloadTimer) clearTimeout(reloadTimer);
+      supabase.removeChannel(ledgerChannel);
+    };
+  }, [type, period, scope, roomSlug, supabase]);
+
+  const loadGifterStatuses = useCallback(async (profileIds: string[]) => {
+    const unique = Array.from(new Set(profileIds.filter((id) => typeof id === 'string' && id.length > 0)));
+    const missing = unique.filter((id) => !gifterStatusCacheRef.current[id]);
+    if (missing.length === 0) return;
+
     try {
-      const leaderboardKey = `${type}_${period}`;
-      const { data, error } = await supabase
-        .from('leaderboard_cache')
-        .select(`
-          profile_id,
-          rank,
-          metric_value,
-          profiles!inner (
-            id,
-            username,
-            avatar_url,
-            gifter_level
-          )
-        `)
-        .eq('leaderboard_type', leaderboardKey)
-        .order('rank', { ascending: true })
-        .limit(100);
+      const response = await fetch(`${API_BASE_URL}/api/gifter-status/batch`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ profileIds: missing }),
+      });
 
-      if (error) throw error;
+      if (!response.ok) return;
+      const json = await response.json();
+      const statuses = (json?.statuses || {}) as Record<string, GifterStatusLite>;
 
-      const formatted = (data || []).map((item: any) => ({
-        profile_id: item.profiles.id,
-        username: item.profiles.username,
-        avatar_url: item.profiles.avatar_url,
-        rank: item.rank,
-        metric_value: item.metric_value,
-        gifter_level: item.profiles.gifter_level || 0,
-      })).filter((entry: any) => Number(entry.metric_value ?? 0) > 0);
+      gifterStatusCacheRef.current = { ...gifterStatusCacheRef.current, ...statuses };
+      setGifterStatusMap((prev) => ({ ...prev, ...statuses }));
+    } catch {
+      // ignore
+    }
+  }, [API_BASE_URL]);
 
-      setEntries(formatted);
+  const loadLeaderboard = async (showLoading = true) => {
+    if (showLoading) setLoading(true);
+    try {
+      const roomIdParam = scope === 'room' ? roomSlug : null;
+      const roomIdParams =
+        scope === 'room' && roomSlug === 'live-central'
+          ? ['live-central', 'live_central']
+          : (roomIdParam ? [roomIdParam] : [null]);
+
+      const results = await Promise.all(
+        roomIdParams.map((rid) =>
+          supabase.rpc('get_leaderboard', {
+            p_type: type,
+            p_period: period,
+            p_limit: 100,
+            p_room_id: rid,
+          })
+        )
+      );
+
+      const firstError = results.find((r) => r.error)?.error;
+      if (firstError) {
+        throw firstError;
+      }
+
+      const combinedRows = results.flatMap((r) => (Array.isArray(r.data) ? (r.data as any[]) : []));
+
+      const mergedByProfile = new Map<string, any>();
+      for (const row of combinedRows) {
+        const key = String(row.profile_id);
+        const prev = mergedByProfile.get(key);
+        const nextMetric = Number(row.metric_value ?? 0);
+        if (!prev) {
+          mergedByProfile.set(key, {
+            ...row,
+            metric_value: nextMetric,
+          });
+        } else {
+          mergedByProfile.set(key, {
+            ...prev,
+            metric_value: Number(prev.metric_value ?? 0) + nextMetric,
+            username: prev.username || row.username,
+            avatar_url: prev.avatar_url || row.avatar_url,
+            is_live: Boolean(prev.is_live || row.is_live),
+            gifter_level: Math.max(Number(prev.gifter_level ?? 0), Number(row.gifter_level ?? 0)),
+          });
+        }
+      }
+
+      const mapped = Array.from(mergedByProfile.values())
+        .map((row: any) => ({
+          profile_id: row.profile_id,
+          username: row.username,
+          avatar_url: row.avatar_url,
+          is_live: Boolean(row.is_live ?? false),
+          metric_value: Number(row.metric_value ?? 0),
+          rank: 0,
+          is_mll_pro: row.is_mll_pro || false,
+        }))
+        .filter((entry: any) => Number(entry.metric_value ?? 0) > 0)
+        .sort((a: any, b: any) => Number(b.metric_value ?? 0) - Number(a.metric_value ?? 0))
+        .map((entry: any, idx: number) => ({ ...entry, rank: idx + 1 }));
+
+      setEntries(mapped);
+
+      if (mapped.length > 0) {
+        await loadGifterStatuses(mapped.map((e: any) => e.profile_id));
+      }
     } catch (error) {
-      // Silently fail
+      setEntries([]);
     } finally {
       setLoading(false);
     }
   };
 
+  const formatMetric = (value: number) => {
+    if (value >= 1000000) return `${(value / 1000000).toFixed(1)}M`;
+    if (value >= 1000) return `${(value / 1000).toFixed(1)}K`;
+    return value.toLocaleString();
+  };
+
   return (
     <View style={styles.leaderboardContainer}>
-      <View style={styles.leaderboardTabs}>
+      <Text style={styles.leaderboardHeader}>Leaderboards</Text>
+
+      <View style={styles.toggleRow}>
         <TouchableOpacity
-          style={[styles.leaderboardTab, type === 'top_streamers' && styles.leaderboardTabActive]}
+          style={[styles.toggleButton, type === 'top_streamers' && styles.toggleButtonActive]}
           onPress={() => setType('top_streamers')}
         >
-          <Text style={[styles.leaderboardTabText, type === 'top_streamers' && styles.leaderboardTabTextActive]}>
+          <Text style={[styles.toggleButtonText, type === 'top_streamers' && styles.toggleButtonTextActive]}>
             Streamers
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
-          style={[styles.leaderboardTab, type === 'top_gifters' && styles.leaderboardTabActive]}
+          style={[styles.toggleButton, type === 'top_gifters' && styles.toggleButtonActive]}
           onPress={() => setType('top_gifters')}
         >
-          <Text style={[styles.leaderboardTabText, type === 'top_gifters' && styles.leaderboardTabTextActive]}>
+          <Text style={[styles.toggleButtonText, type === 'top_gifters' && styles.toggleButtonTextActive]}>
             Gifters
           </Text>
         </TouchableOpacity>
       </View>
 
-      <View style={styles.leaderboardPeriodTabs}>
-        {(['daily', 'weekly', 'alltime'] as const).map((p) => (
+      <View style={styles.toggleRow}>
+        {(['daily', 'weekly', 'monthly', 'alltime'] as Period[]).map((p) => (
           <TouchableOpacity
             key={p}
-            style={[styles.leaderboardPeriodTab, period === p && styles.leaderboardPeriodTabActive]}
+            style={[styles.toggleButtonSmall, period === p && styles.toggleButtonSmallActive]}
             onPress={() => setPeriod(p)}
           >
-            <Text style={[styles.leaderboardPeriodTabText, period === p && styles.leaderboardPeriodTabTextActive]}>
-              {p === 'alltime' ? 'All Time' : p.charAt(0).toUpperCase() + p.slice(1)}
+            <Text style={[styles.toggleButtonSmallText, period === p && styles.toggleButtonSmallTextActive]}>
+              {p === 'alltime' ? 'All-Time' : p.charAt(0).toUpperCase() + p.slice(1)}
             </Text>
           </TouchableOpacity>
         ))}
       </View>
+
+      {roomSlug && (
+        <View style={styles.toggleRow}>
+          <TouchableOpacity
+            style={[styles.toggleButtonSmall, scope === 'room' && styles.toggleButtonSmallActive]}
+            onPress={() => setScope('room')}
+          >
+            <Text style={[styles.toggleButtonSmallText, scope === 'room' && styles.toggleButtonSmallTextActive]}>
+              {roomName || 'Room'}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.toggleButtonSmall, scope === 'global' && styles.toggleButtonSmallActive]}
+            onPress={() => setScope('global')}
+          >
+            <Text style={[styles.toggleButtonSmallText, scope === 'global' && styles.toggleButtonSmallTextActive]}>
+              Global
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
       {loading ? (
         <View style={styles.loading}>
@@ -612,35 +902,57 @@ export function LeaderboardContent() {
         </View>
       ) : entries.length === 0 ? (
         <View style={styles.noDataContainer}>
-          <Text style={styles.noDataText}>No leaderboard data yet</Text>
+          <Text style={styles.noDataText}>No entries yet. Be the first!</Text>
         </View>
       ) : (
         <ScrollView style={styles.leaderboardList}>
-          {entries.map((entry) => (
-            <View key={entry.profile_id} style={styles.leaderboardEntry}>
-              <Text style={[
-                styles.leaderboardRank,
-                entry.rank === 1 && styles.leaderboardRankGold,
-                entry.rank === 2 && styles.leaderboardRankSilver,
-                entry.rank === 3 && styles.leaderboardRankBronze,
-              ]}>
-                #{entry.rank}
-              </Text>
-              <Image
-                source={{ uri: entry.avatar_url || getAvatarUrl(entry.username) }}
-                style={styles.leaderboardAvatar}
-              />
-              <View style={styles.leaderboardUserInfo}>
-                <Text style={styles.leaderboardUsername}>{entry.username}</Text>
-                {entry.gifter_level > 0 && (
-                  <Text style={styles.leaderboardBadge}>L{entry.gifter_level}</Text>
-                )}
+          {entries.map((entry) => {
+            const gifterStatus = entry.profile_id ? gifterStatusMap[entry.profile_id] : undefined;
+            const tier = gifterStatus ? getTierByKey(gifterStatus.tier_key) : undefined;
+            const showGifterBadge = !!gifterStatus && Number(gifterStatus.lifetime_coins ?? 0) > 0;
+            const tierColor = gifterStatus?.tier_color || tier?.color || '#ffffff';
+            const tierIcon = gifterStatus?.tier_icon || tier?.icon || '';
+
+            return (
+              <View key={entry.profile_id} style={styles.leaderboardEntry}>
+                <Text style={[
+                  styles.leaderboardRank,
+                  entry.rank === 1 && styles.leaderboardRankGold,
+                  entry.rank === 2 && styles.leaderboardRankSilver,
+                  entry.rank === 3 && styles.leaderboardRankBronze,
+                ]}>
+                  #{entry.rank}
+                </Text>
+                <Image
+                  source={{ uri: entry.avatar_url || getAvatarUrl(entry.username) }}
+                  style={styles.leaderboardAvatar}
+                />
+                <View style={styles.leaderboardUserInfo}>
+                  <View style={styles.leaderboardNameRow}>
+                    <Text style={styles.leaderboardUsername}>{entry.username}</Text>
+                    <View style={styles.leaderboardBadges}>
+                      {entry.is_mll_pro ? (
+                        <View style={styles.badgeItem}>
+                          <MllProBadge size="sm" />
+                        </View>
+                      ) : null}
+                      {showGifterBadge && tierIcon ? (
+                        <View style={[styles.gifterBadgePill, styles.badgeItem, { backgroundColor: `${tierColor}30`, borderColor: `${tierColor}60` }]}>
+                          <Text style={styles.gifterBadgeIcon}>{tierIcon}</Text>
+                          <Text style={[styles.gifterBadgeLevel, { color: tierColor }]}>
+                            {gifterStatus?.level_in_tier}
+                          </Text>
+                        </View>
+                      ) : null}
+                    </View>
+                  </View>
+                </View>
+                <Text style={styles.leaderboardValue}>
+                  {formatMetric(entry.metric_value)}
+                </Text>
               </View>
-              <Text style={styles.leaderboardValue}>
-                {entry.metric_value.toLocaleString()}
-              </Text>
-            </View>
-          ))}
+            );
+          })}
         </ScrollView>
       )}
     </View>
@@ -890,6 +1202,42 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: 16,
   },
+  sessionStatsContainer: {
+    marginTop: 16,
+    padding: 12,
+    backgroundColor: '#1f1f1f',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#333',
+  },
+  sessionStatsTitle: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '700',
+    marginBottom: 8,
+  },
+  sessionStatsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  sessionStatItem: {
+    width: '48%',
+    backgroundColor: '#2a2a2a',
+    borderRadius: 8,
+    padding: 10,
+  },
+  sessionStatValue: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  sessionStatLabel: {
+    color: '#9ca3af',
+    fontSize: 12,
+    marginTop: 4,
+  },
   statItem: {
     flex: 1,
     alignItems: 'center',
@@ -915,49 +1263,52 @@ const styles = StyleSheet.create({
     flex: 1,
     minHeight: 400,
   },
-  leaderboardTabs: {
-    flexDirection: 'row',
-    padding: 12,
-    paddingBottom: 0,
-  },
-  leaderboardTab: {
-    flex: 1,
-    paddingVertical: 12,
-    alignItems: 'center',
-    borderBottomWidth: 2,
-    borderBottomColor: 'transparent',
-  },
-  leaderboardTabActive: {
-    borderBottomColor: '#4a90d9',
-  },
-  leaderboardTabText: {
-    color: '#888',
-    fontWeight: '600',
-  },
-  leaderboardTabTextActive: {
-    color: '#4a90d9',
-  },
-  leaderboardPeriodTabs: {
-    flexDirection: 'row',
-    padding: 12,
-  },
-  leaderboardPeriodTab: {
-    flex: 1,
-    paddingVertical: 8,
+  leaderboardHeader: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: '700',
+    marginBottom: 12,
     paddingHorizontal: 12,
-    borderRadius: 16,
-    backgroundColor: '#2a2a2a',
-    alignItems: 'center',
-    marginHorizontal: 4,
   },
-  leaderboardPeriodTabActive: {
+  toggleRow: {
+    flexDirection: 'row',
+    gap: 8,
+    paddingHorizontal: 12,
+    marginBottom: 10,
+  },
+  toggleButton: {
+    flex: 1,
+    backgroundColor: '#2a2a2a',
+    paddingVertical: 10,
+    borderRadius: 10,
+    alignItems: 'center',
+  },
+  toggleButtonActive: {
     backgroundColor: '#4a90d9',
   },
-  leaderboardPeriodTabText: {
-    color: '#888',
-    fontSize: 12,
+  toggleButtonText: {
+    color: '#cbd5f5',
+    fontWeight: '700',
   },
-  leaderboardPeriodTabTextActive: {
+  toggleButtonTextActive: {
+    color: '#fff',
+  },
+  toggleButtonSmall: {
+    flex: 1,
+    backgroundColor: '#2a2a2a',
+    paddingVertical: 8,
+    borderRadius: 10,
+    alignItems: 'center',
+  },
+  toggleButtonSmallActive: {
+    backgroundColor: '#3b82f6',
+  },
+  toggleButtonSmallText: {
+    color: '#cbd5f5',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  toggleButtonSmallTextActive: {
     color: '#fff',
   },
   leaderboardList: {
@@ -992,12 +1343,26 @@ const styles = StyleSheet.create({
   },
   leaderboardUserInfo: {
     flex: 1,
+    flexDirection: 'column',
+    minWidth: 0,
+  },
+  leaderboardNameRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 6,
+  },
+  leaderboardBadges: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginLeft: 6,
+  },
+  badgeItem: {
+    marginRight: 6,
   },
   leaderboardUsername: {
     color: '#fff',
-    marginRight: 6,
+    fontWeight: '600',
+    maxWidth: '70%',
   },
   leaderboardBadge: {
     backgroundColor: '#4a90d9',
