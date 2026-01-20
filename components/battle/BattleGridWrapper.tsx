@@ -67,6 +67,8 @@ interface BattleGridWrapperProps {
   onRoomConnected?: () => void;
   /** Callback when room disconnects */
   onRoomDisconnected?: () => void;
+  /** Callback when we detect an unknown participant - triggers session refresh */
+  onRefreshSession?: () => void;
 }
 
 export default function BattleGridWrapper({
@@ -78,6 +80,7 @@ export default function BattleGridWrapper({
   className = '',
   onRoomConnected,
   onRoomDisconnected,
+  onRefreshSession,
 }: BattleGridWrapperProps) {
   const [participants, setParticipants] = useState<GridTileParticipant[]>([]);
   const [volumes, setVolumes] = useState<ParticipantVolume[]>([]);
@@ -85,6 +88,9 @@ export default function BattleGridWrapper({
   const [participantsReady, setParticipantsReady] = useState(false);
   const [allowEmptyState, setAllowEmptyState] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  
+  // Track if we've already requested a refresh for unknown participants
+  const lastRefreshRequestRef = useRef<number>(0);
   
   const isBattleSession = session.type === 'battle';
   const isCohostSession = session.type === 'cohost';
@@ -371,16 +377,25 @@ export default function BattleGridWrapper({
         hostInfo = isHostA ? hostSnapshot.hostA : isHostB ? hostSnapshot.hostB : null;
       }
       
-      // Skip participants who are not invited hosts (never show UUID fallback)
+      // Skip participants who are not in our session data yet
       if (!hostInfo) {
-        console.warn('[LiveKit][Battle] Ignoring uninvited participant', {
+        console.warn('[LiveKit][Battle] Unknown participant - triggering refresh', {
           roomName,
           identity,
           normalizedUserId: userId,
           hostA: hostSnapshot.hostA?.id,
           hostB: hostSnapshot.hostB?.id,
+          participantsCount: hostSnapshot.participants?.length,
         });
-        return; // Skip this participant
+        
+        // Trigger a session refresh if we haven't recently (debounce 3 seconds)
+        const now = Date.now();
+        if (onRefreshSession && now - lastRefreshRequestRef.current > 3000) {
+          lastRefreshRequestRef.current = now;
+          console.log('[LiveKit][Battle] Requesting session refresh for unknown participant');
+          onRefreshSession();
+        }
+        return; // Skip this participant for now - will be added after refresh
       }
       
       // Find video and audio tracks

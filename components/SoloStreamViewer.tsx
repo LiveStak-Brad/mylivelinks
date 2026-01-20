@@ -2170,6 +2170,7 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
                     canPublish={false}
                     remainingSeconds={battleRemainingSeconds}
                     className="w-full h-full box-border pt-28 pb-[40vh]"
+                    onRefreshSession={refreshBattleSession}
                   />
                 ) : (
                   <>

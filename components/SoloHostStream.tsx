@@ -1971,6 +1971,7 @@ export default function SoloHostStream() {
                 canPublish={true}
                 remainingSeconds={battleRemainingSeconds}
                 className="w-full h-full box-border pt-28 pb-[38vh]"
+                onRefreshSession={refreshBattleSession}
               />
             ) : (
               /* Solo video element - normal host view */
