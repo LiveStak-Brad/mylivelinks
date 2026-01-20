@@ -235,7 +235,7 @@ export default function BattleGridWrapper({
     const states = new Map<string, BattleParticipantState>();
     
     // Determine if current user is host A or B
-    const isCurrentUserHostA = currentUserId === hostSnapshot.hostA.id;
+    const isCurrentUserHostA = currentUserId === hostSnapshot.hostA?.id;
     
     // Team-relative color assignment:
     // Current user always sees THEIR color on their side
@@ -260,18 +260,20 @@ export default function BattleGridWrapper({
     });
 
     // Other host state (second in grid)
-    const otherHostId = isCurrentUserHostA ? hostSnapshot.hostB.id : hostSnapshot.hostA.id;
-    states.set(otherHostId, {
+    const otherHostId = isCurrentUserHostA ? hostSnapshot.hostB?.id : hostSnapshot.hostA?.id;
+    if (otherHostId) {
+      states.set(otherHostId, {
       participantId: otherHostId,
       score: isCurrentUserHostA ? scoreB : scoreA,
       color: otherUserColor,
       teamId: isCurrentUserHostA ? 'B' : 'A',
       rank: isCurrentUserHostA ? (isALeading ? 2 : 1) : (isALeading ? 1 : 2),
       isLeading: isCurrentUserHostA ? !isALeading : isALeading,
-    });
+      });
+    }
 
     return states;
-  }, [hostSnapshot.hostA.id, hostSnapshot.hostB.id, currentUserId, isBattleSession, scores]);
+  }, [hostSnapshot.hostA?.id, hostSnapshot.hostB?.id, currentUserId, isBattleSession, scores]);
 
   const renderBattleOverlay = useCallback(
     (participant: GridTileParticipant) => {
@@ -304,18 +306,29 @@ export default function BattleGridWrapper({
       const videoTrack = local.getTrackPublication(Track.Source.Camera)?.track;
       const audioTrack = local.getTrackPublication(Track.Source.Microphone)?.track;
       
-      // Determine if this is host_a or host_b
-      const isHostA = currentUserId === hostSnapshot.hostA.id;
-      const hostInfo = isHostA ? hostSnapshot.hostA : hostSnapshot.hostB;
+      // Determine if this is host_a or host_b - use participants array first
+      let hostInfo: { id: string; username: string; display_name: string | null; avatar_url: string | null } | null = null;
+      if (hostSnapshot.participants) {
+        const participant = hostSnapshot.participants.find(p => p.id === currentUserId);
+        if (participant) {
+          hostInfo = participant;
+        }
+      }
+      if (!hostInfo) {
+        const isHostA = currentUserId === hostSnapshot.hostA?.id;
+        hostInfo = isHostA ? hostSnapshot.hostA : hostSnapshot.hostB;
+      }
       
-      gridParticipants.push({
-        id: currentUserId,
-        name: hostInfo.display_name || hostInfo.username,
-        videoTrack: videoTrack || undefined,
-        audioTrack: audioTrack || undefined,
-        isHost: true, // Current user is always "host" for their own view
-        avatarUrl: hostInfo.avatar_url || undefined,
-      });
+      if (hostInfo) {
+        gridParticipants.push({
+          id: currentUserId,
+          name: hostInfo.display_name || hostInfo.username,
+          videoTrack: videoTrack || undefined,
+          audioTrack: audioTrack || undefined,
+          isHost: true, // Current user is always "host" for their own view
+          avatarUrl: hostInfo.avatar_url || undefined,
+        });
+      }
     }
     
     // Add remote participants - ONLY if they are hostA or hostB (invited hosts only)
@@ -324,10 +337,19 @@ export default function BattleGridWrapper({
       const identity = participant.identity;
       const userId = normalizeParticipantId(identity);
       
-      // Determine participant info from session - must be hostA or hostB
-      const isHostA = userId === hostSnapshot.hostA.id;
-      const isHostB = userId === hostSnapshot.hostB.id;
-      const hostInfo = isHostA ? hostSnapshot.hostA : isHostB ? hostSnapshot.hostB : null;
+      // Determine participant info from session - check participants array first, then hostA/hostB
+      let hostInfo: { id: string; username: string; display_name: string | null; avatar_url: string | null } | null = null;
+      if (hostSnapshot.participants) {
+        const participant = hostSnapshot.participants.find(p => p.id === userId);
+        if (participant) {
+          hostInfo = participant;
+        }
+      }
+      if (!hostInfo) {
+        const isHostA = userId === hostSnapshot.hostA?.id;
+        const isHostB = userId === hostSnapshot.hostB?.id;
+        hostInfo = isHostA ? hostSnapshot.hostA : isHostB ? hostSnapshot.hostB : null;
+      }
       
       // Skip participants who are not invited hosts (never show UUID fallback)
       if (!hostInfo) {
@@ -335,8 +357,8 @@ export default function BattleGridWrapper({
           roomName,
           identity,
           normalizedUserId: userId,
-          hostA: hostSnapshot.hostA.id,
-          hostB: hostSnapshot.hostB.id,
+          hostA: hostSnapshot.hostA?.id,
+          hostB: hostSnapshot.hostB?.id,
         });
         return; // Skip this participant
       }
@@ -783,13 +805,24 @@ export default function BattleGridWrapper({
         async (payload) => {
           const invite = payload.new as any;
           if (invite.to_host_id === currentUserId && invite.type === 'battle' && invite.status === 'pending') {
-            // Get sender username
+            // Get sender username - check participants first, then hostA/hostB
             const otherHostId = invite.from_host_id;
-            const otherHost = otherHostId === hostSnapshot.hostA.id ? hostSnapshot.hostA : hostSnapshot.hostB;
-            setBattleInvite({
-              id: invite.id,
-              fromUsername: otherHost.display_name || otherHost.username,
-            });
+            let otherHost: { username: string; display_name: string | null } | null = null;
+            if (hostSnapshot.participants) {
+              const participant = hostSnapshot.participants.find(p => p.id === otherHostId);
+              if (participant) {
+                otherHost = participant;
+              }
+            }
+            if (!otherHost) {
+              otherHost = otherHostId === hostSnapshot.hostA?.id ? hostSnapshot.hostA : hostSnapshot.hostB;
+            }
+            if (otherHost) {
+              setBattleInvite({
+                id: invite.id,
+                fromUsername: otherHost.display_name || otherHost.username,
+              });
+            }
           }
         }
       )
