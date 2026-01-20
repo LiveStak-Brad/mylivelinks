@@ -485,6 +485,7 @@ interface ViewerEntry {
   display_name?: string;
   avatar_url?: string;
   joined_at: string;
+  is_active?: boolean;
 }
 
 export function ViewersSheet({ 
@@ -495,6 +496,10 @@ export function ViewersSheet({
 }: BaseSheetProps & { viewerCount: number; liveStreamId?: number }) {
   const [viewers, setViewers] = useState<ViewerEntry[]>([]);
   const [loading, setLoading] = useState(true);
+  const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'https://www.mylivelinks.com';
+  const activeViewers = viewers.filter(viewer => viewer.is_active);
+  const inactiveViewers = viewers.filter(viewer => !viewer.is_active);
+  const titleCount = viewers.length > 0 ? viewers.length : viewerCount;
 
   useEffect(() => {
     if (!visible || !liveStreamId) return;
@@ -502,35 +507,30 @@ export function ViewersSheet({
     const loadViewers = async () => {
       setLoading(true);
       try {
-        const { data, error } = await supabase
-          .from('active_viewers')
-          .select(`
-            profile_id,
-            joined_at,
-            profiles!inner (
-              username,
-              display_name,
-              avatar_url
-            )
-          `)
-          .eq('live_stream_id', liveStreamId)
-          .order('joined_at', { ascending: false });
-
-        if (error) {
-          console.error('[ViewersSheet] Error fetching viewers:', error);
+        const res = await fetch(`${API_BASE_URL}/api/active-viewers/list?live_stream_id=${liveStreamId}`);
+        if (!res.ok) {
+          console.error('[ViewersSheet] list fetch failed:', res.status);
+          setViewers([]);
+          return;
+        }
+        const data = await res.json();
+        if (!data || !Array.isArray(data.viewers)) {
+          setViewers([]);
           return;
         }
 
-        const mapped = (data || []).map((row: any) => ({
-          profile_id: row.profile_id,
-          username: row.profiles?.username || 'Unknown',
-          display_name: row.profiles?.display_name,
-          avatar_url: row.profiles?.avatar_url,
-          joined_at: row.joined_at,
+        const mapped = (data.viewers as any[]).map((viewer) => ({
+          profile_id: viewer.profile_id,
+          username: viewer.username || 'Unknown',
+          display_name: viewer.username || 'Unknown',
+          avatar_url: viewer.avatar_url,
+          joined_at: viewer.last_seen,
+          is_active: Boolean(viewer.is_active),
         }));
         setViewers(mapped);
       } catch (err) {
         console.error('[ViewersSheet] Error loading viewers:', err);
+        setViewers([]);
       } finally {
         setLoading(false);
       }
@@ -540,7 +540,7 @@ export function ViewersSheet({
   }, [visible, liveStreamId]);
 
   return (
-    <SheetContainer visible={visible} onClose={onClose} title={`${viewerCount} Watching`}>
+    <SheetContainer visible={visible} onClose={onClose} title={`${titleCount} Watching`}>
       {loading ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#6366F1" />
@@ -554,27 +554,68 @@ export function ViewersSheet({
       ) : (
         <ScrollView style={styles.trendingScrollView} showsVerticalScrollIndicator={false}>
           <View style={styles.trendingList}>
-            {viewers.map((viewer) => (
-              <View key={viewer.profile_id} style={styles.trendingRow}>
-                {viewer.avatar_url ? (
-                  <Image
-                    source={{ uri: viewer.avatar_url }}
-                    style={styles.trendingAvatarImage}
-                  />
-                ) : (
-                  <View style={styles.trendingAvatar}>
-                    <Ionicons name="person" size={16} color="rgba(255,255,255,0.8)" />
+            {activeViewers.length > 0 && (
+              <View style={styles.viewerSection}>
+                <Text style={styles.viewerSectionTitle}>
+                  Active ({activeViewers.length})
+                </Text>
+                {activeViewers.map((viewer) => (
+                  <View key={viewer.profile_id} style={styles.trendingRow}>
+                    {viewer.avatar_url ? (
+                      <Image
+                        source={{ uri: viewer.avatar_url }}
+                        style={styles.trendingAvatarImage}
+                      />
+                    ) : (
+                      <View style={styles.trendingAvatar}>
+                        <Ionicons name="person" size={16} color="rgba(255,255,255,0.8)" />
+                      </View>
+                    )}
+                    <View style={styles.trendingInfo}>
+                      <Text style={styles.trendingUsername} numberOfLines={1}>
+                        {viewer.display_name || viewer.username}
+                      </Text>
+                      <Text style={styles.trendingStat}>@{viewer.username}</Text>
+                    </View>
+                    <View style={styles.viewerStatus}>
+                      <View style={styles.viewerActiveDot} />
+                      <Text style={styles.viewerStatusText}>Watching</Text>
+                    </View>
                   </View>
-                )}
-                <View style={styles.trendingInfo}>
-                  <Text style={styles.trendingUsername} numberOfLines={1}>
-                    {viewer.display_name || viewer.username}
-                  </Text>
-                  <Text style={styles.trendingStat}>@{viewer.username}</Text>
-                </View>
-                <Ionicons name="eye" size={16} color="rgba(255,255,255,0.5)" />
+                ))}
               </View>
-            ))}
+            )}
+            {inactiveViewers.length > 0 && (
+              <View style={styles.viewerSection}>
+                <Text style={styles.viewerSectionTitle}>
+                  Left ({inactiveViewers.length})
+                </Text>
+                {inactiveViewers.map((viewer) => (
+                  <View key={viewer.profile_id} style={[styles.trendingRow, styles.viewerRowInactive]}>
+                    {viewer.avatar_url ? (
+                      <Image
+                        source={{ uri: viewer.avatar_url }}
+                        style={styles.trendingAvatarImage}
+                      />
+                    ) : (
+                      <View style={styles.trendingAvatar}>
+                        <Ionicons name="person" size={16} color="rgba(255,255,255,0.8)" />
+                      </View>
+                    )}
+                    <View style={styles.trendingInfo}>
+                      <Text style={styles.trendingUsername} numberOfLines={1}>
+                        {viewer.display_name || viewer.username}
+                      </Text>
+                      <Text style={styles.trendingStat}>@{viewer.username}</Text>
+                    </View>
+                    <View style={styles.viewerStatus}>
+                      <View style={styles.viewerInactiveDot} />
+                      <Text style={styles.viewerStatusText}>Left</Text>
+                    </View>
+                  </View>
+                ))}
+              </View>
+            )}
           </View>
         </ScrollView>
       )}
@@ -1490,5 +1531,40 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '700',
     color: '#F97316',
+  },
+  viewerSection: {
+    gap: 8,
+  },
+  viewerSectionTitle: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: 'rgba(255,255,255,0.6)',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 2,
+  },
+  viewerStatus: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  viewerStatusText: {
+    fontSize: 11,
+    color: 'rgba(255,255,255,0.6)',
+  },
+  viewerActiveDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#A855F7',
+  },
+  viewerInactiveDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: 'rgba(255,255,255,0.35)',
+  },
+  viewerRowInactive: {
+    opacity: 0.7,
   },
 });

@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, TextInput, Image, ActivityIndicator, Alert, AppState, AppStateStatus } from 'react-native';
 import ReportModal from '../components/ReportModal';
 import ShareModal from '../components/ShareModal';
@@ -12,7 +12,9 @@ import { supabase } from '../lib/supabase';
 import { fetchMobileToken, generateSoloRoomName } from '../lib/livekit';
 import { sendViewerHeartbeat } from '../lib/liveInteractions';
 import ChatOverlay, { ChatMessage, getGifterTierFromCoins } from '../components/live/ChatOverlay';
+import GiftOverlay, { GiftOverlayData } from '../components/live/GiftOverlay';
 import WatchGiftModal from '../components/watch/WatchGiftModal';
+import { playGiftSound } from '../lib/giftAudio';
 
 const API_BASE_URL = 'https://www.mylivelinks.com';
 
@@ -58,6 +60,7 @@ export default function LiveUserScreen() {
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [currentUserProfile, setCurrentUserProfile] = useState<{ username: string; avatar_url?: string } | null>(null);
+  const [giftOverlays, setGiftOverlays] = useState<GiftOverlayData[]>([]);
 
   // Viewer actions
   const [isFollowing, setIsFollowing] = useState(false);
@@ -71,6 +74,24 @@ export default function LiveUserScreen() {
   const chatSubscriptionRef = useRef<any>(null);
   const heartbeatIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const appStateRef = useRef<AppStateStatus>(AppState.currentState);
+  const seenGiftOverlayRef = useRef<Set<string>>(new Set());
+
+  const addGiftOverlay = useCallback((gift: GiftOverlayData) => {
+    setGiftOverlays((prev) => [...prev, gift]);
+    if (gift.giftIconUrl) {
+      void playGiftSound('https://www.mylivelinks.com/sfx/live_alert.wav');
+    }
+  }, []);
+
+  const parseGiftNameFromChat = (text: string): string | null => {
+    if (!text) return null;
+    const sentIdx = text.indexOf(' sent "');
+    if (sentIdx < 0) return null;
+    const rest = text.slice(sentIdx + ' sent "'.length);
+    const endIdx = rest.indexOf('" to ');
+    if (endIdx < 0) return null;
+    return rest.slice(0, endIdx).trim() || null;
+  };
 
   // Load current user
   useEffect(() => {
@@ -223,6 +244,78 @@ export default function LiveUserScreen() {
   useEffect(() => {
     loadStreamerData();
   }, [loadStreamerData]);
+
+  // Keep viewer count in sync for solo live (active_viewers)
+  useEffect(() => {
+    if (!streamerData?.live_stream_id || !streamerData.is_live) return;
+
+    let cancelled = false;
+    const liveStreamId = streamerData.live_stream_id;
+
+    const loadViewerCount = async () => {
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/active-viewers?live_stream_id=${liveStreamId}`);
+        if (!res.ok) {
+          console.error('[LiveUserScreen] Viewer count fetch failed:', res.status);
+          return;
+        }
+        const data = await res.json();
+        if (!cancelled && typeof data.viewer_count === 'number') {
+          setViewerCount(data.viewer_count);
+        }
+      } catch (err) {
+        console.error('[LiveUserScreen] Error loading viewer count:', err);
+      }
+    };
+
+    loadViewerCount();
+
+    const viewerChannel = supabase
+      .channel(`active-viewers-viewer-${liveStreamId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'active_viewers',
+          filter: `live_stream_id=eq.${liveStreamId}`,
+        },
+        () => {
+          if (!cancelled) {
+            setViewerCount((prev) => prev + 1);
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'DELETE',
+          schema: 'public',
+          table: 'active_viewers',
+          filter: `live_stream_id=eq.${liveStreamId}`,
+        },
+        () => {
+          if (!cancelled) {
+            setViewerCount((prev) => Math.max(0, prev - 1));
+          }
+        }
+      )
+      .subscribe((status) => {
+        if (status === 'CHANNEL_ERROR') {
+          console.error('[LiveUserScreen] Viewer channel error:', status);
+        }
+      });
+
+    const interval = setInterval(() => {
+      if (!cancelled) loadViewerCount();
+    }, 60000);
+
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+      viewerChannel.unsubscribe();
+    };
+  }, [streamerData?.live_stream_id, streamerData?.is_live]);
 
   // Connect to LiveKit as viewer
   useEffect(() => {
@@ -401,6 +494,36 @@ export default function LiveUserScreen() {
               lifetimeCoins: profile.total_spent || 0,
             };
             setChatMessages((prev) => [...prev.slice(-49), newMsg]);
+
+            if (payload.new.message_type === 'gift') {
+              const overlayKey = `chat-${payload.new.id}`;
+              if (!seenGiftOverlayRef.current.has(overlayKey)) {
+                seenGiftOverlayRef.current.add(overlayKey);
+                const giftName = parseGiftNameFromChat(payload.new.content || '');
+                if (giftName) {
+                  const { data: giftType } = await supabase
+                    .from('gift_types')
+                    .select('name, icon_url')
+                    .eq('name', giftName)
+                    .maybeSingle();
+                  addGiftOverlay({
+                    id: overlayKey,
+                    giftName: giftType?.name || giftName,
+                    giftIconUrl: giftType?.icon_url || null,
+                    senderUsername: profile.username || null,
+                    coinAmount: null,
+                  });
+                } else {
+                  addGiftOverlay({
+                    id: overlayKey,
+                    giftName: 'Gift',
+                    giftIconUrl: null,
+                    senderUsername: profile.username || null,
+                    coinAmount: null,
+                  });
+                }
+              }
+            }
           }
         }
       )
@@ -415,6 +538,74 @@ export default function LiveUserScreen() {
       }
     };
   }, [streamerData?.live_stream_id]);
+
+  // Fallback: derive overlay from gift chat messages already in state
+  useEffect(() => {
+    if (!chatMessages.length) return;
+    chatMessages.forEach((msg) => {
+      if (msg.type !== 'gift') return;
+      const overlayKey = `chat-local-${msg.id}`;
+      if (seenGiftOverlayRef.current.has(overlayKey)) return;
+      seenGiftOverlayRef.current.add(overlayKey);
+
+      const giftName = parseGiftNameFromChat(msg.text || '') || msg.text || 'Gift';
+      void (async () => {
+        const { data: giftType } = await supabase
+          .from('gift_types')
+          .select('name, icon_url')
+          .eq('name', giftName)
+          .maybeSingle();
+        addGiftOverlay({
+          id: overlayKey,
+          giftName: giftType?.name || giftName,
+          giftIconUrl: giftType?.icon_url || null,
+          senderUsername: msg.username || null,
+          coinAmount: null,
+        });
+      })();
+    });
+  }, [chatMessages, addGiftOverlay]);
+
+  // Subscribe to gifts for overlay
+  useEffect(() => {
+    if (!streamerData?.profile_id) return;
+
+    const recipientId = streamerData.profile_id;
+    const channel = supabase
+      .channel(`gifts:recipient:${recipientId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'gifts',
+          filter: `recipient_id=eq.${recipientId}`,
+        },
+        async (payload: any) => {
+          const gift = payload.new as any;
+          const overlayKey = `gift-${gift.id}`;
+          if (seenGiftOverlayRef.current.has(overlayKey)) return;
+          seenGiftOverlayRef.current.add(overlayKey);
+          const [{ data: senderProfile }, { data: giftType }] = await Promise.all([
+            supabase.from('profiles').select('username').eq('id', gift.sender_id).maybeSingle(),
+            supabase.from('gift_types').select('name, icon_url').eq('id', gift.gift_type_id).maybeSingle(),
+          ]);
+
+          addGiftOverlay({
+            id: overlayKey,
+            giftName: giftType?.name || 'Gift',
+            giftIconUrl: giftType?.icon_url || null,
+            senderUsername: senderProfile?.username || null,
+            coinAmount: gift.coin_amount ?? null,
+          });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [addGiftOverlay, streamerData?.profile_id]);
 
   // Send chat message
   const handleSendMessage = useCallback(async () => {
@@ -659,6 +850,13 @@ export default function LiveUserScreen() {
             )}
           </View>
         )}
+
+        <GiftOverlay
+          gifts={giftOverlays}
+          onComplete={(giftId) => {
+            setGiftOverlays((prev) => prev.filter((gift) => gift.id !== giftId));
+          }}
+        />
 
         {/* Top Overlay */}
         <View style={styles.topOverlay}>

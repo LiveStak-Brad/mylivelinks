@@ -84,6 +84,7 @@ export default function GiftAnimation({
   // Map gift names to emojis (fallback if no icon_url - matches GiftModal)
   const getGiftEmoji = (name: string) => {
     const emojiMap: { [key: string]: string } = {
+      'Poo': '💩',
       'Rose': '🌹',
       'Heart': '❤️',
       'Star': '⭐',

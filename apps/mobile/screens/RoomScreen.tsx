@@ -15,7 +15,9 @@ import { fetchMobileToken, connectAndPublish, disconnectAndCleanup, startLiveStr
 import { useAuth } from '../state/AuthContext';
 import { getSupabaseClient } from '../lib/supabase';
 import { LocalVideoTrack, LocalAudioTrack } from 'livekit-client';
-import { ChatContent, StatsContent, LeaderboardContent, OptionsContent, GiftContent } from '../components/RoomModalContents';
+import { ChatContent, StatsContent, LeaderboardContent, OptionsContent, GiftContent, ViewersContent } from '../components/RoomModalContents';
+import GiftOverlay, { GiftOverlayData } from '../components/live/GiftOverlay';
+import { playGiftSound } from '../lib/giftAudio';
 
 // ============================================================================
 // TYPES
@@ -49,6 +51,7 @@ interface Participant {
   id: string;
   identity: string;
   videoTrack: RemoteTrack | LocalVideoTrack | null;
+  profileId?: string | null;
 }
 
 interface GridConfig {
@@ -56,8 +59,14 @@ interface GridConfig {
   cols: number;
 }
 
+const getProfileIdFromIdentity = (identity?: string | null) => {
+  if (!identity) return null;
+  const match = identity.match(/^(?:u_|guest_)([^:]+)/);
+  return match ? match[1] : null;
+};
+
 // Drawer panel types
-type DrawerPanel = 'none' | 'chat' | 'gifts' | 'leaderboard' | 'stats' | 'options';
+type DrawerPanel = 'none' | 'chat' | 'gifts' | 'leaderboard' | 'stats' | 'options' | 'viewers';
 
 // Mini profile modal state
 interface MiniProfileData {
@@ -692,6 +701,8 @@ interface VideoTileProps {
   onGiftPress: (participant: Participant) => void;
   onLikePress: (participant: Participant) => void;
   isLiked?: boolean;
+  giftOverlays?: GiftOverlayData[];
+  onGiftOverlayComplete: (giftId: string) => void;
 }
 
 // FIX #2: Memoize VideoTile to prevent re-renders when other tiles change
@@ -714,6 +725,8 @@ const VideoTile = React.memo(({
   onGiftPress,
   onLikePress,
   isLiked,
+  giftOverlays = [],
+  onGiftOverlayComplete,
 }: VideoTileProps) => {
   const hasVideo = participant?.videoTrack || (isLocalTile && localVideoTrack);
   const videoTrack = participant?.videoTrack || localVideoTrack;
@@ -804,6 +817,11 @@ const VideoTile = React.memo(({
               videoTrack={videoTrack as any}
               objectFit="cover"
               mirror={isLocalTile}
+            />
+
+            <GiftOverlay
+              gifts={giftOverlays}
+              onComplete={onGiftOverlayComplete}
             />
             
             {/* Local indicator */}
@@ -1019,6 +1037,8 @@ interface GridContainerProps {
   isLikedForIdentity: (identity: string) => boolean;
   hiddenParticipants: Set<string>;
   slotAssignments: Map<number, string>;
+  giftOverlaysByIdentity: Record<string, GiftOverlayData[]>;
+  onGiftOverlayComplete: (identity: string, giftId: string) => void;
 }
 
 function GridContainer({ 
@@ -1042,6 +1062,8 @@ function GridContainer({
   isLikedForIdentity,
   hiddenParticipants,
   slotAssignments,
+  giftOverlaysByIdentity,
+  onGiftOverlayComplete,
 }: GridContainerProps) {
   const { rows, cols } = getGridConfig(isLandscape);
   const tileWidth = screenWidth / cols;
@@ -1104,6 +1126,7 @@ function GridContainer({
       }
 
       const isLiked = participant ? isLikedForIdentity(participant.identity) : false;
+      const identityKey = isLocalTile ? 'You' : (participant?.identity || '');
 
       rowTiles.push(
         <VideoTile
@@ -1126,6 +1149,10 @@ function GridContainer({
           onGiftPress={onGiftPress}
           onLikePress={onLikePress}
           isLiked={isLiked}
+          giftOverlays={identityKey ? (giftOverlaysByIdentity[identityKey] || []) : []}
+          onGiftOverlayComplete={(giftId) => {
+            if (identityKey) onGiftOverlayComplete(identityKey, giftId);
+          }}
         />
       );
       slotIndex++;
@@ -1271,6 +1298,7 @@ export default function RoomScreen() {
   const [liveKitRoom, setLiveKitRoom] = useState<Room | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const [participants, setParticipants] = useState<Participant[]>([]);
+  const [giftOverlaysByIdentity, setGiftOverlaysByIdentity] = useState<Record<string, GiftOverlayData[]>>({});
   const roomRef = useRef<Room | null>(null);
   
   // PHASE 2: Batched participant updates to prevent event burst jank
@@ -1288,6 +1316,27 @@ export default function RoomScreen() {
       commitTimerRef.current = null;
     }, 50);
   }, []);
+
+  const addGiftOverlayForIdentity = useCallback((identity: string, gift: GiftOverlayData) => {
+    setGiftOverlaysByIdentity((prev) => ({
+      ...prev,
+      [identity]: [...(prev[identity] || []), gift],
+    }));
+    if (gift.giftIconUrl) {
+      void playGiftSound('https://www.mylivelinks.com/sfx/live_alert.wav');
+    }
+  }, []);
+
+  const removeGiftOverlayForIdentity = useCallback((identity: string, giftId: string) => {
+    setGiftOverlaysByIdentity((prev) => {
+      const nextList = (prev[identity] || []).filter((gift) => gift.id !== giftId);
+      const next = { ...prev, [identity]: nextList };
+      if (nextList.length === 0) {
+        delete next[identity];
+      }
+      return next;
+    });
+  }, []);
   
   // Publishing state
   const [isPublishing, setIsPublishing] = useState(false);
@@ -1302,6 +1351,8 @@ export default function RoomScreen() {
   // CRITICAL: Refs to capture current values for cleanup (empty deps useEffect has stale closures)
   const userRef = useRef(user);
   const roomConfigRef = useRef<RoomConfig | null>(null);
+  const [presenceDisplayName, setPresenceDisplayName] = useState<string | null>(null);
+  const presenceNamePromiseRef = useRef<Promise<string | null> | null>(null);
 
   // Keep refs in sync with current values for cleanup
   useEffect(() => {
@@ -1311,9 +1362,32 @@ export default function RoomScreen() {
     roomConfigRef.current = roomConfig;
   }, [roomConfig]);
 
+  useEffect(() => {
+    if (!user) {
+      setPresenceDisplayName(null);
+      return;
+    }
+    let cancelled = false;
+    const loadPresenceName = async () => {
+      const { data } = await supabase
+        .from('profiles')
+        .select('display_name, username')
+        .eq('id', user.id)
+        .single();
+      if (!cancelled) {
+        setPresenceDisplayName(data?.display_name || data?.username || null);
+      }
+    };
+    loadPresenceName();
+    return () => {
+      cancelled = true;
+    };
+  }, [user, supabase]);
+
   // Group live stream state
   const groupLiveStreamIdRef = useRef<number | null>(null);
   const [groupLiveStreamId, setGroupLiveStreamId] = useState<number | null>(null);
+  const [groupLiveStartedAt, setGroupLiveStartedAt] = useState<string | null>(null);
 
   // P1: Control bar and drawer state
   const [activeDrawer, setActiveDrawer] = useState<DrawerPanel>('none');
@@ -1336,6 +1410,12 @@ export default function RoomScreen() {
     if (raw.startsWith('u_')) raw = raw.slice('u_'.length);
     return raw.split(':')[0] || null;
   }, []);
+
+  const isLocalIdentity = useCallback((identity: string | undefined | null) => {
+    if (!identity || !user?.id) return false;
+    const profileId = getProfileIdFromIdentity(identity);
+    return !!profileId && profileId === user.id;
+  }, [getProfileIdFromIdentity, user?.id]);
 
   const handleTileGiftPress = useCallback((participant: Participant) => {
     console.log('[TILE_GIFT] Open gift drawer for', participant.identity);
@@ -1443,6 +1523,7 @@ export default function RoomScreen() {
       },
       onPanResponderRelease: (evt, gestureState) => {
         const { dx, dy } = gestureState;
+        const startX = gestureState.x0 ?? evt?.nativeEvent?.pageX ?? 0;
         
         // Determine swipe direction
         if (Math.abs(dy) > Math.abs(dx)) {
@@ -1451,8 +1532,12 @@ export default function RoomScreen() {
             // Swipe up from anywhere -> Chat
             setActiveDrawer('chat');
           } else if (dy > swipeThreshold) {
-            // Swipe down from anywhere -> Leaderboard
-            setActiveDrawer('leaderboard');
+            // Swipe down -> Top-left = Viewers, Top-right = Leaderboard
+            if (startX < screenWidth / 2) {
+              setActiveDrawer('viewers');
+            } else {
+              setActiveDrawer('leaderboard');
+            }
           }
         } else {
           // Horizontal swipe
@@ -1491,11 +1576,35 @@ export default function RoomScreen() {
   // - On start publishing: updateRoomPresence(true, true)
   // - On stop publishing: updateRoomPresence(true, false)
   // - On leave: updateRoomPresence(false)
+  const getPresenceName = useCallback(async () => {
+    if (presenceDisplayName) {
+      return presenceDisplayName;
+    }
+    if (!user) return null;
+    if (!presenceNamePromiseRef.current) {
+      presenceNamePromiseRef.current = (async () => {
+        const { data } = await supabase
+          .from('profiles')
+          .select('display_name, username')
+          .eq('id', user.id)
+          .single();
+        const resolved = data?.display_name || data?.username || null;
+        if (resolved) {
+          setPresenceDisplayName(resolved);
+        }
+        presenceNamePromiseRef.current = null;
+        return resolved;
+      })();
+    }
+    return presenceNamePromiseRef.current;
+  }, [presenceDisplayName, supabase, user]);
+
   const updateRoomPresence = useCallback(async (isPresent: boolean, isLiveAvailable: boolean = false) => {
     if (!user) return;
     if (roomPresenceTableAvailableRef.current === false) return;
 
-    const username = user.email?.split('@')[0] || user.id;
+    const username = isPresent ? await getPresenceName() : presenceDisplayName;
+    if (isPresent && !username) return;
     const roomId = normalizedRoomId(roomConfig?.room_key);
 
     try {
@@ -1549,7 +1658,13 @@ export default function RoomScreen() {
     } catch (err) {
       // Silently fail
     }
-  }, [user, roomConfig?.room_key, normalizedRoomId]);
+  }, [user, roomConfig?.room_key, normalizedRoomId, presenceDisplayName, supabase]);
+
+  useEffect(() => {
+    if (!presenceDisplayName) return;
+    if (!presenceActiveRef.current) return;
+    updateRoomPresence(true, isPublishingRef.current);
+  }, [presenceDisplayName, updateRoomPresence]);
 
   // Start publishing to the room (publish to existing connected session)
   const startPublishing = useCallback(async () => {
@@ -1599,6 +1714,7 @@ export default function RoomScreen() {
       if (!streamError && liveStreamId) {
         groupLiveStreamIdRef.current = liveStreamId;
         setGroupLiveStreamId(liveStreamId);
+        setGroupLiveStartedAt(new Date().toISOString());
       }
 
       updateRoomPresence(true, true);
@@ -1642,6 +1758,7 @@ export default function RoomScreen() {
         await endLiveStreamRecord(user.id);
         groupLiveStreamIdRef.current = null;
         setGroupLiveStreamId(null);
+        setGroupLiveStartedAt(null);
       }
 
       // Update room presence
@@ -2256,6 +2373,9 @@ export default function RoomScreen() {
     participantsMapRef.current.clear();
     
     room.remoteParticipants.forEach((participant: RemoteParticipant) => {
+      if ((localVideoTrack || isPublishingRef.current) && isLocalIdentity(participant.identity)) {
+        return;
+      }
       let videoTrack: RemoteTrack | null = null;
       
       participant.trackPublications.forEach((pub: RemoteTrackPublication) => {
@@ -2270,13 +2390,76 @@ export default function RoomScreen() {
           id: participant.sid,
           identity: participant.identity,
           videoTrack,
+          profileId: getProfileIdFromIdentity(participant.identity),
         });
       }
     });
 
     // Schedule a batched commit to React state
     scheduleCommitParticipants();
-  }, [scheduleCommitParticipants]);
+  }, [scheduleCommitParticipants, localVideoTrack, isLocalIdentity]);
+
+  const giftChannelsRef = useRef<any[]>([]);
+
+  // Subscribe to gift events per recipient in the grid
+  useEffect(() => {
+    giftChannelsRef.current.forEach((channel) => supabase.removeChannel(channel));
+    giftChannelsRef.current = [];
+
+    const recipientIds = new Set<string>();
+    participants.forEach((participant) => {
+      if (participant.profileId) recipientIds.add(participant.profileId);
+    });
+    if (localVideoTrack && user?.id) {
+      recipientIds.add(user.id);
+    }
+
+    if (recipientIds.size === 0) return;
+
+    const channels = Array.from(recipientIds).map((recipientId) =>
+      supabase
+        .channel(`gifts:recipient:${recipientId}`)
+        .on(
+          'postgres_changes',
+          {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'gifts',
+            filter: `recipient_id=eq.${recipientId}`,
+          },
+          async (payload: any) => {
+            const gift = payload.new as any;
+            const [{ data: senderProfile }, { data: giftType }] = await Promise.all([
+              supabase.from('profiles').select('username').eq('id', gift.sender_id).maybeSingle(),
+              supabase.from('gift_types').select('name, icon_url').eq('id', gift.gift_type_id).maybeSingle(),
+            ]);
+
+            const identityKey =
+              user?.id && gift.recipient_id === user.id && localVideoTrack
+                ? 'You'
+                : participants.find((p) => p.profileId === gift.recipient_id)?.identity;
+
+            if (!identityKey) return;
+
+            addGiftOverlayForIdentity(identityKey, {
+              id: `${gift.id}-${Date.now()}`,
+              giftName: giftType?.name || 'Gift',
+              giftIconUrl: giftType?.icon_url || null,
+              senderUsername: senderProfile?.username || null,
+              coinAmount: gift.coin_amount ?? null,
+            });
+          }
+        )
+        .subscribe()
+    );
+
+    giftChannelsRef.current = channels;
+
+    return () => {
+      channels.forEach((channel) => supabase.removeChannel(channel));
+      giftChannelsRef.current = [];
+    };
+  }, [participants, localVideoTrack, user?.id, addGiftOverlayForIdentity]);
 
   // Connect to LiveKit room (same room name as web)
   const connectToLiveKit = useCallback(async () => {
@@ -2357,6 +2540,7 @@ export default function RoomScreen() {
           endLiveStreamRecord(currentUser.id);
           groupLiveStreamIdRef.current = null;
           setGroupLiveStreamId(null);
+          setGroupLiveStartedAt(null);
         }
         
         setIsPublishing(false);
@@ -2364,6 +2548,9 @@ export default function RoomScreen() {
       });
 
       room.on(RoomEvent.ParticipantConnected, (participant) => {
+        if ((localVideoTrack || isPublishingRef.current) && isLocalIdentity(participant.identity)) {
+          return;
+        }
         // Auto-subscribe to camera/mic tracks
         participant.trackPublications.forEach((pub) => {
           if (pub.source === Track.Source.Camera || pub.source === Track.Source.Microphone) {
@@ -2392,6 +2579,7 @@ export default function RoomScreen() {
             id: participant.sid,
             identity: participant.identity,
             videoTrack,
+            profileId: getProfileIdFromIdentity(participant.identity),
           });
           scheduleCommitParticipants();
         }
@@ -2404,12 +2592,16 @@ export default function RoomScreen() {
       });
 
       room.on(RoomEvent.TrackSubscribed, (track: RemoteTrack, publication, participant: RemoteParticipant) => {
+        if ((localVideoTrack || isPublishingRef.current) && isLocalIdentity(participant.identity)) {
+          return;
+        }
         if (track.kind === 'video') {
           // PHASE 2: Update map and schedule commit
           participantsMapRef.current.set(participant.sid, {
             id: participant.sid,
             identity: participant.identity,
             videoTrack: track,
+            profileId: getProfileIdFromIdentity(participant.identity),
           });
           scheduleCommitParticipants();
         }
@@ -2462,6 +2654,7 @@ export default function RoomScreen() {
         endLiveStreamRecord(currentUser.id);
         groupLiveStreamIdRef.current = null;
         setGroupLiveStreamId(null);
+        setGroupLiveStartedAt(null);
       }
       
       if (currentUser && presenceActiveRef.current && currentRoomConfig?.room_key) {
@@ -2573,6 +2766,8 @@ export default function RoomScreen() {
           isLikedForIdentity={isLikedForIdentity}
           hiddenParticipants={hiddenParticipants}
           slotAssignments={slotAssignments}
+          giftOverlaysByIdentity={giftOverlaysByIdentity}
+          onGiftOverlayComplete={removeGiftOverlayForIdentity}
         />
       </View>
       
@@ -2703,13 +2898,28 @@ export default function RoomScreen() {
       </BottomDrawer>
 
       <BottomDrawer
+        visible={activeDrawer === 'viewers'}
+        title="Viewers"
+        onClose={() => setActiveDrawer('none')}
+        bottomInset={insets.bottom}
+        isLandscape={isLandscape}
+        scrollable={false}
+      >
+        <ViewersContent roomId={chatRoomId} />
+      </BottomDrawer>
+
+      <BottomDrawer
         visible={activeDrawer === 'stats'}
         title="Stats"
         onClose={() => setActiveDrawer('none')}
         bottomInset={insets.bottom}
         isLandscape={isLandscape}
       >
-        <StatsContent liveStreamId={groupLiveStreamId} />
+        <StatsContent
+          liveStreamId={groupLiveStreamId}
+          roomId={chatRoomId}
+          sessionStartedAt={groupLiveStartedAt}
+        />
       </BottomDrawer>
 
       <BottomDrawer

@@ -218,13 +218,12 @@ export default function ViewerList({ roomId, onDragStart }: ViewerListProps) {
             const existingViewer = prev.find(v => v.profile_id === updatedRow.profile_id);
             if (!existingViewer) return prev; // Not in list, ignore
             
-            // Check if anything meaningful changed
-            const usernameChanged = updatedRow.username && updatedRow.username !== existingViewer.username;
+            // Check if anything meaningful changed (only live status, not username)
             const liveStatusChanged = updatedRow.is_live_available !== undefined && 
                                       updatedRow.is_live_available !== existingViewer.is_live_available;
             
             // Skip update if only timestamp changed (heartbeat)
-            if (!usernameChanged && !liveStatusChanged) {
+            if (!liveStatusChanged) {
               return prev; // No meaningful change, skip re-render
             }
             
@@ -232,7 +231,7 @@ export default function ViewerList({ roomId, onDragStart }: ViewerListProps) {
               if (v.profile_id !== updatedRow.profile_id) return v;
               return {
                 ...v,
-                username: updatedRow.username || v.username,
+                // Keep existing username from profiles table, don't update from room_presence
                 is_live_available: updatedRow.is_live_available ?? v.is_live_available,
                 last_active_at: updatedRow.last_seen_at || v.last_active_at,
               };
@@ -365,10 +364,10 @@ export default function ViewerList({ roomId, onDragStart }: ViewerListProps) {
 
       const profileIds = [...new Set(filteredPresence.map((item: any) => item.profile_id))];
       
-      // Get profile info (avatar) and live stream info
+      // Get profile info (avatar, display_name) and live stream info
       const { data: profiles } = await supabase
         .from('profiles')
-        .select('id, username, avatar_url')
+        .select('id, username, display_name, avatar_url')
         .in('id', profileIds);
 
       const { data: liveStreams } = await supabase
@@ -395,7 +394,7 @@ export default function ViewerList({ roomId, onDragStart }: ViewerListProps) {
       const viewersWithBadges = await Promise.all(
         (presenceData || []).map(async (presence: any) => {
           if (blockedPeerIds.has(presence.profile_id)) return null;
-          const profile = profileMap.get(presence.profile_id) as { id: string; username: string; avatar_url?: string } | undefined;
+          const profile = profileMap.get(presence.profile_id) as { id: string; username: string; display_name?: string; avatar_url?: string } | undefined;
           if (!profile) return null;
 
           const liveInfo = liveStreamMap.get(presence.profile_id) as { 
@@ -405,7 +404,7 @@ export default function ViewerList({ roomId, onDragStart }: ViewerListProps) {
 
           return {
             profile_id: presence.profile_id,
-            username: presence.username || profile.username,
+            username: profile.display_name || profile.username, // Use display_name, fallback to username
             avatar_url: profile.avatar_url ?? undefined,
             is_active: true,
             last_active_at: presence.last_seen_at,

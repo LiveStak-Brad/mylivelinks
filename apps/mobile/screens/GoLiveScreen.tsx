@@ -10,10 +10,12 @@ import { fetchMobileToken, generateSoloRoomName, startLiveStreamRecord, endLiveS
 import { supabase } from '../lib/supabase';
 
 import SoloHostOverlay from '../components/live/SoloHostOverlay';
+import GiftOverlay, { GiftOverlayData } from '../components/live/GiftOverlay';
 import type { ChatMessage, ChatFontColor } from '../components/live/ChatOverlay';
 import { getGifterTierFromCoins } from '../components/live/ChatOverlay';
 import type { TopGifter } from '../components/live/TopGifterBubbles';
 import { attachFiltersToLocalVideoTrack, setFilterParams as setNativeFilterParams } from '../lib/videoFilters';
+import { playGiftSound } from '../lib/giftAudio';
 import {
   DEFAULT_HOST_CAMERA_FILTERS,
   loadHostCameraFilters,
@@ -24,6 +26,16 @@ import { DEFAULT_HOST_LIVE_OPTIONS, loadHostLiveOptions, saveHostLiveOptions, ty
 
 // Default font color for chat
 const DEFAULT_CHAT_FONT_COLOR: ChatFontColor = '#FFFFFF';
+
+const parseGiftNameFromChat = (text: string): string | null => {
+  if (!text) return null;
+  const sentIdx = text.indexOf(' sent "');
+  if (sentIdx < 0) return null;
+  const rest = text.slice(sentIdx + ' sent "'.length);
+  const endIdx = rest.indexOf('" to ');
+  if (endIdx < 0) return null;
+  return rest.slice(0, endIdx).trim() || null;
+};
 
 export default function GoLiveScreen() {
   const insets = useSafeAreaInsets();
@@ -95,6 +107,8 @@ export default function GoLiveScreen() {
 
   // Chat messages (fetched from chat_messages table like web)
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [giftOverlays, setGiftOverlays] = useState<GiftOverlayData[]>([]);
+  const seenGiftOverlayRef = useRef<Set<string>>(new Set());
 
   // Ranking data (fetched from Supabase RPCs - only shown when available)
   const [trendingRank, setTrendingRank] = useState<number | null>(null);
@@ -441,6 +455,29 @@ export default function GoLiveScreen() {
 
           // Prepend new message (array is newest-first for inverted FlatList)
           setChatMessages((prev) => [newMessage, ...prev.slice(0, 49)]);
+
+          if (msg.message_type === 'gift') {
+            const overlayKey = `chat-${msg.id}`;
+            if (seenGiftOverlayRef.current.has(overlayKey)) return;
+            seenGiftOverlayRef.current.add(overlayKey);
+            const giftName = parseGiftNameFromChat(msg.content || '') || 'Gift';
+            const { data: giftType } = await supabase
+              .from('gift_types')
+              .select('name, icon_url')
+              .eq('name', giftName)
+              .maybeSingle();
+            setGiftOverlays((prev) => [
+              ...prev,
+              {
+                id: overlayKey,
+                giftName: giftType?.name || giftName,
+                giftIconUrl: giftType?.icon_url || null,
+                senderUsername: profile?.display_name || profile?.username || null,
+                coinAmount: extractGiftAmount(msg.content || '') ?? null,
+              },
+            ]);
+            void playGiftSound('https://www.mylivelinks.com/sfx/live_alert.wav');
+          }
         }
       )
       .subscribe();
@@ -970,6 +1007,13 @@ export default function GoLiveScreen() {
           </View>
         )}
 
+        <GiftOverlay
+          gifts={giftOverlays}
+          onComplete={(giftId) => {
+            setGiftOverlays((prev) => prev.filter((gift) => gift.id !== giftId));
+          }}
+        />
+
         {/* Permissions Banner */}
         {needsPermissions && !isLive && (
           <View style={[styles.permissionsBanner, { top: insets.top + 64 }]}>
@@ -1152,6 +1196,7 @@ export default function GoLiveScreen() {
             cameraDisabled={cameraDisabled}
             onSetCameraDisabled={(next) => void applyCameraDisabled(next)}
             onHostLiveOptionsChange={persistHostLiveOptions}
+            liveStreamId={liveStreamId ?? undefined}
             onEndStream={handleEndLive}
             onFlipCamera={handleFlipCamera}
             onToggleMute={() => void applyMicMuted(!micMuted)}
