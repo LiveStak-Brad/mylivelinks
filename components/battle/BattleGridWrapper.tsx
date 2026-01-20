@@ -118,7 +118,7 @@ export default function BattleGridWrapper({
   const hostSnapshot = useMemo(() => {
     // Use participants array if available (new multi-host format)
     if (session.participants && Array.isArray(session.participants) && session.participants.length > 0) {
-      const participantList = session.participants as Array<{
+      const rawParticipants = session.participants as Array<{
         profile_id: string;
         username: string;
         display_name: string | null;
@@ -127,15 +127,25 @@ export default function BattleGridWrapper({
         slot_index: number;
       }>;
       
+      // Map to normalized format with 'id' instead of 'profile_id'
+      const participantList = rawParticipants.map(p => ({
+        id: p.profile_id,
+        username: p.username,
+        display_name: p.display_name,
+        avatar_url: p.avatar_url,
+        team: p.team,
+        slot_index: p.slot_index,
+      }));
+      
       return {
         hostA: participantList[0] ? {
-          id: participantList[0].profile_id,
+          id: participantList[0].id,
           username: participantList[0].username,
           display_name: participantList[0].display_name,
           avatar_url: participantList[0].avatar_url,
         } : null,
         hostB: participantList[1] ? {
-          id: participantList[1].profile_id,
+          id: participantList[1].id,
           username: participantList[1].username,
           display_name: participantList[1].display_name,
           avatar_url: participantList[1].avatar_url,
@@ -311,7 +321,12 @@ export default function BattleGridWrapper({
       if (hostSnapshot.participants) {
         const participant = hostSnapshot.participants.find(p => p.id === currentUserId);
         if (participant) {
-          hostInfo = participant;
+          hostInfo = {
+            id: participant.id,
+            username: participant.username,
+            display_name: participant.display_name,
+            avatar_url: participant.avatar_url,
+          };
         }
       }
       if (!hostInfo) {
@@ -342,7 +357,12 @@ export default function BattleGridWrapper({
       if (hostSnapshot.participants) {
         const participant = hostSnapshot.participants.find(p => p.id === userId);
         if (participant) {
-          hostInfo = participant;
+          hostInfo = {
+            id: participant.id,
+            username: participant.username,
+            display_name: participant.display_name,
+            avatar_url: participant.avatar_url,
+          };
         }
       }
       if (!hostInfo) {
@@ -811,7 +831,7 @@ export default function BattleGridWrapper({
             if (hostSnapshot.participants) {
               const participant = hostSnapshot.participants.find(p => p.id === otherHostId);
               if (participant) {
-                otherHost = participant;
+                otherHost = { username: participant.username, display_name: participant.display_name };
               }
             }
             if (!otherHost) {
