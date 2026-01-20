@@ -320,40 +320,41 @@ export default function BattleGridWrapper({
     
     const gridParticipants: GridTileParticipant[] = [];
     
-    // Add local participant if publishing
+    // Add local participant if publishing - ALWAYS add when canPublish is true
     const local = room.localParticipant;
     if (local && canPublish) {
       const videoTrack = local.getTrackPublication(Track.Source.Camera)?.track;
       const audioTrack = local.getTrackPublication(Track.Source.Microphone)?.track;
       
-      // Determine if this is host_a or host_b - use participants array first
-      let hostInfo: { id: string; username: string; display_name: string | null; avatar_url: string | null } | null = null;
+      // Determine display info - use participants array first, fallback to hostA/hostB, then use props
+      let displayName = currentUserName;
+      let avatarUrl: string | undefined = undefined;
+      
       if (hostSnapshot.participants) {
         const participant = hostSnapshot.participants.find(p => p.id === currentUserId);
         if (participant) {
-          hostInfo = {
-            id: participant.id,
-            username: participant.username,
-            display_name: participant.display_name,
-            avatar_url: participant.avatar_url,
-          };
+          displayName = participant.display_name || participant.username;
+          avatarUrl = participant.avatar_url || undefined;
         }
       }
-      if (!hostInfo) {
+      if (!avatarUrl) {
         const isHostA = currentUserId === hostSnapshot.hostA?.id;
-        hostInfo = isHostA ? hostSnapshot.hostA : hostSnapshot.hostB;
+        const hostInfo = isHostA ? hostSnapshot.hostA : hostSnapshot.hostB;
+        if (hostInfo) {
+          displayName = hostInfo.display_name || hostInfo.username;
+          avatarUrl = hostInfo.avatar_url || undefined;
+        }
       }
       
-      if (hostInfo) {
-        gridParticipants.push({
-          id: currentUserId,
-          name: hostInfo.display_name || hostInfo.username,
-          videoTrack: videoTrack || undefined,
-          audioTrack: audioTrack || undefined,
-          isHost: true, // Current user is always "host" for their own view
-          avatarUrl: hostInfo.avatar_url || undefined,
-        });
-      }
+      // Always add local participant to grid when publishing
+      gridParticipants.push({
+        id: currentUserId,
+        name: displayName,
+        videoTrack: videoTrack || undefined,
+        audioTrack: audioTrack || undefined,
+        isHost: true, // Current user is always "host" for their own view
+        avatarUrl: avatarUrl,
+      });
     }
     
     // Add remote participants - ONLY if they are hostA or hostB (invited hosts only)
