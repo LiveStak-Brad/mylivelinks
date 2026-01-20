@@ -240,13 +240,14 @@ export default function StreamChat({ liveStreamId, onGiftClick, onShareClick, on
         // Load user profile immediately for optimistic messages
         supabase
           .from('profiles')
-          .select('username, avatar_url')
+          .select('username, display_name, avatar_url')
           .eq('id', user.id)
           .single()
           .then(({ data: profile }: { data: any }) => {
             if (profile) {
               setCurrentUserProfile({
                 username: profile.username,
+                display_name: profile.display_name,
                 avatar_url: profile.avatar_url,
               });
             }
@@ -369,6 +370,7 @@ export default function StreamChat({ liveStreamId, onGiftClick, onShareClick, on
           created_at,
           profiles (
             username,
+            display_name,
             avatar_url
           )
         `)
@@ -448,6 +450,7 @@ export default function StreamChat({ liveStreamId, onGiftClick, onShareClick, on
           id: String(msg.id),
           profile_id: msg.profile_id,
           username: profile?.username || 'Unknown',
+          display_name: profile?.display_name,
           avatar_url: profile?.avatar_url,
           message_type: msg.message_type,
           content: msg.content,
@@ -694,7 +697,7 @@ export default function StreamChat({ liveStreamId, onGiftClick, onShareClick, on
     Promise.all([
       supabase
         .from('profiles')
-        .select('username, avatar_url, gifter_level')
+        .select('username, display_name, avatar_url, gifter_level')
         .eq('id', message.profile_id)
         .single(),
       supabase

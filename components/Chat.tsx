@@ -80,13 +80,14 @@ function Chat({ roomSlug, liveStreamId, onGiftClick, onShareClick, onSettingsCli
         // Load user profile immediately for optimistic messages
         supabase
           .from('profiles')
-          .select('username, avatar_url')
+          .select('username, display_name, avatar_url')
           .eq('id', user.id)
           .single()
           .then(({ data: profile }: { data: any }) => {
             if (profile) {
               setCurrentUserProfile({
                 username: profile.username,
+                display_name: profile.display_name,
                 avatar_url: profile.avatar_url,
               });
             }
@@ -145,6 +146,7 @@ function Chat({ roomSlug, liveStreamId, onGiftClick, onShareClick, onSettingsCli
           created_at,
           profiles (
             username,
+            display_name,
             avatar_url,
             is_live,
             chat_bubble_color,
@@ -173,6 +175,7 @@ function Chat({ roomSlug, liveStreamId, onGiftClick, onShareClick, onSettingsCli
           id: msg.id,
           profile_id: msg.profile_id,
           username: profile?.username || 'Unknown',
+          display_name: profile?.display_name,
           avatar_url: profile?.avatar_url,
           is_live: profile?.is_live || false,
           message_type: msg.message_type,
@@ -312,7 +315,7 @@ function Chat({ roomSlug, liveStreamId, onGiftClick, onShareClick, onSettingsCli
     Promise.all([
       supabase
         .from('profiles')
-        .select('username, avatar_url, is_live, chat_bubble_color, chat_font')
+        .select('username, display_name, avatar_url, is_live, chat_bubble_color, chat_font')
         .eq('id', message.profile_id)
         .single(),
       fetchGifterStatuses([message.profile_id]).then((m) => m[message.profile_id] || null),
