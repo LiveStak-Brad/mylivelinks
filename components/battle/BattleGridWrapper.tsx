@@ -114,32 +114,66 @@ export default function BattleGridWrapper({
 
   // Host metadata should not force LiveKit reconnection when only session.status/timers change.
   // We derive a stable host snapshot based on identity fields.
+  // Supports both old host_a/host_b format and new participants array
   const hostSnapshot = useMemo(() => {
+    // Use participants array if available (new multi-host format)
+    if (session.participants && Array.isArray(session.participants) && session.participants.length > 0) {
+      const participantList = session.participants as Array<{
+        profile_id: string;
+        username: string;
+        display_name: string | null;
+        avatar_url: string | null;
+        team: string;
+        slot_index: number;
+      }>;
+      
+      return {
+        hostA: participantList[0] ? {
+          id: participantList[0].profile_id,
+          username: participantList[0].username,
+          display_name: participantList[0].display_name,
+          avatar_url: participantList[0].avatar_url,
+        } : null,
+        hostB: participantList[1] ? {
+          id: participantList[1].profile_id,
+          username: participantList[1].username,
+          display_name: participantList[1].display_name,
+          avatar_url: participantList[1].avatar_url,
+        } : null,
+        participants: participantList,
+        type: session.type,
+        session_id: session.session_id,
+      };
+    }
+    
+    // Fallback to old host_a/host_b format
     return {
-      hostA: {
+      hostA: session.host_a ? {
         id: session.host_a.id,
         username: session.host_a.username,
         display_name: session.host_a.display_name,
         avatar_url: session.host_a.avatar_url,
-      },
-      hostB: {
+      } : null,
+      hostB: session.host_b ? {
         id: session.host_b.id,
         username: session.host_b.username,
         display_name: session.host_b.display_name,
         avatar_url: session.host_b.avatar_url,
-      },
+      } : null,
+      participants: null,
       type: session.type,
       session_id: session.session_id,
     };
   }, [
-    session.host_a.id,
-    session.host_a.username,
-    session.host_a.display_name,
-    session.host_a.avatar_url,
-    session.host_b.id,
-    session.host_b.username,
-    session.host_b.display_name,
-    session.host_b.avatar_url,
+    session.participants,
+    session.host_a?.id,
+    session.host_a?.username,
+    session.host_a?.display_name,
+    session.host_a?.avatar_url,
+    session.host_b?.id,
+    session.host_b?.username,
+    session.host_b?.display_name,
+    session.host_b?.avatar_url,
     session.type,
     session.session_id,
   ]);

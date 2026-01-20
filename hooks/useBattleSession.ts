@@ -86,7 +86,12 @@ export function useBattleSession({
   // Check if current user is a participant
   const isParticipant = useMemo(() => {
     if (!session || !profileId) return false;
-    return session.host_a.id === profileId || session.host_b.id === profileId;
+    // Check participants array first (new multi-host format)
+    if (session.participants && Array.isArray(session.participants)) {
+      return session.participants.some((p: any) => p.profile_id === profileId);
+    }
+    // Fallback to host_a/host_b (backwards compatibility)
+    return session.host_a?.id === profileId || session.host_b?.id === profileId;
   }, [session, profileId]);
   
   // Get room name

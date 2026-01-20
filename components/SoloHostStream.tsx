@@ -319,7 +319,24 @@ export default function SoloHostStream() {
   // Get opponent info for cooldown sheet
   const battleOpponent = useMemo(() => {
     if (!battleSession || !currentUserId) return null;
-    const isHostA = battleSession.host_a.id === currentUserId;
+    
+    // Use participants array if available (new multi-host format)
+    if (battleSession.participants && Array.isArray(battleSession.participants)) {
+      const others = battleSession.participants.filter((p: any) => p.profile_id !== currentUserId);
+      if (others.length > 0) {
+        const opponent = others[0];
+        return {
+          id: opponent.profile_id,
+          username: opponent.username,
+          display_name: opponent.display_name,
+          avatar_url: opponent.avatar_url,
+        };
+      }
+      return null;
+    }
+    
+    // Fallback to old host_a/host_b format
+    const isHostA = battleSession.host_a?.id === currentUserId;
     return isHostA ? battleSession.host_b : battleSession.host_a;
   }, [battleSession, currentUserId]);
   

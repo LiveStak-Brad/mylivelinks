@@ -19,6 +19,16 @@ export interface SessionHost {
   avatar_url: string | null;
 }
 
+export interface SessionParticipant {
+  profile_id: string;
+  username: string;
+  display_name: string | null;
+  avatar_url: string | null;
+  team: 'A' | 'B';
+  slot_index: number;
+  joined_at: string;
+}
+
 export interface LiveSession {
   session_id: string;
   type: SessionType;
@@ -28,7 +38,8 @@ export interface LiveSession {
   ends_at: string | null;
   cooldown_ends_at: string | null;
   host_a: SessionHost;
-  host_b: SessionHost;
+  host_b: SessionHost | null; // Can be null for multi-host sessions
+  participants?: SessionParticipant[]; // New: array of all participants
 }
 
 export interface LiveSessionInvite {
