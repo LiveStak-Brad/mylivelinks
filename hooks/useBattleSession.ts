@@ -291,6 +291,19 @@ export function useBattleSession({
           refresh();
         }
       )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'live_session_participants',
+          filter: `profile_id=eq.${targetHostId}`,
+        },
+        (payload) => {
+          console.log('[useBattleSession] Participant update (self):', payload);
+          refresh();
+        }
+      )
       .subscribe();
     
     channelRef.current = channel;
@@ -302,6 +315,45 @@ export function useBattleSession({
       }
     };
   }, [targetHostId, supabase, refresh]);
+  
+  // Also subscribe to participant changes for the current session
+  useEffect(() => {
+    if (!session?.session_id) return;
+    
+    const channel = supabase
+      .channel(`session_participants_${session.session_id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'live_session_participants',
+          filter: `session_id=eq.${session.session_id}`,
+        },
+        (payload) => {
+          console.log('[useBattleSession] New participant joined:', payload);
+          refresh();
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'live_session_participants',
+          filter: `session_id=eq.${session.session_id}`,
+        },
+        (payload) => {
+          console.log('[useBattleSession] Participant updated:', payload);
+          refresh();
+        }
+      )
+      .subscribe();
+    
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [session?.session_id, supabase, refresh]);
   
   // Realtime subscription for invite updates (for hosts)
   useEffect(() => {

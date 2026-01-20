@@ -468,6 +468,26 @@ END;
 $$;
 
 -- =============================================================================
+-- 8. Enable realtime for live_session_participants
+-- =============================================================================
+
+-- Add table to realtime publication if not already added
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_publication_tables 
+    WHERE pubname = 'supabase_realtime' 
+    AND schemaname = 'public' 
+    AND tablename = 'live_session_participants'
+  ) THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.live_session_participants;
+    RAISE NOTICE 'Added live_session_participants to realtime publication';
+  ELSE
+    RAISE NOTICE 'live_session_participants already in realtime publication';
+  END IF;
+END $$;
+
+-- =============================================================================
 -- Verification
 -- =============================================================================
 
