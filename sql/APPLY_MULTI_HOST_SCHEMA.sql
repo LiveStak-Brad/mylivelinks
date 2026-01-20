@@ -488,6 +488,230 @@ BEGIN
 END $$;
 
 -- =============================================================================
+-- 9. Update rpc_send_battle_invite_from_cohost for multi-host
+-- =============================================================================
+
+CREATE OR REPLACE FUNCTION public.rpc_send_battle_invite_from_cohost(
+  p_session_id UUID
+)
+RETURNS UUID
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_user_id UUID := auth.uid();
+  v_session live_sessions%ROWTYPE;
+  v_other_host RECORD;
+  v_invite_id UUID;
+  v_first_invite_id UUID := NULL;
+  v_participant_count INT;
+BEGIN
+  IF v_user_id IS NULL THEN
+    RAISE EXCEPTION 'Not authenticated';
+  END IF;
+  
+  -- Fetch the cohost session
+  SELECT * INTO v_session
+  FROM live_sessions
+  WHERE id = p_session_id
+    AND type = 'cohost'
+    AND status = 'active'
+  FOR UPDATE;
+  
+  IF v_session IS NULL THEN
+    RAISE EXCEPTION 'Cohost session not found or not active';
+  END IF;
+  
+  -- Verify caller is in this session
+  SELECT COUNT(*) INTO v_participant_count
+  FROM live_session_participants
+  WHERE session_id = p_session_id
+    AND profile_id = v_user_id
+    AND left_at IS NULL;
+    
+  IF v_participant_count = 0 THEN
+    RAISE EXCEPTION 'You are not in this session';
+  END IF;
+  
+  -- Cancel any existing pending battle invites for this session
+  UPDATE live_session_invites
+  SET status = 'cancelled', responded_at = now()
+  WHERE session_id = p_session_id
+    AND type = 'battle'
+    AND status = 'pending';
+  
+  -- Send battle invite to ALL other participants in the session
+  FOR v_other_host IN
+    SELECT profile_id
+    FROM live_session_participants
+    WHERE session_id = p_session_id
+      AND profile_id != v_user_id
+      AND left_at IS NULL
+  LOOP
+    INSERT INTO live_session_invites (
+      from_host_id,
+      to_host_id,
+      type,
+      mode,
+      status,
+      session_id
+    )
+    VALUES (
+      v_user_id,
+      v_other_host.profile_id,
+      'battle',
+      v_session.mode,
+      'pending',
+      p_session_id
+    )
+    RETURNING id INTO v_invite_id;
+    
+    -- Track the first invite ID to return
+    IF v_first_invite_id IS NULL THEN
+      v_first_invite_id := v_invite_id;
+    END IF;
+  END LOOP;
+  
+  IF v_first_invite_id IS NULL THEN
+    RAISE EXCEPTION 'No other participants to invite';
+  END IF;
+  
+  RETURN v_first_invite_id;
+END;
+$$;
+
+-- =============================================================================
+-- 10. Update rpc_accept_battle_invite_from_cohost to start when all accept
+-- =============================================================================
+
+CREATE OR REPLACE FUNCTION public.rpc_accept_battle_invite_from_cohost(
+  p_invite_id UUID
+)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_user_id UUID := auth.uid();
+  v_invite live_session_invites%ROWTYPE;
+  v_session_id UUID;
+  v_battle_duration INTERVAL;
+  v_pending_count INT;
+  v_participant_count INT;
+BEGIN
+  IF v_user_id IS NULL THEN
+    RAISE EXCEPTION 'Not authenticated';
+  END IF;
+  
+  -- Fetch the invite
+  SELECT * INTO v_invite
+  FROM live_session_invites
+  WHERE id = p_invite_id
+    AND to_host_id = v_user_id
+    AND type = 'battle'
+    AND status = 'pending'
+  FOR UPDATE;
+  
+  IF v_invite IS NULL THEN
+    RAISE EXCEPTION 'Battle invite not found or already responded';
+  END IF;
+  
+  -- Must have a session_id (invite from cohost)
+  IF v_invite.session_id IS NULL THEN
+    RAISE EXCEPTION 'Invalid battle invite - no session linked';
+  END IF;
+  
+  v_session_id := v_invite.session_id;
+  
+  -- Update this invite to accepted
+  UPDATE live_session_invites
+  SET status = 'accepted', responded_at = now()
+  WHERE id = p_invite_id;
+  
+  -- Check if all participants have accepted (no more pending battle invites for this session)
+  SELECT COUNT(*) INTO v_pending_count
+  FROM live_session_invites
+  WHERE session_id = v_session_id
+    AND type = 'battle'
+    AND status = 'pending';
+  
+  -- Only start battle when ALL have accepted
+  IF v_pending_count = 0 THEN
+    -- Determine battle duration based on mode
+    IF v_invite.mode = 'speed' THEN
+      v_battle_duration := INTERVAL '60 seconds';
+    ELSE
+      v_battle_duration := INTERVAL '180 seconds';
+    END IF;
+    
+    -- Convert the cohost session to battle
+    UPDATE live_sessions
+    SET 
+      type = 'battle',
+      started_at = now(),
+      ends_at = now() + v_battle_duration
+    WHERE id = v_session_id;
+    
+    -- Get participant count for team assignment
+    SELECT COUNT(*) INTO v_participant_count
+    FROM live_session_participants
+    WHERE session_id = v_session_id AND left_at IS NULL;
+    
+    -- Update teams in participants table: alternate A/B based on slot_index
+    UPDATE live_session_participants
+    SET team = CASE WHEN slot_index % 2 = 0 THEN 'A' ELSE 'B' END
+    WHERE session_id = v_session_id AND left_at IS NULL;
+    
+    -- Initialize battle_scores table
+    INSERT INTO battle_scores (
+      session_id,
+      points_a,
+      points_b,
+      supporter_stats,
+      participant_states,
+      boost_active,
+      boost_multiplier,
+      boost_started_at,
+      boost_ends_at
+    ) VALUES (
+      v_session_id,
+      0,
+      0,
+      '{"supporters": []}'::jsonb,
+      '{}'::jsonb,
+      false,
+      1,
+      NULL,
+      NULL
+    )
+    ON CONFLICT (session_id) DO UPDATE SET
+      points_a = 0,
+      points_b = 0,
+      supporter_stats = '{"supporters": []}'::jsonb;
+    
+    RETURN jsonb_build_object(
+      'status', 'battle_started',
+      'invite_id', p_invite_id,
+      'session_id', v_session_id,
+      'type', 'battle',
+      'started_at', now(),
+      'ends_at', now() + v_battle_duration
+    );
+  ELSE
+    -- Waiting for others to accept
+    RETURN jsonb_build_object(
+      'status', 'accepted_waiting',
+      'invite_id', p_invite_id,
+      'session_id', v_session_id,
+      'pending_count', v_pending_count
+    );
+  END IF;
+END;
+$$;
+
+-- =============================================================================
 -- Verification
 -- =============================================================================
 
