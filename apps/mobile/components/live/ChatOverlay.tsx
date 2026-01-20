@@ -457,7 +457,7 @@ const styles = StyleSheet.create({
     fontSize: 9,
   },
   gifterBadgeLevel: {
-    fontSize: 9,
+    fontSize: 12,
     fontWeight: '700',
   },
   

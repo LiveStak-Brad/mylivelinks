@@ -88,7 +88,7 @@ export default function GifterBadge({
         {tier.icon}
       </span>
       {showLevel && (
-        <span className="font-bold tracking-tight">
+        <span className="font-bold tracking-tight text-base">
           {level}
         </span>
       )}

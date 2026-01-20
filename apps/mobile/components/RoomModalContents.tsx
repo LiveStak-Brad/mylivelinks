@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { View, StyleSheet, Text, ActivityIndicator, ScrollView, TextInput, TouchableOpacity, Image, Alert, FlatList, InteractionManager } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
+import type { NavigationProp } from '@react-navigation/native';
 import { useAuth } from '../state/AuthContext';
 import { getSupabaseClient } from '../lib/supabase';
 import { getAvatarSource, getAvatarUrl } from '../lib/defaultAvatar';
@@ -102,6 +104,7 @@ export function ChatContent({ roomSlug }: { roomSlug?: string }) {
           created_at,
           profiles (
             username,
+            display_name,
             avatar_url,
             is_live,
             chat_bubble_color,
@@ -127,7 +130,7 @@ export function ChatContent({ roomSlug }: { roomSlug?: string }) {
         // FIX #3: Populate cache with profiles from initial load
         if (msg.profile_id && profile) {
           profileCacheRef.current.set(msg.profile_id, {
-            username: profile.username || 'Unknown',
+            username: profile.display_name || profile.username || 'Unknown',
             avatar_url: profile.avatar_url,
             is_live: profile.is_live || false,
             gifter_level: profile.gifter_level || 0,
@@ -139,7 +142,7 @@ export function ChatContent({ roomSlug }: { roomSlug?: string }) {
         return {
           id: msg.id,
           profile_id: msg.profile_id,
-          username: profile?.username || 'Unknown',
+          username: profile?.display_name || profile?.username || 'Unknown',
           avatar_url: profile?.avatar_url,
           is_live: profile?.is_live || false,
           message_type: msg.message_type,
@@ -224,14 +227,14 @@ export function ChatContent({ roomSlug }: { roomSlug?: string }) {
             // Cache miss - fetch and cache profile
             const { data: profile } = await supabase
               .from('profiles')
-              .select('username, avatar_url, is_live, gifter_level, total_spent, is_mll_pro')
+              .select('username, display_name, avatar_url, is_live, gifter_level, total_spent, is_mll_pro')
               .eq('id', newMsg.profile_id)
               .single();
               
             if (profile) {
               // Cache the profile
               profileCacheRef.current.set(newMsg.profile_id, {
-                username: profile.username || 'Unknown',
+                username: profile.display_name || profile.username || 'Unknown',
                 avatar_url: profile.avatar_url,
                 is_live: profile.is_live || false,
                 gifter_level: profile.gifter_level || 0,
@@ -424,7 +427,15 @@ export function ChatContent({ roomSlug }: { roomSlug?: string }) {
 // USER STATS CONTENT - Match web UserStatsSection.tsx exactly
 // ============================================================================
 
-export function StatsContent({ liveStreamId }: { liveStreamId?: number | null }) {
+export function StatsContent({
+  liveStreamId,
+  roomId,
+  sessionStartedAt,
+}: {
+  liveStreamId?: number | null;
+  roomId?: string | null;
+  sessionStartedAt?: string | null;
+}) {
   const { user } = useAuth();
   const supabase = getSupabaseClient();
   const [stats, setStats] = useState({
@@ -441,11 +452,70 @@ export function StatsContent({ liveStreamId }: { liveStreamId?: number | null })
     diamondsEarned: 0,
     elapsedSeconds: 0,
   });
+  const [roomViewerCount, setRoomViewerCount] = useState(0);
+  const [resolvedLiveStreamId, setResolvedLiveStreamId] = useState<number | null>(liveStreamId ?? null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     loadUserStats();
   }, [user]);
+
+  useEffect(() => {
+    setResolvedLiveStreamId(liveStreamId ?? null);
+  }, [liveStreamId]);
+
+  useEffect(() => {
+    if (!roomId) {
+      setRoomViewerCount(0);
+      return;
+    }
+
+    let cancelled = false;
+    const loadRoomViewerCount = async () => {
+      const { data } = await supabase.rpc('get_room_presence_count_minus_self', {
+        p_room_id: roomId,
+      });
+      if (!cancelled) {
+        setRoomViewerCount(Number(data ?? 0));
+      }
+    };
+
+    loadRoomViewerCount();
+    const interval = setInterval(loadRoomViewerCount, 10000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [roomId, supabase]);
+
+  useEffect(() => {
+    if (liveStreamId || !user) return;
+    let cancelled = false;
+
+    const resolveLiveStream = async () => {
+      const { data } = await supabase
+        .from('live_streams')
+        .select('id')
+        .eq('profile_id', user.id)
+        .eq('live_available', true)
+        .eq('streaming_mode', 'group')
+        .order('started_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (!cancelled) {
+        setResolvedLiveStreamId((data as any)?.id ?? null);
+      }
+    };
+
+    resolveLiveStream();
+    const interval = setInterval(resolveLiveStream, 10000);
+
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [liveStreamId, user, supabase]);
 
   // Real-time subscription for balance updates
   useEffect(() => {
@@ -487,7 +557,7 @@ export function StatsContent({ liveStreamId }: { liveStreamId?: number | null })
     try {
       const { data, error } = await supabase
         .from('profiles')
-        .select('username, avatar_url, coin_balance, earnings_balance, gifter_level')
+        .select('username, display_name, avatar_url, coin_balance, earnings_balance, gifter_level')
         .eq('id', user.id)
         .single();
 
@@ -496,7 +566,7 @@ export function StatsContent({ liveStreamId }: { liveStreamId?: number | null })
       setStats({
         coinBalance: data.coin_balance || 0,
         diamondBalance: data.earnings_balance || 0,
-        username: data.username || '',
+        username: data.display_name || data.username || '',
         avatarUrl: data.avatar_url || '',
         gifterLevel: data.gifter_level || 0,
       });
@@ -508,35 +578,41 @@ export function StatsContent({ liveStreamId }: { liveStreamId?: number | null })
   };
 
   const loadSessionStats = useCallback(async () => {
-    if (!liveStreamId) {
+    if (!resolvedLiveStreamId) {
       setSessionStats({
-        startedAt: null,
+        startedAt: sessionStartedAt ?? null,
         viewerCount: 0,
         likesCount: 0,
         diamondsEarned: 0,
-        elapsedSeconds: 0,
+        elapsedSeconds: sessionStartedAt
+          ? Math.max(0, Math.floor((Date.now() - new Date(sessionStartedAt).getTime()) / 1000))
+          : 0,
       });
       return;
     }
 
     const { data: stream } = await supabase
       .from('live_streams')
-      .select('started_at, viewer_count')
-      .eq('id', liveStreamId)
+      .select('started_at, created_at, viewer_count')
+      .eq('id', resolvedLiveStreamId)
       .maybeSingle();
 
-    const startedAt = (stream as any)?.started_at ?? null;
+    const startedAt =
+      (stream as any)?.started_at ??
+      (stream as any)?.created_at ??
+      sessionStartedAt ??
+      null;
     const viewerCount = Number((stream as any)?.viewer_count ?? 0);
 
     const { count: likesCount } = await supabase
       .from('stream_likes')
       .select('id', { count: 'exact', head: true })
-      .eq('live_stream_id', liveStreamId);
+      .eq('live_stream_id', resolvedLiveStreamId);
 
     const { data: gifts } = await supabase
       .from('gifts')
       .select('diamonds_awarded')
-      .eq('live_stream_id', liveStreamId);
+      .eq('live_stream_id', resolvedLiveStreamId);
 
     const diamondsEarned = (gifts || []).reduce((sum, g) => sum + Number(g?.diamonds_awarded ?? 0), 0);
 
@@ -551,22 +627,22 @@ export function StatsContent({ liveStreamId }: { liveStreamId?: number | null })
       diamondsEarned,
       elapsedSeconds,
     });
-  }, [liveStreamId, supabase]);
+  }, [resolvedLiveStreamId, sessionStartedAt, supabase]);
 
   useEffect(() => {
     loadSessionStats();
   }, [loadSessionStats]);
 
   useEffect(() => {
-    if (!liveStreamId) return;
+    if (!resolvedLiveStreamId) return;
     const interval = setInterval(() => {
       loadSessionStats();
     }, 20000);
     return () => clearInterval(interval);
-  }, [liveStreamId, loadSessionStats]);
+  }, [resolvedLiveStreamId, loadSessionStats]);
 
   useEffect(() => {
-    if (!liveStreamId || !sessionStats.startedAt) return;
+    if (!sessionStats.startedAt) return;
     const interval = setInterval(() => {
       setSessionStats(prev => ({
         ...prev,
@@ -574,7 +650,7 @@ export function StatsContent({ liveStreamId }: { liveStreamId?: number | null })
       }));
     }, 1000);
     return () => clearInterval(interval);
-  }, [liveStreamId, sessionStats.startedAt]);
+  }, [sessionStats.startedAt]);
 
   const formatDuration = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -633,9 +709,15 @@ export function StatsContent({ liveStreamId }: { liveStreamId?: number | null })
         </View>
       </View>
 
-      {liveStreamId && (
-        <View style={styles.sessionStatsContainer}>
-          <Text style={styles.sessionStatsTitle}>Session Stats</Text>
+      <View style={styles.sessionStatsContainer}>
+        <Text style={styles.sessionStatsTitle}>Session Stats</Text>
+        <Text style={styles.sessionStatsDebugText}>
+          Room: {roomId || 'none'} • Stream: {resolvedLiveStreamId ?? 'none'} • Started:{' '}
+          {sessionStats.startedAt || 'none'}
+        </Text>
+        {!resolvedLiveStreamId && !roomId ? (
+          <Text style={styles.sessionStatsEmptyText}>Go live to see session stats.</Text>
+        ) : (
           <View style={styles.sessionStatsGrid}>
             <View style={styles.sessionStatItem}>
               <Text style={styles.sessionStatValue}>{formatDuration(sessionStats.elapsedSeconds)}</Text>
@@ -646,7 +728,9 @@ export function StatsContent({ liveStreamId }: { liveStreamId?: number | null })
               <Text style={styles.sessionStatLabel}>Earnings</Text>
             </View>
             <View style={styles.sessionStatItem}>
-              <Text style={styles.sessionStatValue}>{sessionStats.viewerCount}</Text>
+              <Text style={styles.sessionStatValue}>
+                {roomId ? roomViewerCount : sessionStats.viewerCount}
+              </Text>
               <Text style={styles.sessionStatLabel}>Views</Text>
             </View>
             <View style={styles.sessionStatItem}>
@@ -654,8 +738,8 @@ export function StatsContent({ liveStreamId }: { liveStreamId?: number | null })
               <Text style={styles.sessionStatLabel}>Likes</Text>
             </View>
           </View>
-        </View>
-      )}
+        )}
+      </View>
     </View>
   );
 }
@@ -960,12 +1044,175 @@ export function LeaderboardContent({ roomSlug, roomName }: { roomSlug?: string; 
 }
 
 // ============================================================================
+// VIEWERS CONTENT - Room Presence List
+// ============================================================================
+
+type ViewerEntry = {
+  profile_id: string;
+  username?: string | null;
+  last_seen_at?: string | null;
+  is_live_available?: boolean | null;
+  profiles?: {
+    username?: string | null;
+    display_name?: string | null;
+    avatar_url?: string | null;
+  } | null;
+};
+
+export function ViewersContent({ roomId }: { roomId?: string | null }) {
+  const supabase = getSupabaseClient();
+  const [viewers, setViewers] = useState<ViewerEntry[]>([]);
+  const [liveMap, setLiveMap] = useState<Record<string, boolean>>({});
+  const [loading, setLoading] = useState(true);
+
+  const loadViewers = useCallback(async () => {
+    if (!roomId) {
+      setViewers([]);
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('room_presence')
+        .select('profile_id, username, last_seen_at, is_live_available, profiles (username, display_name, avatar_url)')
+        .eq('room_id', roomId)
+        .order('last_seen_at', { ascending: false })
+        .limit(200);
+
+      if (error) throw error;
+      setViewers((data as ViewerEntry[]) || []);
+    } catch {
+      setViewers([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [roomId, supabase]);
+
+  const loadLiveMap = useCallback(async (profileIds: string[]) => {
+    const ids = Array.from(new Set(profileIds.filter(Boolean)));
+    if (ids.length === 0) {
+      setLiveMap({});
+      return;
+    }
+
+    const { data } = await supabase
+      .from('live_streams')
+      .select('profile_id')
+      .in('profile_id', ids)
+      .eq('live_available', true);
+
+    const map: Record<string, boolean> = {};
+    (data || []).forEach((row: any) => {
+      if (row?.profile_id) {
+        map[row.profile_id] = true;
+      }
+    });
+    setLiveMap(map);
+  }, [supabase]);
+
+  useEffect(() => {
+    loadViewers();
+  }, [loadViewers]);
+
+  useEffect(() => {
+    const ids = viewers.map(v => v.profile_id).filter(Boolean);
+    loadLiveMap(ids);
+  }, [viewers, loadLiveMap]);
+
+  useEffect(() => {
+    if (!roomId) return;
+    const channel = supabase
+      .channel(`room-presence:${roomId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'room_presence',
+          filter: `room_id=eq.${roomId}`,
+        },
+        () => {
+          loadViewers();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [roomId, supabase, loadViewers]);
+
+  const renderViewer = ({ item }: { item: ViewerEntry }) => {
+    const name = item.profiles?.display_name || item.profiles?.username || item.username || 'User';
+    const avatarUrl = item.profiles?.avatar_url || undefined;
+    const isLive = !!liveMap[item.profile_id] || !!item.is_live_available;
+    const lastSeen = item.last_seen_at ? new Date(item.last_seen_at).getTime() : 0;
+    const isActive = lastSeen > 0 && Date.now() - lastSeen < 60_000;
+    return (
+      <View style={styles.viewerRow}>
+        {avatarUrl ? (
+          <Image source={{ uri: avatarUrl }} style={styles.viewerAvatar} />
+        ) : (
+          <View style={styles.viewerAvatarFallback}>
+            <Text style={styles.viewerAvatarText}>{name[0]?.toUpperCase() || 'U'}</Text>
+          </View>
+        )}
+        <View style={styles.viewerInfo}>
+          <View style={styles.viewerNameRow}>
+            <Text style={styles.viewerName}>{name}</Text>
+            {isActive ? <View style={styles.viewerActiveDot} /> : null}
+            {isLive ? <Ionicons name="videocam" size={14} color="#ef4444" /> : null}
+          </View>
+          {item.profiles?.username ? (
+            <Text style={styles.viewerUsername}>@{item.profiles.username}</Text>
+          ) : null}
+        </View>
+      </View>
+    );
+  };
+
+  if (loading) {
+    return (
+      <View style={styles.loading}>
+        <ActivityIndicator size="small" color="#fff" />
+      </View>
+    );
+  }
+
+  const sortedViewers = [...viewers].sort((a, b) => {
+    const aLast = a.last_seen_at ? new Date(a.last_seen_at).getTime() : 0;
+    const bLast = b.last_seen_at ? new Date(b.last_seen_at).getTime() : 0;
+    const aActive = aLast > 0 && Date.now() - aLast < 60_000;
+    const bActive = bLast > 0 && Date.now() - bLast < 60_000;
+    if (aActive !== bActive) return aActive ? -1 : 1;
+    return bLast - aLast;
+  });
+
+  return (
+    <View style={styles.viewersContainer}>
+      {viewers.length === 0 ? (
+        <Text style={styles.noDataText}>No viewers yet</Text>
+      ) : (
+        <FlatList
+          data={sortedViewers}
+          keyExtractor={(item) => `${item.profile_id}-${item.last_seen_at || ''}`}
+          renderItem={renderViewer}
+          contentContainerStyle={styles.viewerList}
+        />
+      )}
+    </View>
+  );
+}
+
+// ============================================================================
 // OPTIONS CONTENT - Match web OptionsMenu.tsx
 // ============================================================================
 
 export function OptionsContent() {
   const { user } = useAuth();
   const supabase = getSupabaseClient();
+  const navigation = useNavigation<NavigationProp<any>>();
   const [muteAll, setMuteAll] = useState(false);
   const [autoplay, setAutoplay] = useState(true);
 
@@ -1003,6 +1250,15 @@ export function OptionsContent() {
 
       {/* Divider */}
       <View style={styles.optionDivider} />
+
+      {/* Wallet */}
+      <TouchableOpacity
+        style={styles.optionButton}
+        onPress={() => navigation.navigate('Wallet')}
+      >
+        <Ionicons name="wallet-outline" size={20} color="#fff" />
+        <Text style={styles.optionButtonText}>Wallet</Text>
+      </TouchableOpacity>
 
       {/* Room Rules */}
       <TouchableOpacity style={styles.optionButton}>
@@ -1122,7 +1378,7 @@ const styles = StyleSheet.create({
     fontSize: 9,
   },
   gifterBadgeLevel: {
-    fontSize: 9,
+    fontSize: 12,
     fontWeight: '700',
   },
   chatMessageText: {
@@ -1216,6 +1472,15 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     marginBottom: 8,
   },
+  sessionStatsEmptyText: {
+    color: '#9ca3af',
+    fontSize: 12,
+  },
+  sessionStatsDebugText: {
+    color: '#6b7280',
+    fontSize: 10,
+    marginBottom: 6,
+  },
   sessionStatsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -1237,6 +1502,64 @@ const styles = StyleSheet.create({
     color: '#9ca3af',
     fontSize: 12,
     marginTop: 4,
+  },
+  // Viewers styles
+  viewersContainer: {
+    padding: 16,
+    flex: 1,
+  },
+  viewerList: {
+    paddingBottom: 12,
+  },
+  viewerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#2a2a2a',
+  },
+  viewerAvatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    marginRight: 12,
+  },
+  viewerAvatarFallback: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    marginRight: 12,
+    backgroundColor: '#2a2a2a',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  viewerAvatarText: {
+    color: '#fff',
+    fontWeight: '700',
+  },
+  viewerInfo: {
+    flex: 1,
+  },
+  viewerNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  viewerName: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  viewerUsername: {
+    color: '#9ca3af',
+    fontSize: 12,
+    marginTop: 2,
+  },
+  viewerActiveDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#a855f7',
   },
   statItem: {
     flex: 1,
