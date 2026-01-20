@@ -62,6 +62,7 @@ export default function StreamChat({ liveStreamId, onGiftClick, onShareClick, on
   const [gifterStatusMap, setGifterStatusMap] = useState<Record<string, GifterStatus>>({});
   const [currentUserProfile, setCurrentUserProfile] = useState<{
     username: string;
+    display_name?: string;
     avatar_url?: string;
   } | null>(null);
   const [selectedProfile, setSelectedProfile] = useState<{
