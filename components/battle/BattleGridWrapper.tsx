@@ -284,11 +284,28 @@ export default function BattleGridWrapper({
       });
     }
     
-    // Add remote participants
+    // Add remote participants - ONLY if they are hostA or hostB (invited hosts only)
     room.remoteParticipants.forEach((participant) => {
       // Extract user ID from identity (format: u_<uuid>[:device], guest_<uuid>[:device])
       const identity = participant.identity;
       const userId = normalizeParticipantId(identity);
+      
+      // Determine participant info from session - must be hostA or hostB
+      const isHostA = userId === hostSnapshot.hostA.id;
+      const isHostB = userId === hostSnapshot.hostB.id;
+      const hostInfo = isHostA ? hostSnapshot.hostA : isHostB ? hostSnapshot.hostB : null;
+      
+      // Skip participants who are not invited hosts (never show UUID fallback)
+      if (!hostInfo) {
+        console.warn('[LiveKit][Battle] Ignoring uninvited participant', {
+          roomName,
+          identity,
+          normalizedUserId: userId,
+          hostA: hostSnapshot.hostA.id,
+          hostB: hostSnapshot.hostB.id,
+        });
+        return; // Skip this participant
+      }
       
       // Find video and audio tracks
       let videoTrack: RemoteTrack | undefined;
@@ -304,29 +321,14 @@ export default function BattleGridWrapper({
         }
       });
       
-      // Determine participant info from session
-      const isHostA = userId === hostSnapshot.hostA.id;
-      const isHostB = userId === hostSnapshot.hostB.id;
-      const hostInfo = isHostA ? hostSnapshot.hostA : isHostB ? hostSnapshot.hostB : null;
-      
-      const fallbackName = identity.replace(/^u_/, '').split(':')[0] || 'Participant';
       gridParticipants.push({
         id: userId,
-        name: hostInfo ? (hostInfo.display_name || hostInfo.username) : fallbackName,
+        name: hostInfo.display_name || hostInfo.username,
         videoTrack: videoTrack || undefined,
         audioTrack: audioTrack || undefined,
-        isHost: !!hostInfo,
-        avatarUrl: hostInfo?.avatar_url || undefined,
+        isHost: true,
+        avatarUrl: hostInfo.avatar_url || undefined,
       });
-      if (!hostInfo) {
-        console.log('[LiveKit][Battle] Fallback participant hydrated', {
-          roomName,
-          identity,
-          normalizedUserId: userId,
-          hostA: hostSnapshot.hostA.id,
-          hostB: hostSnapshot.hostB.id,
-        });
-      }
     });
     
     setParticipants(gridParticipants);
