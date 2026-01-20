@@ -23,6 +23,7 @@ export function LiveStreamPreview({ streamerProfileId, streamerUsername, display
   const [showPrompt, setShowPrompt] = useState(false);
   const [hasVideo, setHasVideo] = useState(false);
   const [isMuted, setIsMuted] = useState(true);
+  const [previewEnded, setPreviewEnded] = useState(false);
   const supabase = useMemo(() => createClient(), []);
 
   const handleEnterLive = () => {
@@ -189,12 +190,12 @@ export function LiveStreamPreview({ streamerProfileId, streamerUsername, display
 
         isConnectingRef.current = false;
 
-        // Show "Tap to enter" prompt after 15 seconds
+        // Show "Tap to enter" prompt after 5 seconds (always show, even if no video)
         promptTimer = setTimeout(() => {
           if (mounted) {
             setShowPrompt(true);
           }
-        }, 15000);
+        }, 5000);
 
       } catch (err) {
         console.error('[LiveStreamPreview] Error:', err);
@@ -205,9 +206,28 @@ export function LiveStreamPreview({ streamerProfileId, streamerUsername, display
     // Small delay to avoid race conditions with React strict mode
     const connectTimer = setTimeout(connectToRoom, 100);
 
+    // Always show prompt after 5 seconds, even if connection fails
+    const fallbackPromptTimer = setTimeout(() => {
+      if (mounted) {
+        setShowPrompt(true);
+      }
+    }, 5000);
+
+    // End preview after 15 seconds - disconnect and force user to scroll or join
+    const endPreviewTimer = setTimeout(() => {
+      if (mounted) {
+        console.log('[LiveStreamPreview] Ending preview after 15s');
+        setPreviewEnded(true);
+        disconnectRoom();
+        setHasVideo(false);
+      }
+    }, 15000);
+
     return () => {
       mounted = false;
       clearTimeout(connectTimer);
+      clearTimeout(fallbackPromptTimer);
+      clearTimeout(endPreviewTimer);
       if (promptTimer) clearTimeout(promptTimer);
       isConnectingRef.current = false;
       disconnectRoom();
@@ -219,56 +239,85 @@ export function LiveStreamPreview({ streamerProfileId, streamerUsername, display
       className="absolute inset-0 cursor-pointer z-10"
       onClick={handleEnterLive}
     >
-      <video
-        ref={videoRef}
-        autoPlay
-        playsInline
-        muted={isMuted}
-        className="absolute inset-0 w-full h-full object-cover"
-        style={{ display: hasVideo ? 'block' : 'none' }}
-      />
-      
-      {/* Volume Toggle Button - Top Right */}
-      {hasVideo && (
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            setIsMuted(!isMuted);
-          }}
-          className="absolute top-16 right-4 z-20 p-2 rounded-full bg-black/50 hover:bg-black/70 transition"
-          aria-label={isMuted ? 'Unmute' : 'Mute'}
-        >
-          {isMuted ? (
-            <VolumeX className="w-5 h-5 text-white" />
-          ) : (
-            <Volume2 className="w-5 h-5 text-white" />
-          )}
-        </button>
-      )}
-      
-      {/* Gentle edge gradients */}
-      <div 
-        className="absolute inset-0 pointer-events-none"
-        style={{
-          background: 'linear-gradient(to right, rgba(0,0,0,0.3) 0%, transparent 20%, transparent 80%, rgba(0,0,0,0.3) 100%), linear-gradient(to bottom, rgba(0,0,0,0.2) 0%, transparent 15%, transparent 85%, rgba(0,0,0,0.4) 100%)'
-        }}
-      />
-
-      {/* Tap to enter prompt after 15 seconds */}
-      {showPrompt && (
-        <div 
-          className="absolute inset-0 flex items-center justify-center z-30 bg-black/40 pointer-events-none"
-        >
+      {previewEnded ? (
+        /* Preview ended - show message to encourage action */
+        <div className="absolute inset-0 bg-black/85 flex items-center justify-center">
           <div className="text-center">
-            <div className="text-white text-2xl font-bold mb-2">
-              {displayName} is live
+            <div className="inline-flex items-center bg-red-600 px-4 py-2 rounded mb-4">
+              <div className="w-2 h-2 bg-white rounded-full mr-2"></div>
+              <span className="text-white text-sm font-bold tracking-wider">LIVE</span>
             </div>
-            <div className="px-8 py-3 bg-gradient-to-r from-pink-500 to-purple-600 rounded-full text-white font-semibold text-lg shadow-lg">
-              Tap to Join
+            <div className="text-white text-2xl font-bold mb-2">
+              Preview Ended
+            </div>
+            <div className="text-white text-base opacity-80">
+              Tap to join or scroll to continue
             </div>
           </div>
         </div>
+      ) : (
+        <>
+          {/* Loading state background - shown until video loads */}
+          {!hasVideo && (
+            <div className="absolute inset-0 bg-black/20 flex items-center justify-center">
+              <div className="text-white text-sm opacity-70">Connecting to stream...</div>
+            </div>
+          )}
+
+          {/* Video preview - fullscreen when loaded */}
+          <video
+            ref={videoRef}
+            autoPlay
+            playsInline
+            muted={isMuted}
+            className="absolute inset-0 w-full h-full object-cover"
+            style={{ display: hasVideo ? 'block' : 'none' }}
+          />
+          
+          {/* Volume Toggle Button - Top Right (only show when video is playing) */}
+          {hasVideo && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsMuted(!isMuted);
+              }}
+              className="absolute top-16 right-4 z-20 p-2 rounded-full bg-black/50 hover:bg-black/70 transition"
+              aria-label={isMuted ? 'Unmute' : 'Mute'}
+            >
+              {isMuted ? (
+                <VolumeX className="w-5 h-5 text-white" />
+              ) : (
+                <Volume2 className="w-5 h-5 text-white" />
+              )}
+            </button>
+          )}
+          
+          {/* Gentle edge gradients */}
+          <div 
+            className="absolute inset-0 pointer-events-none"
+            style={{
+              background: 'linear-gradient(to right, rgba(0,0,0,0.3) 0%, transparent 20%, transparent 80%, rgba(0,0,0,0.3) 100%), linear-gradient(to bottom, rgba(0,0,0,0.2) 0%, transparent 15%, transparent 85%, rgba(0,0,0,0.4) 100%)'
+            }}
+          />
+
+          {/* Tap to enter prompt after 5 seconds */}
+          {showPrompt && !previewEnded && (
+            <div 
+              className="absolute inset-0 flex items-center justify-center z-30 bg-black/40"
+              style={{ pointerEvents: 'none' }}
+            >
+              <div className="text-center animate-pulse">
+                <div className="text-white text-2xl font-bold mb-2">
+                  {displayName} is live
+                </div>
+                <div className="px-8 py-3 bg-gradient-to-r from-pink-500 to-purple-600 rounded-full text-white font-semibold text-lg shadow-lg">
+                  Tap to Join
+                </div>
+              </div>
+            </div>
+          )}
+        </>
       )}
     </div>
   );

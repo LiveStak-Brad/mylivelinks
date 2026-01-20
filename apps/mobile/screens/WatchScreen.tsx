@@ -10,6 +10,7 @@ import {
   Text,
   View,
   ViewToken,
+  useWindowDimensions,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -21,6 +22,7 @@ import WatchLiveBadge from '../components/watch/WatchLiveBadge';
 import WatchActionStack from '../components/watch/WatchActionStack';
 import WatchCaptionOverlay from '../components/watch/WatchCaptionOverlay';
 import WatchContentItem from '../components/watch/WatchContentItem';
+import LiveStreamPreview from '../components/watch/LiveStreamPreview';
 import WatchCommentsModal from '../components/watch/WatchCommentsModal';
 import WatchGiftModal from '../components/watch/WatchGiftModal';
 import WatchUploadModal from '../components/watch/WatchUploadModal';
@@ -35,6 +37,7 @@ import { showComingSoon } from '../lib/showComingSoon';
 
 export default function WatchScreen() {
   const navigation = useNavigation();
+  const { width: screenWidth } = useWindowDimensions();
   const flatListRef = useRef<FlatList>(null);
   const [containerHeight, setContainerHeight] = useState(0);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -380,8 +383,11 @@ export default function WatchScreen() {
     ({ item, index }: { item: WatchItem; index: number }) => {
       const isLive = item.type === 'live';
       const isVisible = index === currentIndex;
-      // Priority: thumbnailUrl > mediaUrl > placeholder (never avatar for content)
-      const thumbnailUrl = item.thumbnailUrl || item.mediaUrl || 'https://picsum.photos/seed/default/720/1280';
+      // For live streams: use thumbnailUrl (avatar) or generate default avatar
+      // For videos: use thumbnailUrl > mediaUrl > placeholder
+      const thumbnailUrl = isLive 
+        ? (item.thumbnailUrl || item.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(item.displayName || item.username)}&size=720&background=1a1a2e&color=fff&bold=true`)
+        : (item.thumbnailUrl || item.mediaUrl || 'https://picsum.photos/seed/default/720/1280');
 
       return (
         <Pressable onPress={() => isLive && handleLiveItemPress(item)}>
@@ -394,6 +400,20 @@ export default function WatchScreen() {
             onMuteToggle={() => setGlobalMuted(prev => !prev)}
             height={containerHeight}
           >
+            {/* Live video preview - connects to LiveKit and shows actual stream */}
+            {isLive && item.authorId && isVisible && (
+              <LiveStreamPreview
+                streamerProfileId={item.authorId}
+                streamerUsername={item.username}
+                displayName={item.displayName}
+                streamingMode={item.streamingMode || 'solo'}
+                roomKey={item.roomKey}
+                onEnterLive={() => handleLiveItemPress(item)}
+                width={screenWidth}
+                height={containerHeight}
+              />
+            )}
+
             {/* Top section: Tabs + Mode label + Live badge */}
             <View style={styles.topSection}>
               <WatchTopTabs 
