@@ -832,10 +832,16 @@ export default function BattleGridWrapper({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ invite_id: inviteId }),
       });
+      
+      const data = await response.json();
+      
       if (!response.ok) {
-        throw new Error('Failed to accept battle invite');
+        console.error('[BattleGridWrapper] Accept battle API error:', data);
+        throw new Error(data.error || 'Failed to accept battle invite');
       }
-      // Session will convert to battle via realtime
+      
+      console.log('[BattleGridWrapper] Accept battle success:', data);
+      // Session will convert to battle via realtime (or wait for others)
       setBattleInvite(null);
     } catch (err) {
       console.error('[BattleGridWrapper] Accept battle error:', err);
@@ -865,6 +871,52 @@ export default function BattleGridWrapper({
     if (!isCohostSession || !currentUserId) return;
     
     const supabase = createClient();
+    
+    // Helper to process an invite and show popup
+    const processInvite = (invite: any) => {
+      if (invite.to_host_id === currentUserId && invite.type === 'battle' && invite.status === 'pending') {
+        // Get sender username - check participants first, then hostA/hostB
+        const otherHostId = invite.from_host_id;
+        let otherHost: { username: string; display_name: string | null } | null = null;
+        if (hostSnapshot.participants) {
+          const participant = hostSnapshot.participants.find(p => p.id === otherHostId);
+          if (participant) {
+            otherHost = { username: participant.username, display_name: participant.display_name };
+          }
+        }
+        if (!otherHost) {
+          otherHost = otherHostId === hostSnapshot.hostA?.id ? hostSnapshot.hostA : hostSnapshot.hostB;
+        }
+        if (otherHost) {
+          setBattleInvite({
+            id: invite.id,
+            fromUsername: otherHost.display_name || otherHost.username,
+          });
+        }
+      }
+    };
+    
+    // Check for existing pending battle invites on mount
+    const checkExistingInvites = async () => {
+      const { data: invites, error } = await supabase
+        .from('live_session_invites')
+        .select('*')
+        .eq('session_id', session.session_id)
+        .eq('to_host_id', currentUserId)
+        .eq('type', 'battle')
+        .eq('status', 'pending')
+        .order('created_at', { ascending: false })
+        .limit(1);
+      
+      if (!error && invites && invites.length > 0) {
+        console.log('[BattleGridWrapper] Found existing pending battle invite:', invites[0].id);
+        processInvite(invites[0]);
+      }
+    };
+    
+    checkExistingInvites();
+    
+    // Also listen for new invites via realtime
     const channel = supabase
       .channel(`battle_invites_${session.session_id}`)
       .on(
@@ -876,27 +928,7 @@ export default function BattleGridWrapper({
           filter: `session_id=eq.${session.session_id}`,
         },
         async (payload) => {
-          const invite = payload.new as any;
-          if (invite.to_host_id === currentUserId && invite.type === 'battle' && invite.status === 'pending') {
-            // Get sender username - check participants first, then hostA/hostB
-            const otherHostId = invite.from_host_id;
-            let otherHost: { username: string; display_name: string | null } | null = null;
-            if (hostSnapshot.participants) {
-              const participant = hostSnapshot.participants.find(p => p.id === otherHostId);
-              if (participant) {
-                otherHost = { username: participant.username, display_name: participant.display_name };
-              }
-            }
-            if (!otherHost) {
-              otherHost = otherHostId === hostSnapshot.hostA?.id ? hostSnapshot.hostA : hostSnapshot.hostB;
-            }
-            if (otherHost) {
-              setBattleInvite({
-                id: invite.id,
-                fromUsername: otherHost.display_name || otherHost.username,
-              });
-            }
-          }
+          processInvite(payload.new as any);
         }
       )
       .subscribe();

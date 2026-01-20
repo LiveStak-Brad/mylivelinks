@@ -42,13 +42,18 @@ export async function POST(request: NextRequest) {
       );
     }
     
+    console.log('[battle/accept] Success:', data);
+    
+    // Handle both "battle_started" and "accepted_waiting" statuses
     return NextResponse.json({
       success: true,
-      session_id: data.session_id,
-      type: data.type,
-      started_at: data.started_at,
-      ends_at: data.ends_at,
-      message: 'Battle started!',
+      status: data?.status || 'accepted',
+      session_id: data?.session_id,
+      type: data?.type,
+      started_at: data?.started_at,
+      ends_at: data?.ends_at,
+      pending_count: data?.pending_count,
+      message: data?.status === 'battle_started' ? 'Battle started!' : 'Waiting for others...',
     });
   } catch (err: any) {
     console.error('[battle/accept] Error:', err);

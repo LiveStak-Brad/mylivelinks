@@ -32,13 +32,17 @@ export default function BattleInvitePopup({
 }: BattleInvitePopupProps) {
   const [loading, setLoading] = useState(false);
 
+  const [error, setError] = useState<string | null>(null);
+
   const handleAccept = async () => {
     setLoading(true);
+    setError(null);
     try {
       await onAccept(inviteId);
       onClose();
-    } catch (err) {
+    } catch (err: any) {
       console.error('[BattleInvitePopup] Accept error:', err);
+      setError(err?.message || 'Failed to accept. Try again.');
     } finally {
       setLoading(false);
     }
@@ -84,6 +88,11 @@ export default function BattleInvitePopup({
         <p className="text-white/80 text-center mb-6">
           <span className="font-semibold text-orange-400">{fromUsername}</span> wants to start a battle!
         </p>
+
+        {/* Error message */}
+        {error && (
+          <p className="text-red-400 text-sm text-center mb-4">{error}</p>
+        )}
 
         {/* Buttons */}
         <div className="flex gap-3">
