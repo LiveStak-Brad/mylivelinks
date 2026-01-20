@@ -28,3 +28,7 @@ export { default as BattleScoreSlider } from './BattleScoreSlider';
 export { default as BattleTimer } from './BattleTimer';
 export { default as CooldownSheet } from './CooldownSheet';
 export { default as BattleGridWrapper } from './BattleGridWrapper';
+
+// Top Gifters Display (used in bottom row of battle grid)
+export { default as TopGiftersDisplay } from './TopGiftersDisplay';
+export type { TeamTopGifter } from './TopGiftersDisplay';

@@ -26,7 +26,7 @@ import {
 } from 'livekit-client';
 import { TOKEN_ENDPOINT } from '@/lib/livekit-constants';
 import { LiveSession, getSessionRoomName } from '@/lib/battle-session';
-import MultiHostGrid, { ParticipantVolume } from './MultiHostGrid';
+import MultiHostGrid, { ParticipantVolume, GridMode } from './MultiHostGrid';
 import { GridTileParticipant } from './GridTile';
 import BattleTimer from './BattleTimer';
 import BattleScoreSlider from './BattleScoreSlider';
@@ -40,6 +40,7 @@ import BoostRoundIndicator from './BoostRoundIndicator';
 import CohostStartBattleButton from './CohostStartBattleButton';
 import BattleInvitePopup from './BattleInvitePopup';
 import useBattleScores from '@/hooks/useBattleScores';
+import TopGiftersDisplay, { TeamTopGifter } from './TopGiftersDisplay';
 import { createClient } from '@/lib/supabase';
 
 const normalizeParticipantId = (identity: string): string => {
@@ -144,6 +145,52 @@ export default function BattleGridWrapper({
   ]);
 
   const battleMode: BattleMode = 'duel';
+
+  // Dynamic grid sizing based on participant count
+  // Primary driver is maxSlots; mode is derived to match
+  const { gridMaxSlots, gridMode } = useMemo((): { gridMaxSlots: 2 | 4 | 9; gridMode: GridMode } => {
+    const count = participants.length;
+    if (count <= 2) {
+      return { gridMaxSlots: 2, gridMode: 'duo' };
+    } else if (count <= 4) {
+      return { gridMaxSlots: 4, gridMode: 'squad' };
+    } else {
+      return { gridMaxSlots: 9, gridMode: 'ffa' };
+    }
+  }, [participants.length]);
+
+  // Derive top 3 gifters per team from scores.supporters
+  const { teamAGifters, teamBGifters } = useMemo((): { 
+    teamAGifters: TeamTopGifter[]; 
+    teamBGifters: TeamTopGifter[]; 
+  } => {
+    if (!scores?.supporters || scores.supporters.length === 0) {
+      return { teamAGifters: [], teamBGifters: [] };
+    }
+
+    const mapToGifter = (s: typeof scores.supporters[0], rank: 1 | 2 | 3): TeamTopGifter => ({
+      profile_id: s.profile_id,
+      username: s.username,
+      display_name: s.display_name,
+      avatar_url: s.avatar_url,
+      points: s.points,
+      rank,
+    });
+
+    const teamA = scores.supporters
+      .filter(s => s.side === 'A')
+      .sort((a, b) => b.points - a.points)
+      .slice(0, 3)
+      .map((s, i) => mapToGifter(s, (i + 1) as 1 | 2 | 3));
+
+    const teamB = scores.supporters
+      .filter(s => s.side === 'B')
+      .sort((a, b) => b.points - a.points)
+      .slice(0, 3)
+      .map((s, i) => mapToGifter(s, (i + 1) as 1 | 2 | 3));
+
+    return { teamAGifters: teamA, teamBGifters: teamB };
+  }, [scores?.supporters]);
 
   // Battle states with real scores and team-relative colors
   const battleStates = useMemo(() => {
@@ -736,8 +783,8 @@ export default function BattleGridWrapper({
       <div className="relative flex-1">
         <MultiHostGrid
           participants={participants}
-          mode="duo"
-          maxSlots={2}
+          mode={gridMode}
+          maxSlots={gridMaxSlots}
           currentUserId={currentUserId}
           volumes={volumes}
           onVolumeChange={handleVolumeChange}
@@ -767,28 +814,53 @@ export default function BattleGridWrapper({
         )}
       </div>
 
-      {/* Bottom Controls - varies by session type and status */}
-      {isBattleSession && !isInCooldown && (
-        <div className="w-full bg-black/60 backdrop-blur-sm py-2 flex items-center justify-center">
-          <BattleTimer
-            remainingSeconds={remainingSeconds}
-            phase="active"
-            mode={session.mode}
-            compact
-          />
+      {/* Bottom Row: Top Gifters (left/right) + Timer/StartBattle (center) */}
+      {/* Unified layout: always render if battle/cohost active, content varies */}
+      {(isBattleSession || (isCohostSession && canPublish)) && !isInCooldown && (
+        <div className="w-full flex items-center justify-between px-2 py-1">
+          {/* Left: Team A Top 3 Gifters */}
+          <div className="flex-1 min-w-0">
+            {isBattleSession && teamAGifters.length > 0 && (
+              <TopGiftersDisplay
+                gifters={teamAGifters}
+                side="A"
+                color={TEAM_COLORS.A}
+              />
+            )}
+          </div>
+
+          {/* Center: Timer (battle) or Start Battle (cohost) */}
+          <div className="flex-shrink-0 px-2">
+            {isBattleSession ? (
+              <BattleTimer
+                remainingSeconds={remainingSeconds}
+                phase="active"
+                mode={session.mode}
+                compact
+              />
+            ) : isCohostSession && canPublish ? (
+              <CohostStartBattleButton onStartBattle={handleStartBattle} />
+            ) : null}
+          </div>
+
+          {/* Right: Team B Top 3 Gifters (only if exists) */}
+          <div className="flex-1 min-w-0 flex justify-end">
+            {isBattleSession && teamBGifters.length > 0 && (
+              <TopGiftersDisplay
+                gifters={teamBGifters}
+                side="B"
+                color={TEAM_COLORS.B}
+              />
+            )}
+          </div>
         </div>
       )}
       
+      {/* Cooldown controls (battle only, host only) */}
       {isBattleSession && isInCooldown && canPublish && (
         <BattleCooldownControls
           onRematch={handleRematch}
         />
-      )}
-      
-      {isCohostSession && canPublish && (
-        <div className="w-full bg-black/60 backdrop-blur-sm py-3 flex items-center justify-center">
-          <CohostStartBattleButton onStartBattle={handleStartBattle} />
-        </div>
       )}
       
       {/* Battle Invite Popup */}
