@@ -13,7 +13,7 @@ CREATE TABLE IF NOT EXISTS public.live_session_participants (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   session_id UUID NOT NULL REFERENCES public.live_sessions(id) ON DELETE CASCADE,
   profile_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
-  team TEXT DEFAULT 'A' CHECK (team IN ('A', 'B')),
+  team TEXT DEFAULT 'A' CHECK (team IN ('A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I')),
   slot_index INT NOT NULL DEFAULT 0, -- 0 = host/owner, 1+ = guests in order joined
   joined_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   left_at TIMESTAMPTZ, -- NULL = still in session
@@ -252,15 +252,19 @@ BEGIN
     FROM live_session_participants
     WHERE session_id = v_session_id AND left_at IS NULL;
     
-    -- Determine team (alternate for battles, always A for cohost)
-    -- For battles: even slots = A, odd slots = B
+    -- Determine team:
+    -- For cohost: always 'A'
+    -- For battles with 2 people: A vs B
+    -- For battles with 3+ people: each gets own team (free-for-all)
     INSERT INTO live_session_participants (session_id, profile_id, team, slot_index)
     VALUES (
       v_session_id,
       v_user_id,
-      CASE WHEN v_invite.type = 'battle' THEN 
-        CASE WHEN v_next_slot % 2 = 0 THEN 'A' ELSE 'B' END
-      ELSE 'A' END,
+      CASE 
+        WHEN v_invite.type != 'battle' THEN 'A'
+        WHEN v_next_slot <= 1 THEN CASE WHEN v_next_slot = 0 THEN 'A' ELSE 'B' END
+        ELSE CHR(65 + v_next_slot) -- Free-for-all: 'C', 'D', etc.
+      END,
       v_next_slot
     );
     
@@ -659,10 +663,20 @@ BEGIN
     FROM live_session_participants
     WHERE session_id = v_session_id AND left_at IS NULL;
     
-    -- Update teams in participants table: alternate A/B based on slot_index
-    UPDATE live_session_participants
-    SET team = CASE WHEN slot_index % 2 = 0 THEN 'A' ELSE 'B' END
-    WHERE session_id = v_session_id AND left_at IS NULL;
+    -- Update teams in participants table:
+    -- 2 people: A vs B (duel)
+    -- 3+ people: Each gets their own team (free-for-all: A, B, C, D, E, F, G, H, I)
+    IF v_participant_count <= 2 THEN
+      -- Duel mode: alternate A/B
+      UPDATE live_session_participants
+      SET team = CASE WHEN slot_index = 0 THEN 'A' ELSE 'B' END
+      WHERE session_id = v_session_id AND left_at IS NULL;
+    ELSE
+      -- Free-for-all: each person gets their own team letter
+      UPDATE live_session_participants
+      SET team = CHR(65 + slot_index) -- 65 = 'A', so slot 0='A', 1='B', 2='C', etc.
+      WHERE session_id = v_session_id AND left_at IS NULL;
+    END IF;
     
     -- Initialize battle_scores table
     INSERT INTO battle_scores (
