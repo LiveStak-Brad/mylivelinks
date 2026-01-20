@@ -692,35 +692,69 @@ export default function BattleGridWrapper({
   
   // Handle reset connection (fixes camera issues)
   const handleResetConnection = useCallback(async () => {
-    console.log('[LiveKit][Battle] Resetting connection...');
+    console.log('[LiveKit][Battle] Resetting connection - stopping all tracks and releasing camera...');
     setIsResetting(true);
+    setError(null);
     
-    // Stop existing tracks
-    if (localTracksRef.current.video) {
-      localTracksRef.current.video.stop();
+    try {
+      // Unpublish tracks from room first
+      if (roomRef.current) {
+        const room = roomRef.current;
+        const localParticipant = room.localParticipant;
+        
+        // Unpublish all local tracks
+        localParticipant.trackPublications.forEach((pub) => {
+          if (pub.track) {
+            console.log('[LiveKit][Battle] Unpublishing track:', pub.track.kind);
+            localParticipant.unpublishTrack(pub.track);
+          }
+        });
+      }
+      
+      // Stop and release local tracks
+      if (localTracksRef.current.video) {
+        console.log('[LiveKit][Battle] Stopping video track');
+        localTracksRef.current.video.stop();
+        // Also stop the underlying media stream track
+        if (localTracksRef.current.video.mediaStreamTrack) {
+          localTracksRef.current.video.mediaStreamTrack.stop();
+        }
+      }
+      if (localTracksRef.current.audio) {
+        console.log('[LiveKit][Battle] Stopping audio track');
+        localTracksRef.current.audio.stop();
+        if (localTracksRef.current.audio.mediaStreamTrack) {
+          localTracksRef.current.audio.mediaStreamTrack.stop();
+        }
+      }
+      localTracksRef.current = { video: null, audio: null };
+      
+      // Disconnect room
+      if (roomRef.current) {
+        console.log('[LiveKit][Battle] Disconnecting room');
+        await roomRef.current.disconnect(true); // Force disconnect
+        roomRef.current = null;
+      }
+      
+      // Clear state
+      setParticipants([]);
+      setIsConnected(false);
+      setParticipantsReady(false);
+      setAllowEmptyState(false);
+      
+      // Longer delay to ensure camera is fully released
+      console.log('[LiveKit][Battle] Waiting for camera release...');
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Trigger reconnection
+      console.log('[LiveKit][Battle] Triggering reconnection');
+      setReconnectTrigger(prev => prev + 1);
+    } catch (err) {
+      console.error('[LiveKit][Battle] Reset error:', err);
+      setError('Failed to reset camera. Please refresh the page.');
+    } finally {
+      setIsResetting(false);
     }
-    if (localTracksRef.current.audio) {
-      localTracksRef.current.audio.stop();
-    }
-    localTracksRef.current = { video: null, audio: null };
-    
-    // Disconnect room
-    if (roomRef.current) {
-      roomRef.current.disconnect();
-      roomRef.current = null;
-    }
-    
-    // Clear state
-    setParticipants([]);
-    setIsConnected(false);
-    setParticipantsReady(false);
-    
-    // Small delay before reconnecting
-    await new Promise(resolve => setTimeout(resolve, 500));
-    
-    // Trigger reconnection
-    setReconnectTrigger(prev => prev + 1);
-    setIsResetting(false);
   }, []);
   
   // Handle volume change
