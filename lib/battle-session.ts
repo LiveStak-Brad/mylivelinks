@@ -330,9 +330,11 @@ export async function getPendingInvites(): Promise<LiveSessionInvite[]> {
 
 /**
  * Get room name for a session
+ * Uses a consistent name that doesn't change when session type changes (cohost <-> battle)
  */
 export function getSessionRoomName(sessionId: string, type: SessionType): string {
-  return `${type}_${sessionId}`;
+  // Always use 'session_' prefix so room name stays the same when type changes
+  return `session_${sessionId}`;
 }
 
 /**
