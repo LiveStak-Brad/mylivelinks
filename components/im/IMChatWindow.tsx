@@ -5,6 +5,7 @@ import { X, Minus, Send, MoreHorizontal, Phone, Video, Smile, Gift } from 'lucid
 import Image from 'next/image';
 import { getAvatarUrl } from '@/lib/defaultAvatar';
 import GiftPickerMini from '@/components/messages/GiftPickerMini';
+import { isTestGiftType, TEST_GIFT_MEDIA } from '@/lib/gifts/testGiftConfig';
 
 // Map gift names to emojis
 const getGiftEmoji = (name: string) => {
@@ -361,6 +362,14 @@ export default function IMChatWindow({
             
             // Gift message rendering
             if (msg.type === 'gift') {
+              const isTestGift = isTestGiftType({ name: msg.giftName, icon_url: msg.giftIcon });
+              const giftIconClass = isTestGift ? 'w-12 h-12' : 'w-8 h-8';
+              const resolvedIcon =
+                msg.giftIcon?.startsWith('http') || msg.giftIcon?.startsWith('/')
+                  ? msg.giftIcon
+                  : isTestGift
+                    ? TEST_GIFT_MEDIA.iconUrl
+                    : msg.giftIcon;
               return (
                 <div
                   key={msg.id}
@@ -369,10 +378,14 @@ export default function IMChatWindow({
                   <div className="max-w-[80%] px-3 py-2 rounded-2xl bg-gradient-to-r from-yellow-100 to-amber-100 dark:from-yellow-900/30 dark:to-amber-900/30 border border-yellow-200 dark:border-yellow-800">
                     <div className="flex items-center gap-2">
                       <span className="text-2xl">
-                        {msg.giftIcon?.startsWith('http') || msg.giftIcon?.startsWith('/') ? (
-                          <img src={msg.giftIcon} alt={msg.giftName || 'Gift'} className="w-8 h-8" />
+                        {resolvedIcon ? (
+                          resolvedIcon.startsWith('http') || resolvedIcon.startsWith('/') ? (
+                            <img src={resolvedIcon} alt={msg.giftName || 'Gift'} className={giftIconClass} />
+                          ) : (
+                            resolvedIcon
+                          )
                         ) : (
-                          msg.giftIcon || getGiftEmoji(msg.giftName || '')
+                          getGiftEmoji(msg.giftName || '')
                         )}
                       </span>
                       <div>

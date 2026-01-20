@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { X, Loader2, Gift, Send } from 'lucide-react';
 import { createClient } from '@/lib/supabase';
+import { isTestGiftType } from '@/lib/gifts/testGiftConfig';
 
 interface GiftType {
   id: number;
@@ -11,6 +12,14 @@ interface GiftType {
   icon_url?: string;
   emoji?: string;
 }
+
+const getGiftIconClass = (gift: GiftType, size: 'grid' | 'selected') => {
+  const isTestGift = isTestGiftType({ name: gift.name, icon_url: gift.icon_url });
+  if (!isTestGift) {
+    return size === 'grid' ? 'w-6 h-6' : 'w-5 h-5';
+  }
+  return size === 'grid' ? 'w-9 h-9' : 'w-8 h-8';
+};
 
 interface GiftPickerMiniProps {
   isOpen: boolean;
@@ -101,7 +110,16 @@ export default function GiftPickerMini({ isOpen, onClose, onSelectGift, recipien
         .order('display_order');
 
       if (gifts) {
-        setGiftTypes(gifts);
+        const sorted = [...gifts].sort((a: any, b: any) => {
+          const costA = Number(a?.coin_cost ?? 0);
+          const costB = Number(b?.coin_cost ?? 0);
+          if (costA !== costB) return costA - costB;
+          const orderA = Number(a?.display_order ?? 0);
+          const orderB = Number(b?.display_order ?? 0);
+          if (orderA !== orderB) return orderA - orderB;
+          return String(a?.name ?? '').localeCompare(String(b?.name ?? ''));
+        });
+        setGiftTypes(sorted);
       }
 
       // Load user balance
@@ -190,7 +208,7 @@ export default function GiftPickerMini({ isOpen, onClose, onSelectGift, recipien
                 >
                   <span className={`text-xl transition-transform ${isSelected ? 'scale-125' : ''}`}>
                     {gift.icon_url ? (
-                      <img src={gift.icon_url} alt={gift.name} className="w-6 h-6" />
+                      <img src={gift.icon_url} alt={gift.name} className={getGiftIconClass(gift, 'grid')} />
                     ) : (
                       gift.emoji || getGiftEmoji(gift.name)
                     )}
@@ -212,7 +230,7 @@ export default function GiftPickerMini({ isOpen, onClose, onSelectGift, recipien
             <div className="flex items-center gap-2 min-w-0 flex-1">
               <span className="text-lg flex-shrink-0">
                 {selectedGift.icon_url ? (
-                  <img src={selectedGift.icon_url} alt={selectedGift.name} className="w-5 h-5" />
+                  <img src={selectedGift.icon_url} alt={selectedGift.name} className={getGiftIconClass(selectedGift, 'selected')} />
                 ) : (
                   selectedGift.emoji || getGiftEmoji(selectedGift.name)
                 )}

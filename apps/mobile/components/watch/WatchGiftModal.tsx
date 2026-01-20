@@ -48,6 +48,8 @@ const getGiftEmoji = (name: string): string => {
   return emojiMap[name] || '🎁';
 };
 
+const isTestGiftName = (name: string) => name.trim().toLowerCase() === 'mylivelinks';
+
 /**
  * Gift modal for Watch feed items.
  * Fetches real gift types and sends gifts via API.
@@ -79,7 +81,16 @@ export default function WatchGiftModal({
         .order('display_order');
 
       if (!error && data) {
-        setGiftTypes(data);
+        const sorted = [...data].sort((a: any, b: any) => {
+          const costA = Number(a?.coin_cost ?? 0);
+          const costB = Number(b?.coin_cost ?? 0);
+          if (costA !== costB) return costA - costB;
+          const orderA = Number(a?.display_order ?? 0);
+          const orderB = Number(b?.display_order ?? 0);
+          if (orderA !== orderB) return orderA - orderB;
+          return String(a?.name ?? '').localeCompare(String(b?.name ?? ''));
+        });
+        setGiftTypes(sorted);
       }
     } catch (err) {
       console.error('[WatchGiftModal] Error loading gift types:', err);
@@ -245,6 +256,7 @@ export default function WatchGiftModal({
                 {giftTypes.map((gift) => {
                   const isSelected = selectedGift?.id === gift.id;
                   const canAfford = userCoinBalance >= gift.coin_cost;
+                  const isTestGift = isTestGiftName(gift.name || '');
                   return (
                     <Pressable
                       key={gift.id}
@@ -256,7 +268,14 @@ export default function WatchGiftModal({
                       onPress={() => handleGiftSelect(gift)}
                       disabled={!canAfford}
                     >
-                      <Text style={styles.giftEmoji}>{getGiftEmoji(gift.name)}</Text>
+                      {gift.icon_url ? (
+                        <Image
+                          source={{ uri: gift.icon_url }}
+                          style={[styles.giftIcon, isTestGift && styles.giftIconLarge]}
+                        />
+                      ) : (
+                        <Text style={styles.giftEmoji}>{getGiftEmoji(gift.name)}</Text>
+                      )}
                       <Text style={[styles.giftName, !canAfford && styles.giftNameDisabled]}>
                         {gift.name}
                       </Text>
@@ -414,6 +433,16 @@ const styles = StyleSheet.create({
   },
   giftItemDisabled: {
     opacity: 0.4,
+  },
+  giftIcon: {
+    width: 36,
+    height: 36,
+    marginBottom: 6,
+    resizeMode: 'contain',
+  },
+  giftIconLarge: {
+    width: 48,
+    height: 48,
   },
   giftEmoji: {
     fontSize: 32,

@@ -5,6 +5,7 @@ import { Gift, X, Send } from 'lucide-react';
 import { createClient } from '@/lib/supabase';
 import { trackLiveGift } from '@/lib/trending-hooks';
 import { lockScroll, unlockScroll } from '@/lib/scrollLock';
+import { isTestGiftType } from '@/lib/gifts/testGiftConfig';
 
 /**
  * Hook to detect if viewport is mobile-width for layout purposes.
@@ -37,6 +38,8 @@ interface GiftType {
   emoji?: string;
   tier: number;
 }
+
+type GiftIconSize = 'gridCompact' | 'gridStandard' | 'selectedCompact' | 'selectedStandard';
 
 interface GiftModalProps {
   recipientId: string;
@@ -121,6 +124,34 @@ export default function GiftModal({
     return emojiMap[name] || '🎁';
   };
 
+  const getGiftIconClass = (gift: GiftType, size: GiftIconSize) => {
+    const isTestGift = isTestGiftType({ name: gift.name, icon_url: gift.icon_url });
+    if (!isTestGift) {
+      switch (size) {
+        case 'gridCompact':
+          return 'w-8 h-8 drop-shadow-md';
+        case 'selectedCompact':
+          return 'w-6 h-6';
+        case 'gridStandard':
+          return 'w-10 h-10 drop-shadow-md';
+        case 'selectedStandard':
+        default:
+          return 'w-8 h-8';
+      }
+    }
+    switch (size) {
+      case 'gridCompact':
+        return 'w-11 h-11 drop-shadow-md';
+      case 'selectedCompact':
+        return 'w-9 h-9';
+      case 'gridStandard':
+        return 'w-14 h-14 drop-shadow-md';
+      case 'selectedStandard':
+      default:
+        return 'w-12 h-12';
+    }
+  };
+
   // Load gift types and user balance on mount
   useEffect(() => {
     loadGiftTypes();
@@ -156,7 +187,16 @@ export default function GiftModal({
       .order('display_order');
     
     if (!error && data) {
-      setGiftTypes(data);
+      const sorted = [...data].sort((a: any, b: any) => {
+        const costA = Number(a?.coin_cost ?? 0);
+        const costB = Number(b?.coin_cost ?? 0);
+        if (costA !== costB) return costA - costB;
+        const orderA = Number(a?.display_order ?? 0);
+        const orderB = Number(b?.display_order ?? 0);
+        if (orderA !== orderB) return orderA - orderB;
+        return String(a?.name ?? '').localeCompare(String(b?.name ?? ''));
+      });
+      setGiftTypes(sorted);
     }
   };
 
@@ -376,7 +416,7 @@ export default function GiftModal({
                   >
                     <span className={`text-2xl mb-0.5 transition-transform duration-200 ${isSelected ? 'scale-110' : ''}`}>
                       {gift.icon_url ? (
-                        <img src={gift.icon_url} alt={gift.name} className="w-8 h-8 drop-shadow-md" />
+                        <img src={gift.icon_url} alt={gift.name} className={getGiftIconClass(gift, 'gridCompact')} />
                       ) : (
                         gift.emoji || getGiftEmoji(gift.name)
                       )}
@@ -396,7 +436,7 @@ export default function GiftModal({
                   <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-100 to-pink-100 dark:from-purple-900/50 dark:to-pink-900/50 flex items-center justify-center flex-shrink-0">
                     <span className="text-xl">
                       {selectedGift.icon_url ? (
-                        <img src={selectedGift.icon_url} alt={selectedGift.name} className="w-6 h-6" />
+                        <img src={selectedGift.icon_url} alt={selectedGift.name} className={getGiftIconClass(selectedGift, 'selectedCompact')} />
                       ) : (
                         selectedGift.emoji || getGiftEmoji(selectedGift.name)
                       )}
@@ -510,7 +550,7 @@ export default function GiftModal({
                 >
                   <span className={`text-3xl mb-1 transition-transform duration-200 ${isSelected ? 'scale-110' : ''}`}>
                     {gift.icon_url ? (
-                      <img src={gift.icon_url} alt={gift.name} className="w-10 h-10 drop-shadow-md" />
+                      <img src={gift.icon_url} alt={gift.name} className={getGiftIconClass(gift, 'gridStandard')} />
                     ) : (
                       gift.emoji || getGiftEmoji(gift.name)
                     )}
@@ -530,7 +570,7 @@ export default function GiftModal({
                 <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-100 to-pink-100 dark:from-purple-900/50 dark:to-pink-900/50 flex items-center justify-center">
                   <span className="text-2xl">
                     {selectedGift.icon_url ? (
-                      <img src={selectedGift.icon_url} alt={selectedGift.name} className="w-8 h-8" />
+                      <img src={selectedGift.icon_url} alt={selectedGift.name} className={getGiftIconClass(selectedGift, 'selectedStandard')} />
                     ) : (
                       selectedGift.emoji || getGiftEmoji(selectedGift.name)
                     )}

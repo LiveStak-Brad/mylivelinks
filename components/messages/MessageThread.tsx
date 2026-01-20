@@ -4,6 +4,7 @@ import { useState, useRef, useEffect, type KeyboardEvent, type ChangeEvent } fro
 import { Send, Gift, Smile, ArrowLeft, Loader2, ExternalLink, ImagePlus, Share2, Phone, Video } from 'lucide-react';
 import { useMessages, Message, Conversation } from './MessagesContext';
 import GiftPickerMini from './GiftPickerMini';
+import { isTestGiftType, TEST_GIFT_MEDIA } from '@/lib/gifts/testGiftConfig';
 import { useIM } from '@/components/im';
 import SafeRichText from '@/components/SafeRichText';
 import SafeOutboundLink from '@/components/SafeOutboundLink';
@@ -519,16 +520,23 @@ function MessageBubble({
   if (message.type === 'gift') {
     const giftIcon = typeof message.giftIcon === 'string' ? message.giftIcon : '';
     const isIconUrl = giftIcon.startsWith('http://') || giftIcon.startsWith('https://') || giftIcon.startsWith('/');
+    const isTestGift = isTestGiftType({ name: message.giftName, icon_url: giftIcon });
+    const giftIconClass = isTestGift ? 'w-14 h-14' : 'w-10 h-10';
+    const resolvedIcon = isIconUrl ? giftIcon : isTestGift ? TEST_GIFT_MEDIA.iconUrl : giftIcon;
 
     return (
       <div className={`flex ${isOwn ? 'justify-end' : 'justify-start'}`}>
         <div className="max-w-[80%] px-4 py-3 rounded-2xl bg-gradient-to-r from-yellow-100 to-amber-100 dark:from-yellow-900/30 dark:to-amber-900/30 border border-yellow-200 dark:border-yellow-800">
           <div className="flex items-center gap-3">
             <span className="text-3xl">
-              {giftIcon && isIconUrl ? (
-                <img src={giftIcon} alt={message.giftName || 'Gift'} className="w-10 h-10" />
+              {resolvedIcon ? (
+                resolvedIcon.startsWith('http') || resolvedIcon.startsWith('/') ? (
+                  <img src={resolvedIcon} alt={message.giftName || 'Gift'} className={giftIconClass} />
+                ) : (
+                  resolvedIcon
+                )
               ) : (
-                giftIcon || getGiftEmoji(message.giftName || 'Gift')
+                getGiftEmoji(message.giftName || 'Gift')
               )}
             </span>
             <div>

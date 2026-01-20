@@ -1,6 +1,13 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
+import ChromaKeyVideoGift from './gifts/ChromaKeyVideoGift';
+import { playGiftSound } from '@/lib/gifts/giftAudio';
+import {
+  isTestGiftType,
+  resolveTestGiftAnimationUrl,
+  TEST_GIFT_MEDIA,
+} from '@/lib/gifts/testGiftConfig';
 
 interface GiftAnimationProps {
   giftName: string;
@@ -8,6 +15,7 @@ interface GiftAnimationProps {
   senderUsername: string;
   coinAmount: number;
   scale?: number;
+  giftAnimationUrl?: string | null;
   onComplete: () => void;
 }
 
@@ -17,12 +25,26 @@ export default function GiftAnimation({
   senderUsername,
   coinAmount,
   scale: scaleOverride,
+  giftAnimationUrl,
   onComplete,
 }: GiftAnimationProps) {
   const [isVisible, setIsVisible] = useState(true);
   const [scale, setScale] = useState(1);
 
   const effectiveScale = typeof scaleOverride === 'number' ? scaleOverride : scale;
+  const isTestGift = useMemo(
+    () => isTestGiftType({ name: giftName, animation_url: giftAnimationUrl }),
+    [giftName, giftAnimationUrl]
+  );
+  const testGiftAnimationUrl = useMemo(
+    () => resolveTestGiftAnimationUrl({ name: giftName, animation_url: giftAnimationUrl }),
+    [giftName, giftAnimationUrl]
+  );
+
+  const handleComplete = useCallback(() => {
+    setIsVisible(false);
+    setTimeout(onComplete, 300);
+  }, [onComplete]);
 
   useEffect(() => {
     if (typeof scaleOverride === 'number') {
@@ -45,14 +67,19 @@ export default function GiftAnimation({
   }, []);
 
   useEffect(() => {
+    if (isTestGift) return;
     // Animation duration: 3 seconds
     const timer = setTimeout(() => {
-      setIsVisible(false);
-      setTimeout(onComplete, 300); // Wait for fade out
+      handleComplete();
     }, 3000);
 
     return () => clearTimeout(timer);
-  }, [onComplete]);
+  }, [handleComplete, isTestGift]);
+
+  useEffect(() => {
+    if (!isTestGift) return;
+    playGiftSound(TEST_GIFT_MEDIA.soundUrl);
+  }, [isTestGift]);
 
   // Map gift names to emojis (fallback if no icon_url - matches GiftModal)
   const getGiftEmoji = (name: string) => {
@@ -107,50 +134,63 @@ export default function GiftAnimation({
         isVisible ? 'opacity-100' : 'opacity-0'
       }`}
     >
-      {/* Background overlay */}
-      <div className="absolute inset-0 bg-gradient-to-t from-purple-900/40 via-transparent to-transparent animate-pulse" />
-      
-      {/* Gift animation */}
-      <div style={{ transform: `scale(${effectiveScale})`, transformOrigin: 'center' }}>
-        <div className="relative z-10 text-center animate-gift-bounce">
-          {/* Gift icon */}
-          <div className="mb-4 animate-gift-spin">
-            {giftIcon ? (
-              <img src={giftIcon} alt={giftName} className="w-24 h-24 mx-auto drop-shadow-2xl" />
-            ) : (
-              <div className="text-8xl drop-shadow-2xl filter brightness-125">
-                {getGiftEmoji(giftName)}
+      {isTestGift && testGiftAnimationUrl ? (
+        <ChromaKeyVideoGift
+          src={testGiftAnimationUrl}
+          maxSize={TEST_GIFT_MEDIA.maxSize}
+          minGreen={TEST_GIFT_MEDIA.chromaKey.minGreen}
+          greenDelta={TEST_GIFT_MEDIA.chromaKey.greenDelta}
+          onEnded={handleComplete}
+          onError={handleComplete}
+        />
+      ) : (
+        <>
+          {/* Background overlay */}
+          <div className="absolute inset-0 bg-gradient-to-t from-purple-900/40 via-transparent to-transparent animate-pulse" />
+          
+          {/* Gift animation */}
+          <div style={{ transform: `scale(${effectiveScale})`, transformOrigin: 'center' }}>
+            <div className="relative z-10 text-center animate-gift-bounce">
+              {/* Gift icon */}
+              <div className="mb-4 animate-gift-spin">
+                {giftIcon ? (
+                  <img src={giftIcon} alt={giftName} className="w-24 h-24 mx-auto drop-shadow-2xl" />
+                ) : (
+                  <div className="text-8xl drop-shadow-2xl filter brightness-125">
+                    {getGiftEmoji(giftName)}
+                  </div>
+                )}
               </div>
-            )}
+              
+              {/* Gift info */}
+              <div className="bg-gradient-to-r from-purple-600 to-pink-600 text-white px-6 py-3 rounded-full shadow-2xl backdrop-blur-sm">
+                <p className="text-lg font-bold drop-shadow-lg">
+                  {senderUsername} sent {giftName}!
+                </p>
+                <p className="text-sm opacity-90">
+                  +{coinAmount} coins
+                </p>
+              </div>
+            </div>
           </div>
           
-          {/* Gift info */}
-          <div className="bg-gradient-to-r from-purple-600 to-pink-600 text-white px-6 py-3 rounded-full shadow-2xl backdrop-blur-sm">
-            <p className="text-lg font-bold drop-shadow-lg">
-              {senderUsername} sent {giftName}!
-            </p>
-            <p className="text-sm opacity-90">
-              +{coinAmount} coins
-            </p>
+          {/* Sparkles effect */}
+          <div className="absolute inset-0 overflow-hidden pointer-events-none">
+            {[...Array(12)].map((_, i) => (
+              <div
+                key={i}
+                className="absolute w-2 h-2 bg-yellow-300 rounded-full animate-sparkle"
+                style={{
+                  left: `${Math.random() * 100}%`,
+                  top: `${Math.random() * 100}%`,
+                  animationDelay: `${Math.random() * 0.5}s`,
+                  animationDuration: `${1 + Math.random()}s`,
+                }}
+              />
+            ))}
           </div>
-        </div>
-      </div>
-      
-      {/* Sparkles effect */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        {[...Array(12)].map((_, i) => (
-          <div
-            key={i}
-            className="absolute w-2 h-2 bg-yellow-300 rounded-full animate-sparkle"
-            style={{
-              left: `${Math.random() * 100}%`,
-              top: `${Math.random() * 100}%`,
-              animationDelay: `${Math.random() * 0.5}s`,
-              animationDuration: `${1 + Math.random()}s`,
-            }}
-          />
-        ))}
-      </div>
+        </>
+      )}
     </div>
   );
 }

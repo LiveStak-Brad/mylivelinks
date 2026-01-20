@@ -18,6 +18,7 @@ interface GiftAnimationData {
   id: string;
   giftName: string;
   giftIcon?: string;
+  giftAnimationUrl?: string | null;
   senderUsername: string;
   coinAmount: number;
 }
@@ -379,7 +380,7 @@ export default function Tile({
           
           const { data: giftType } = await supabase
             .from('gift_types')
-            .select('name, icon_url')
+            .select('name, icon_url, animation_url')
             .eq('id', gift.gift_type_id)
             .single();
           
@@ -388,6 +389,7 @@ export default function Tile({
               id: `${gift.id}-${Date.now()}`,
               giftName: giftType.name,
               giftIcon: giftType.icon_url,
+              giftAnimationUrl: giftType.animation_url,
               senderUsername: senderProfile.username,
               coinAmount: gift.coin_amount,
             };
@@ -483,6 +485,7 @@ export default function Tile({
             key={gift.id}
             giftName={gift.giftName}
             giftIcon={gift.giftIcon}
+            giftAnimationUrl={gift.giftAnimationUrl}
             senderUsername={gift.senderUsername}
             coinAmount={gift.coinAmount}
             scale={giftOverlayScale}

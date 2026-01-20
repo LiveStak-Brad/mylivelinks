@@ -39,6 +39,7 @@ import { fetchGifterStatuses } from '@/lib/gifter-status-client';
 import Chat from './Chat';
 import StreamChat from './StreamChat';
 import GiftModal from './GiftModal';
+import GiftAnimation from './GiftAnimation';
 import ReportModal from './ReportModal';
 import GoLiveButton from './GoLiveButton';
 import ChatSettingsModal from './ChatSettingsModal';
@@ -98,6 +99,15 @@ interface LeaderboardRank {
   rank_tier: string | null;
   points_to_next_rank: number;
   next_rank: number;
+}
+
+interface GiftAnimationData {
+  id: string;
+  giftName: string;
+  giftIcon?: string;
+  giftAnimationUrl?: string | null;
+  senderUsername: string;
+  coinAmount: number;
 }
 
 function computeRankFromLeaderboardRows(profileId: string, rows: any[]): LeaderboardRank {
@@ -195,6 +205,7 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
   const [showShareModal, setShowShareModal] = useState(false);
   const [recommendedStreams, setRecommendedStreams] = useState<RecommendedStream[]>([]);
   const [topGifters, setTopGifters] = useState<TopGifter[]>([]);
+  const [activeGiftAnimations, setActiveGiftAnimations] = useState<GiftAnimationData[]>([]);
   
   // Guest publishing state
   const [isAcceptedGuest, setIsAcceptedGuest] = useState(false);
@@ -761,6 +772,57 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
       streamChannel.unsubscribe();
     };
   }, [streamer?.profile_id, streamer?.live_stream_id, supabase]);
+
+  // Subscribe to gift animations for this streamer (realtime)
+  useEffect(() => {
+    if (!streamer?.profile_id) return;
+
+    const recipientId = streamer.profile_id;
+    const giftsChannel = supabase
+      .channel(`gifts:recipient:${recipientId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'gifts',
+          filter: `recipient_id=eq.${recipientId}`,
+        },
+        async (payload: any) => {
+          const gift = payload.new as any;
+
+          const { data: senderProfile } = await supabase
+            .from('profiles')
+            .select('username')
+            .eq('id', gift.sender_id)
+            .single();
+
+          const { data: giftType } = await supabase
+            .from('gift_types')
+            .select('name, icon_url, animation_url')
+            .eq('id', gift.gift_type_id)
+            .single();
+
+          if (senderProfile && giftType) {
+            const animationData: GiftAnimationData = {
+              id: `${gift.id}-${Date.now()}`,
+              giftName: giftType.name,
+              giftIcon: giftType.icon_url,
+              giftAnimationUrl: giftType.animation_url,
+              senderUsername: senderProfile.username,
+              coinAmount: gift.coin_amount,
+            };
+
+            setActiveGiftAnimations((prev) => [...prev, animationData]);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      giftsChannel.unsubscribe();
+    };
+  }, [streamer?.profile_id, supabase]);
  
   // Bind Top 3 gifter bubbles to the same aggregated source used by the modal
   useEffect(() => {
@@ -2130,6 +2192,20 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
                     <audio ref={audioRef} autoPlay playsInline muted={isMuted} />
                   </>
                 )}
+
+                {activeGiftAnimations.map((gift) => (
+                  <GiftAnimation
+                    key={gift.id}
+                    giftName={gift.giftName}
+                    giftIcon={gift.giftIcon}
+                    giftAnimationUrl={gift.giftAnimationUrl}
+                    senderUsername={gift.senderUsername}
+                    coinAmount={gift.coinAmount}
+                    onComplete={() => {
+                      setActiveGiftAnimations((prev) => prev.filter((g) => g.id !== gift.id));
+                    }}
+                  />
+                ))}
               </>
             ) : (
               <>
