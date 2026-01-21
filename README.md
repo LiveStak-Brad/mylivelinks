@@ -249,6 +249,16 @@ Before going live:
 - **Ledger is source of truth** - Never update balances directly
 - **Publish state is derived** - Never set `is_published` manually
 
+## Developer Tooling
+
+### LiveKit MCP Integration
+
+For AI-assisted LiveKit development in Cursor, we provide an MCP server integration that gives direct access to LiveKit documentation:
+
+- **Setup Guide**: [`docs/livekit/LiveKit_MCP.md`](docs/livekit/LiveKit_MCP.md)
+- **Quick Add**: In Cursor Settings → MCP, add `https://docs.livekit.io/mcp`
+- **No runtime changes** - tooling only
+
 ## Support
 
 For questions about the schema design or implementation, refer to:
