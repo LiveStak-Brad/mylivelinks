@@ -345,7 +345,7 @@ export default function BattleGridWrapper({
   // Map LiveKit participants to grid participants
   const updateParticipants = useCallback(() => {
     const room = roomRef.current;
-    if (!room) return;
+    if (!room || !hostSnapshot) return;
     
     const gridParticipants: GridTileParticipant[] = [];
     
