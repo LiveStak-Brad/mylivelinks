@@ -245,25 +245,45 @@ export async function POST(request: NextRequest) {
         const sessionId = roomName.replace(/^(battle|cohost)_/i, '');
         try {
           const adminClient = getSupabaseAdmin();
+          
+          // First verify the session exists and is in a valid state
           const { data: session } = await adminClient
             .from('live_sessions')
-            .select('host_a, host_b, status')
+            .select('id, status')
             .eq('id', sessionId)
-            .in('status', ['active', 'cooldown'])
+            .in('status', ['active', 'battle_ready', 'battle_active', 'cooldown'])
             .maybeSingle();
           
-          if (session && (session.host_a === user.id || session.host_b === user.id)) {
-            isSessionParticipant = true;
-            console.log('[LIVEKIT_TOKEN] User is session participant, allowing publish', { 
-              userId: user.id, 
-              sessionId,
-              roomName 
-            });
+          if (session) {
+            // Check if user is an active participant in the session via participants table
+            // This handles 2-person (host_a/host_b) AND 3+ person sessions
+            const { data: participant } = await adminClient
+              .from('live_session_participants')
+              .select('id')
+              .eq('session_id', sessionId)
+              .eq('profile_id', user.id)
+              .is('left_at', null)
+              .maybeSingle();
+            
+            if (participant) {
+              isSessionParticipant = true;
+              console.log('[LIVEKIT_TOKEN] User is session participant, allowing publish', { 
+                userId: user.id, 
+                sessionId,
+                roomName,
+                sessionStatus: session.status
+              });
+            } else {
+              console.log('[LIVEKIT_TOKEN] User is NOT in live_session_participants', { 
+                userId: user.id, 
+                sessionId,
+                sessionStatus: session.status
+              });
+            }
           } else {
-            console.log('[LIVEKIT_TOKEN] User is NOT session participant', { 
+            console.log('[LIVEKIT_TOKEN] Session not found or invalid status', { 
               userId: user.id, 
-              sessionId,
-              session: session ? { host_a: session.host_a, host_b: session.host_b } : null 
+              sessionId
             });
           }
         } catch (err) {
