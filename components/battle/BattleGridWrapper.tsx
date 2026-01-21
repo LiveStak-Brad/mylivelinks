@@ -888,11 +888,14 @@ export default function BattleGridWrapper({
     try {
       const result = await startBattleReady(session.session_id);
       console.log('[BattleGridWrapper] Battle ready phase started:', result);
-      // Session will update via realtime, UI will show ready states
+      // Trigger immediate refresh so session status updates to battle_ready
+      if (onRefreshSession) {
+        setTimeout(() => onRefreshSession(), 100);
+      }
     } catch (err) {
       console.error('[BattleGridWrapper] Start battle error:', err);
     }
-  }, [session?.session_id]);
+  }, [session?.session_id, onRefreshSession]);
   
   const handleSetReady = useCallback(async () => {
     console.log('[BattleGridWrapper] Ready Up clicked');
