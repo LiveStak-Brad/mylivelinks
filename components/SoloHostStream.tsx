@@ -376,6 +376,8 @@ export default function SoloHostStream() {
   // Active device tracking for live switching
   const [activeVideoDeviceId, setActiveVideoDeviceId] = useState<string | undefined>(undefined);
   const [activeAudioDeviceId, setActiveAudioDeviceId] = useState<string | undefined>(undefined);
+  // Track current camera facing mode for mobile - 'user' = front, 'environment' = back
+  const [currentFacingMode, setCurrentFacingMode] = useState<'user' | 'environment'>('user');
 
   // Screen share state
   const [isScreenSharing, setIsScreenSharing] = useState(false);
@@ -1024,6 +1026,16 @@ export default function SoloHostStream() {
     router.push('/');
   };
 
+  // Helper to determine if a device is a back/environment camera based on label
+  const isBackCamera = useCallback((deviceLabel: string): boolean => {
+    const label = deviceLabel.toLowerCase();
+    return label.includes('back') || 
+           label.includes('rear') || 
+           label.includes('environment') ||
+           label.includes('camera 0') || // Android often labels back camera as camera 0
+           label.includes('camera0');
+  }, []);
+
   // Live device switching - switch camera while streaming
   const handleSwitchCamera = async (deviceId: string) => {
     const room = roomRef.current;
@@ -1039,7 +1051,7 @@ export default function SoloHostStream() {
       .find(pub => pub.source === Track.Source.Camera && pub.track);
     
     if (cameraPublication && cameraPublication.track) {
-      console.log('[SoloHostStream] Switching camera to:', deviceId);
+      console.log('[SoloHostStream] Switching camera to:', deviceId, 'isMobile:', isMobileWeb);
       
       try {
         // Stop filter pipeline first
@@ -1055,15 +1067,80 @@ export default function SoloHostStream() {
           rawCameraTrackRef.current = null;
         }
         
-        // Create new track with new device
+        // MOBILE FIX: On mobile/PWA, use facingMode instead of deviceId
+        // deviceId is unreliable on Android WebView/PWA and can cause wrong camera selection
         const { createLocalTracks, VideoPresets } = await import('livekit-client');
-        const [newVideoTrack] = await createLocalTracks({
-          video: {
+        
+        let videoConstraints: any;
+        let newFacingMode: 'user' | 'environment' = currentFacingMode;
+        
+        if (isMobileWeb) {
+          // On mobile, determine target facing mode based on device label or toggle
+          // Get device info to check if it's front or back camera
+          try {
+            const devices = await navigator.mediaDevices.enumerateDevices();
+            const targetDevice = devices.find(d => d.deviceId === deviceId);
+            
+            if (targetDevice && targetDevice.label) {
+              // Determine facing mode from device label
+              newFacingMode = isBackCamera(targetDevice.label) ? 'environment' : 'user';
+              console.log('[SoloHostStream] Mobile: Target device label:', targetDevice.label, '-> facingMode:', newFacingMode);
+            } else {
+              // If we can't determine from label, toggle from current
+              newFacingMode = currentFacingMode === 'user' ? 'environment' : 'user';
+              console.log('[SoloHostStream] Mobile: Toggling facingMode from', currentFacingMode, 'to', newFacingMode);
+            }
+          } catch (enumErr) {
+            // Fallback: toggle from current
+            newFacingMode = currentFacingMode === 'user' ? 'environment' : 'user';
+            console.log('[SoloHostStream] Mobile: enumeration failed, toggling facingMode to', newFacingMode);
+          }
+          
+          // Use facingMode constraint for mobile (more reliable than deviceId)
+          videoConstraints = {
+            facingMode: { exact: newFacingMode },
+            width: { ideal: 1920, max: 1920 },
+            height: { ideal: 1080, max: 1080 },
+          };
+        } else {
+          // Desktop: use deviceId as before
+          videoConstraints = {
             deviceId: deviceId,
             resolution: VideoPresets.h1080,
-          },
-          audio: false,
-        });
+          };
+        }
+        
+        let newVideoTrack;
+        try {
+          [newVideoTrack] = await createLocalTracks({
+            video: videoConstraints,
+            audio: false,
+          });
+        } catch (trackErr: any) {
+          console.warn('[SoloHostStream] Failed with primary constraints, trying fallback:', trackErr.message);
+          
+          // Fallback for mobile: try without 'exact' constraint
+          if (isMobileWeb) {
+            [newVideoTrack] = await createLocalTracks({
+              video: {
+                facingMode: newFacingMode,
+                width: { ideal: 1280 },
+                height: { ideal: 720 },
+              },
+              audio: false,
+            });
+          } else {
+            // Desktop fallback: try ideal instead of exact deviceId
+            [newVideoTrack] = await createLocalTracks({
+              video: {
+                deviceId: { ideal: deviceId },
+                width: { ideal: 1920 },
+                height: { ideal: 1080 },
+              },
+              audio: false,
+            });
+          }
+        }
         
         // Store reference to raw track for filters
         rawCameraTrackRef.current = newVideoTrack.mediaStreamTrack;
@@ -1081,6 +1158,7 @@ export default function SoloHostStream() {
           // Re-apply filters with new camera track
           console.log('[SoloHostStream] Re-applying filters to new camera');
           setActiveVideoDeviceId(deviceId);
+          setCurrentFacingMode(newFacingMode);
           // Small delay then re-apply filters
           setTimeout(() => handleApplyFilters(filterSettings), 100);
           return; // handleApplyFilters will handle publishing
@@ -1098,7 +1176,8 @@ export default function SoloHostStream() {
         }
         
         setActiveVideoDeviceId(deviceId);
-        console.log('[SoloHostStream] Camera switched successfully');
+        setCurrentFacingMode(newFacingMode);
+        console.log('[SoloHostStream] Camera switched successfully to facingMode:', newFacingMode);
       } catch (err) {
         console.error('[SoloHostStream] Error switching camera:', err);
         throw err;
@@ -1228,12 +1307,23 @@ export default function SoloHostStream() {
       };
 
       if (!wasScreenSharing) {
-        trackOptions.video = {
-          deviceId: currentVideoDevice ? { ideal: currentVideoDevice } : undefined,
-          width: { ideal: 1920, max: 1920, min: 1280 },
-          height: { ideal: 1080, max: 1080, min: 720 },
-          frameRate: { ideal: 30, max: 30 },
-        };
+        // MOBILE FIX: On mobile, use facingMode instead of deviceId for reliable camera selection
+        if (isMobileWeb) {
+          trackOptions.video = {
+            facingMode: currentFacingMode,
+            width: { ideal: 1920, max: 1920 },
+            height: { ideal: 1080, max: 1080 },
+            frameRate: { ideal: 30, max: 30 },
+          };
+          console.log('[SoloHostStream] Mobile: Reset using facingMode:', currentFacingMode);
+        } else {
+          trackOptions.video = {
+            deviceId: currentVideoDevice ? { ideal: currentVideoDevice } : undefined,
+            width: { ideal: 1920, max: 1920, min: 1280 },
+            height: { ideal: 1080, max: 1080, min: 720 },
+            frameRate: { ideal: 30, max: 30 },
+          };
+        }
       }
 
       console.log('[SoloHostStream] Creating new tracks...', { 
@@ -1436,8 +1526,18 @@ export default function SoloHostStream() {
       console.log('[SoloHostStream] Re-publishing camera...');
       const { createLocalTracks, VideoPresets } = await import('livekit-client');
       
-      const [newVideoTrack] = await createLocalTracks({
-        video: activeVideoDeviceId 
+      // MOBILE FIX: On mobile, use facingMode instead of deviceId
+      let videoConstraints: any;
+      if (isMobileWeb) {
+        // Use the current facing mode state for mobile
+        videoConstraints = {
+          facingMode: currentFacingMode,
+          width: { ideal: 1920, max: 1920 },
+          height: { ideal: 1080, max: 1080 },
+        };
+        console.log('[SoloHostStream] Mobile: Re-publishing with facingMode:', currentFacingMode);
+      } else {
+        videoConstraints = activeVideoDeviceId 
           ? { 
               deviceId: activeVideoDeviceId,
               resolution: VideoPresets.h1080,
@@ -1445,7 +1545,11 @@ export default function SoloHostStream() {
           : {
               facingMode: 'user',
               resolution: VideoPresets.h1080,
-            },
+            };
+      }
+      
+      const [newVideoTrack] = await createLocalTracks({
+        video: videoConstraints,
         audio: false,
       });
 
@@ -1567,10 +1671,17 @@ export default function SoloHostStream() {
           // Get track from current publication
           sourceTrack = cameraPublication.track.mediaStreamTrack;
           // Clone and store as raw
-          const stream = await navigator.mediaDevices.getUserMedia({
-            video: activeVideoDeviceId 
+          // MOBILE FIX: Use facingMode on mobile for reliable camera access
+          let videoConstraints: MediaTrackConstraints;
+          if (isMobileWeb) {
+            videoConstraints = { facingMode: currentFacingMode };
+          } else {
+            videoConstraints = activeVideoDeviceId 
               ? { deviceId: { exact: activeVideoDeviceId } }
-              : { facingMode: 'user' },
+              : { facingMode: 'user' };
+          }
+          const stream = await navigator.mediaDevices.getUserMedia({
+            video: videoConstraints,
             audio: false,
           });
           rawCameraTrackRef.current = stream.getVideoTracks()[0];
