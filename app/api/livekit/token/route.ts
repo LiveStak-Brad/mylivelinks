@@ -207,21 +207,23 @@ export async function POST(request: NextRequest) {
         return sendJson(400, { error: 'roomName and participantName are required', stage: 'body_parse' }, 'body_parse');
       }
 
-      // ROOM GATE: Allow live_central (group mode), solo_* (solo streams), battle_*/cohost_* (sessions), and call_* (1:1 calls)
+      // ROOM GATE: Allow live_central (group mode), solo_* (solo streams), session_*/battle_*/cohost_* (sessions), and call_* (1:1 calls)
       // Solo streams use unique room names:
       // - solo_${live_stream_id} (numeric) - e.g. solo_12345
       // - solo_${profile_id} (UUID) - e.g. solo_abc123-def456-...
       // Battle/Cohost sessions use:
-      // - battle_${session_uuid} - e.g. battle_abc123-def456-...
-      // - cohost_${session_uuid} - e.g. cohost_abc123-def456-...
+      // - session_${session_uuid} - e.g. session_abc123-def456-... (stable name that doesn't change between cohost/battle)
+      // - battle_${session_uuid} - e.g. battle_abc123-def456-... (legacy)
+      // - cohost_${session_uuid} - e.g. cohost_abc123-def456-... (legacy)
       // 1:1 Calls use:
       // - call_${call_uuid} - e.g. call_abc123-def456-...
       const isLiveCentralRoom = roomName === 'live_central' || roomName === 'live-central';
       const isSoloRoom = /^solo_[a-f0-9-]+$/i.test(roomName); // solo_ followed by alphanumeric/dashes (covers both IDs)
+      const isGenericSessionRoom = /^session_[a-f0-9-]+$/i.test(roomName); // session_ followed by UUID (stable name)
       const isBattleRoom = /^battle_[a-f0-9-]+$/i.test(roomName); // battle_ followed by UUID
       const isCohostRoom = /^cohost_[a-f0-9-]+$/i.test(roomName); // cohost_ followed by UUID
       const isCallRoom = /^call_[a-f0-9-]+$/i.test(roomName); // call_ followed by UUID (1:1 calls)
-      const isSessionRoom = isBattleRoom || isCohostRoom;
+      const isSessionRoom = isGenericSessionRoom || isBattleRoom || isCohostRoom;
       
       if (!isLiveCentralRoom && !isSoloRoom && !isSessionRoom && !isCallRoom) {
         console.log('[LIVEKIT_TOKEN] Room gate blocked:', { roomName, isLiveCentralRoom, isSoloRoom, isSessionRoom, isCallRoom });
@@ -239,10 +241,10 @@ export async function POST(request: NextRequest) {
       const isSoloStreamRoom = /^solo_[a-f0-9-]+$/i.test(roomName);
       
       // BATTLE/COHOST SESSION ROOM: Check if user is a participant in the session
-      // Extract session_id from room name (battle_<uuid> or cohost_<uuid>)
+      // Extract session_id from room name (session_<uuid>, battle_<uuid>, or cohost_<uuid>)
       let isSessionParticipant = false;
       if (isSessionRoom && wantsPublish) {
-        const sessionId = roomName.replace(/^(battle|cohost)_/i, '');
+        const sessionId = roomName.replace(/^(session|battle|cohost)_/i, '');
         try {
           const adminClient = getSupabaseAdmin();
           
