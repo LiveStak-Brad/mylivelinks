@@ -1099,8 +1099,7 @@ export default function SoloHostStream() {
           // Use facingMode constraint for mobile (more reliable than deviceId)
           videoConstraints = {
             facingMode: { exact: newFacingMode },
-            width: { ideal: 1920, max: 1920 },
-            height: { ideal: 1080, max: 1080 },
+            resolution: VideoPresets.h1080.resolution,
           };
         } else {
           // Desktop: use deviceId as before
@@ -1124,8 +1123,7 @@ export default function SoloHostStream() {
             [newVideoTrack] = await createLocalTracks({
               video: {
                 facingMode: newFacingMode,
-                width: { ideal: 1280 },
-                height: { ideal: 720 },
+                resolution: VideoPresets.h720.resolution,
               },
               audio: false,
             });
@@ -1134,8 +1132,7 @@ export default function SoloHostStream() {
             [newVideoTrack] = await createLocalTracks({
               video: {
                 deviceId: { ideal: deviceId },
-                width: { ideal: 1920 },
-                height: { ideal: 1080 },
+                resolution: VideoPresets.h1080.resolution,
               },
               audio: false,
             });
@@ -1294,7 +1291,7 @@ export default function SoloHostStream() {
       await new Promise(r => setTimeout(r, 300));
 
       // 6. Recreate tracks
-      const { createLocalTracks, LocalVideoTrack } = await import('livekit-client');
+      const { createLocalTracks, LocalVideoTrack, VideoPresets } = await import('livekit-client');
       
       // Only recreate camera if not screen sharing
       const trackOptions: any = {
@@ -1311,17 +1308,13 @@ export default function SoloHostStream() {
         if (isMobileWeb) {
           trackOptions.video = {
             facingMode: currentFacingMode,
-            width: { ideal: 1920, max: 1920 },
-            height: { ideal: 1080, max: 1080 },
-            frameRate: { ideal: 30, max: 30 },
+            resolution: VideoPresets.h1080.resolution,
           };
           console.log('[SoloHostStream] Mobile: Reset using facingMode:', currentFacingMode);
         } else {
           trackOptions.video = {
             deviceId: currentVideoDevice ? { ideal: currentVideoDevice } : undefined,
-            width: { ideal: 1920, max: 1920, min: 1280 },
-            height: { ideal: 1080, max: 1080, min: 720 },
-            frameRate: { ideal: 30, max: 30 },
+            resolution: VideoPresets.h1080.resolution,
           };
         }
       }
@@ -1532,8 +1525,7 @@ export default function SoloHostStream() {
         // Use the current facing mode state for mobile
         videoConstraints = {
           facingMode: currentFacingMode,
-          width: { ideal: 1920, max: 1920 },
-          height: { ideal: 1080, max: 1080 },
+          resolution: VideoPresets.h1080.resolution,
         };
         console.log('[SoloHostStream] Mobile: Re-publishing with facingMode:', currentFacingMode);
       } else {
