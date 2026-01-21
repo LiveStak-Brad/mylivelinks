@@ -52,10 +52,12 @@ export default function IncomingBattleRequestCard({
     setLoadingParticipants(true);
     getSessionParticipants(invite.session_id)
       .then(data => {
-        setParticipants(data || []);
+        // Ensure data is an array
+        setParticipants(Array.isArray(data) ? data : []);
       })
       .catch(err => {
         console.error('[IncomingBattleRequestCard] Error fetching participants:', err);
+        setParticipants([]);
       })
       .finally(() => {
         setLoadingParticipants(false);

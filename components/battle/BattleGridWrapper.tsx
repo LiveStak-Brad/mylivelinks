@@ -102,8 +102,10 @@ export default function BattleGridWrapper({
   const isBattleReady = session.status === 'battle_ready';
   const isBattleActive = session.status === 'battle_active' || session.status === 'active';
   
-  // Ready states for battle_ready phase
-  const readyStates = session.ready_states || {};
+  // Ready states for battle_ready phase - ensure it's a plain object
+  const readyStates = (session.ready_states && typeof session.ready_states === 'object' && !Array.isArray(session.ready_states)) 
+    ? session.ready_states as Record<string, boolean>
+    : {};
   const isCurrentUserReady = readyStates[currentUserId] === true;
   const [settingReady, setSettingReady] = useState(false);
   

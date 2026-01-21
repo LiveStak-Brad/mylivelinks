@@ -423,7 +423,14 @@ export async function getSessionParticipants(sessionId: string): Promise<Session
     throw error;
   }
   
-  return (data || []) as SessionParticipant[];
+  // Ensure we return an array - RPC returns JSONB which should be parsed correctly
+  if (Array.isArray(data)) {
+    return data as SessionParticipant[];
+  }
+  
+  // If data is somehow not an array, return empty
+  console.warn('[battle-session] getSessionParticipants returned non-array:', typeof data);
+  return [];
 }
 
 /**
