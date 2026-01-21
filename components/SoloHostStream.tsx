@@ -258,8 +258,14 @@ export default function SoloHostStream() {
   }, [battleSession, streamer?.live_stream_id, endCurrentSession]);
   
   // Auto-exit session when only 1 participant remains (return to solo mode)
+  // IMPORTANT: Only trigger this if we previously had 2+ participants (avoid false triggers during loading)
+  const hadMultipleParticipantsRef = useRef(false);
+  
   useEffect(() => {
-    if (!battleSession) return;
+    if (!battleSession) {
+      hadMultipleParticipantsRef.current = false;
+      return;
+    }
     
     // Check if session is in an active state (not ended)
     const isActiveStatus = ['active', 'battle_ready', 'battle_active', 'cooldown'].includes(battleSession.status);
@@ -272,7 +278,14 @@ export default function SoloHostStream() {
     // Filter to only active participants (those without left_at)
     const activeParticipants = participants.filter((p: any) => !p.left_at);
     
-    if (activeParticipants.length <= 1) {
+    // Track if we've ever had multiple participants
+    if (activeParticipants.length >= 2) {
+      hadMultipleParticipantsRef.current = true;
+    }
+    
+    // Only auto-exit if we HAD multiple participants before and now have 1 or fewer
+    // This prevents false triggers during session loading or data refresh
+    if (hadMultipleParticipantsRef.current && activeParticipants.length <= 1) {
       console.log('[SoloHostStream] Only 1 participant remaining - exiting session to return to solo mode');
       endCurrentSession().catch(err => {
         console.error('[SoloHostStream] Failed to auto-exit session:', err);
