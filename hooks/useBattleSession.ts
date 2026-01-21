@@ -227,8 +227,13 @@ export function useBattleSession({
   
   // Timer countdown effect
   useEffect(() => {
-    // Cohost sessions are indefinite (no countdown/cooldown transitions)
-    if (!session || session.type === 'cohost' || remainingSeconds <= 0) {
+    // Cohost and battle_ready sessions are indefinite (no countdown)
+    const hasTimer = session && 
+      session.type === 'battle' && 
+      (session.status === 'battle_active' || session.status === 'active' || session.status === 'cooldown') &&
+      remainingSeconds > 0;
+    
+    if (!hasTimer) {
       if (timerRef.current) {
         clearInterval(timerRef.current);
         timerRef.current = null;
@@ -239,8 +244,9 @@ export function useBattleSession({
     timerRef.current = setInterval(() => {
       setRemainingSeconds(prev => {
         if (prev <= 1) {
-          // Timer expired - if we're in active state, transition to cooldown
-          if (session.type === 'battle' && session.status === 'active' && isParticipant) {
+          // Timer expired - if we're in battle_active state, transition to cooldown
+          const isBattleActive = session.status === 'battle_active' || session.status === 'active';
+          if (session.type === 'battle' && isBattleActive && isParticipant) {
             transitionToCooldown().catch(console.error);
           } else if (session.status === 'cooldown' && isParticipant) {
             // Cooldown expired - convert back to cohost (never auto-kick)
@@ -263,38 +269,12 @@ export function useBattleSession({
     };
   }, [session, remainingSeconds, isParticipant, transitionToCooldown, refresh]);
   
-  // Realtime subscription for session updates
+  // Realtime subscription for MY participant row changes (tells me when I join/leave sessions)
   useEffect(() => {
     if (!targetHostId) return;
     
     const channel = supabase
-      .channel(`session_updates_${targetHostId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'live_sessions',
-          filter: `host_a=eq.${targetHostId}`,
-        },
-        (payload) => {
-          console.log('[useBattleSession] Session update (host_a):', payload);
-          refresh();
-        }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'live_sessions',
-          filter: `host_b=eq.${targetHostId}`,
-        },
-        (payload) => {
-          console.log('[useBattleSession] Session update (host_b):', payload);
-          refresh();
-        }
-      )
+      .channel(`my_participant_${targetHostId}`)
       .on(
         'postgres_changes',
         {
@@ -304,7 +284,7 @@ export function useBattleSession({
           filter: `profile_id=eq.${targetHostId}`,
         },
         (payload) => {
-          console.log('[useBattleSession] Participant update (self):', payload);
+          console.log('[useBattleSession] My participant row changed:', payload);
           refresh();
         }
       )
@@ -320,35 +300,51 @@ export function useBattleSession({
     };
   }, [targetHostId, supabase, refresh]);
   
-  // Also subscribe to participant changes for the current session
+  // Subscribe to session-level changes and all participant changes for current session
   useEffect(() => {
     if (!session?.session_id) return;
     
     const channel = supabase
-      .channel(`session_participants_${session.session_id}`)
+      .channel(`session_all_${session.session_id}`)
+      // Session-level changes (status, type, ends_at, etc.)
       .on(
         'postgres_changes',
         {
-          event: 'INSERT',
+          event: '*',
           schema: 'public',
-          table: 'live_session_participants',
-          filter: `session_id=eq.${session.session_id}`,
+          table: 'live_sessions',
+          filter: `id=eq.${session.session_id}`,
         },
         (payload) => {
-          console.log('[useBattleSession] New participant joined:', payload);
+          console.log('[useBattleSession] Session changed:', payload);
           refresh();
         }
       )
+      // All participant changes in this session (joins, leaves, team changes)
       .on(
         'postgres_changes',
         {
-          event: 'UPDATE',
+          event: '*',
           schema: 'public',
           table: 'live_session_participants',
           filter: `session_id=eq.${session.session_id}`,
         },
         (payload) => {
-          console.log('[useBattleSession] Participant updated:', payload);
+          console.log('[useBattleSession] Session participant changed:', payload);
+          refresh();
+        }
+      )
+      // Battle scores changes (for ready states)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'battle_scores',
+          filter: `session_id=eq.${session.session_id}`,
+        },
+        (payload) => {
+          console.log('[useBattleSession] Battle scores changed:', payload);
           refresh();
         }
       )

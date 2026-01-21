@@ -8,7 +8,7 @@ import { createClient } from '@/lib/supabase';
 
 export type SessionType = 'battle' | 'cohost';
 export type SessionMode = 'speed' | 'standard';
-export type SessionStatus = 'pending' | 'active' | 'cooldown' | 'ended';
+export type SessionStatus = 'pending' | 'active' | 'battle_ready' | 'battle_active' | 'cooldown' | 'ended';
 export type InviteStatus = 'pending' | 'accepted' | 'declined' | 'cancelled';
 export type InviteTab = 'friends' | 'following' | 'followers' | 'everyone';
 
@@ -39,7 +39,8 @@ export interface LiveSession {
   cooldown_ends_at: string | null;
   host_a: SessionHost;
   host_b: SessionHost | null; // Can be null for multi-host sessions
-  participants?: SessionParticipant[]; // New: array of all participants
+  participants?: SessionParticipant[]; // Array of all participants
+  ready_states?: Record<string, boolean>; // Map of profile_id -> ready status (for battle_ready phase)
 }
 
 export interface LiveSessionInvite {
@@ -354,4 +355,97 @@ export function formatTimer(seconds: number): string {
   const mins = Math.floor(seconds / 60);
   const secs = seconds % 60;
   return `${mins}:${secs.toString().padStart(2, '0')}`;
+}
+
+/**
+ * Start battle READY phase (replaces battle invite flow)
+ * Everyone sees "Ready Up!" UI, battle starts when all ready
+ */
+export async function startBattleReady(sessionId: string): Promise<{
+  status: string;
+  session_id: string;
+  participant_count: number;
+  ready_states: Record<string, boolean>;
+}> {
+  const supabase = createClient();
+  
+  const { data, error } = await supabase.rpc('rpc_start_battle_ready', {
+    p_session_id: sessionId,
+  });
+  
+  if (error) {
+    console.error('[battle-session] startBattleReady error:', error);
+    throw error;
+  }
+  
+  return data as any;
+}
+
+/**
+ * Set current user's ready state for battle
+ */
+export async function setBattleReady(sessionId: string, ready: boolean): Promise<{
+  status: string;
+  session_id: string;
+  ready?: boolean;
+  ready_states?: Record<string, boolean>;
+  started_at?: string;
+  ends_at?: string;
+}> {
+  const supabase = createClient();
+  
+  const { data, error } = await supabase.rpc('rpc_set_battle_ready', {
+    p_session_id: sessionId,
+    p_ready: ready,
+  });
+  
+  if (error) {
+    console.error('[battle-session] setBattleReady error:', error);
+    throw error;
+  }
+  
+  return data as any;
+}
+
+/**
+ * Get session participants for a given session
+ * Used by invite accept card to show who's already in the session
+ */
+export async function getSessionParticipants(sessionId: string): Promise<SessionParticipant[]> {
+  const supabase = createClient();
+  
+  const { data, error } = await supabase.rpc('rpc_get_session_participants', {
+    p_session_id: sessionId,
+  });
+  
+  if (error) {
+    console.error('[battle-session] getSessionParticipants error:', error);
+    throw error;
+  }
+  
+  return (data || []) as SessionParticipant[];
+}
+
+/**
+ * Get outgoing pending invites for current user (as sender)
+ */
+export async function getOutgoingInvites(): Promise<LiveSessionInvite[]> {
+  const supabase = createClient();
+  const { data: userData } = await supabase.auth.getUser();
+  
+  if (!userData.user) return [];
+  
+  const { data, error } = await supabase
+    .from('live_session_invites')
+    .select('*')
+    .eq('from_host_id', userData.user.id)
+    .eq('status', 'pending')
+    .order('created_at', { ascending: false });
+  
+  if (error) {
+    console.error('[battle-session] getOutgoingInvites error:', error);
+    throw error;
+  }
+  
+  return (data || []) as LiveSessionInvite[];
 }

@@ -25,7 +25,7 @@ import {
   createLocalTracks,
 } from 'livekit-client';
 import { TOKEN_ENDPOINT } from '@/lib/livekit-constants';
-import { LiveSession, getSessionRoomName } from '@/lib/battle-session';
+import { LiveSession, getSessionRoomName, startBattleReady, setBattleReady } from '@/lib/battle-session';
 import MultiHostGrid, { ParticipantVolume, GridMode } from './MultiHostGrid';
 import { GridTileParticipant } from './GridTile';
 import BattleTimer from './BattleTimer';
@@ -99,6 +99,13 @@ export default function BattleGridWrapper({
   const isBattleSession = session.type === 'battle';
   const isCohostSession = session.type === 'cohost';
   const isInCooldown = session.status === 'cooldown';
+  const isBattleReady = session.status === 'battle_ready';
+  const isBattleActive = session.status === 'battle_active' || session.status === 'active';
+  
+  // Ready states for battle_ready phase
+  const readyStates = session.ready_states || {};
+  const isCurrentUserReady = readyStates[currentUserId] === true;
+  const [settingReady, setSettingReady] = useState(false);
   
   // Battle scores hook (only for battle sessions)
   const { scores, awardChatPoints } = useBattleScores({
@@ -297,7 +304,24 @@ export default function BattleGridWrapper({
 
   const renderBattleOverlay = useCallback(
     (participant: GridTileParticipant) => {
-      if (!isBattleSession) return null;
+      // During battle_ready phase, show ready/not-ready indicator
+      if (isBattleReady) {
+        const isReady = readyStates[participant.id] === true;
+        return (
+          <div className={`absolute inset-0 pointer-events-none border-4 ${
+            isReady ? 'border-green-500' : 'border-red-500'
+          } transition-colors`}>
+            <div className={`absolute top-2 right-2 px-2 py-1 rounded text-xs font-bold ${
+              isReady ? 'bg-green-500 text-white' : 'bg-red-500 text-white'
+            }`}>
+              {isReady ? 'READY' : 'NOT READY'}
+            </div>
+          </div>
+        );
+      }
+      
+      // During active battle, show battle overlay
+      if (!isBattleSession || !isBattleActive) return null;
       const state = battleStates.get(participant.id);
       if (!state) return null;
 
@@ -310,7 +334,7 @@ export default function BattleGridWrapper({
         />
       );
     },
-    [battleStates, battleMode, isBattleSession, participants.length]
+    [battleStates, battleMode, isBattleSession, isBattleActive, isBattleReady, readyStates, participants.length]
   );
   
   // Map LiveKit participants to grid participants
@@ -839,22 +863,28 @@ export default function BattleGridWrapper({
   }, [session.session_id]);
 
   const handleStartBattle = useCallback(async () => {
-    // Send battle invite from cohost session
-    console.log('[BattleGridWrapper] Start Battle clicked');
+    // Start battle READY phase - everyone must ready up before battle begins
+    console.log('[BattleGridWrapper] Start Battle clicked - entering READY phase');
     try {
-      const response = await fetch('/api/battle/start', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          session_id: session.session_id,
-        }),
-      });
-      if (!response.ok) {
-        throw new Error('Failed to send battle invite');
-      }
-      // Invite sent, other host will see popup
+      const result = await startBattleReady(session.session_id);
+      console.log('[BattleGridWrapper] Battle ready phase started:', result);
+      // Session will update via realtime, UI will show ready states
     } catch (err) {
       console.error('[BattleGridWrapper] Start battle error:', err);
+    }
+  }, [session.session_id]);
+  
+  const handleSetReady = useCallback(async () => {
+    console.log('[BattleGridWrapper] Ready Up clicked');
+    setSettingReady(true);
+    try {
+      const result = await setBattleReady(session.session_id, true);
+      console.log('[BattleGridWrapper] Ready set:', result);
+      // If battle started, session will update via realtime
+    } catch (err) {
+      console.error('[BattleGridWrapper] Set ready error:', err);
+    } finally {
+      setSettingReady(false);
     }
   }, [session.session_id]);
   
@@ -998,7 +1028,7 @@ export default function BattleGridWrapper({
           onVolumeChange={handleVolumeChange}
           onMuteToggle={handleMuteToggle}
           isBattleMode={isBattleSession}
-          renderOverlay={isBattleSession ? renderBattleOverlay : undefined}
+          renderOverlay={(isBattleSession || isBattleReady) ? renderBattleOverlay : undefined}
         />
         
         {((!isConnected) || showConnectingOverlay) && !error && (
@@ -1043,13 +1073,13 @@ export default function BattleGridWrapper({
         )}
       </div>
 
-      {/* Bottom Row: Top Gifters (left/right) + Timer/StartBattle (center) */}
+      {/* Bottom Row: Top Gifters (left/right) + Timer/StartBattle/Ready (center) */}
       {/* Unified layout: always render if battle/cohost active, content varies */}
       {(isBattleSession || (isCohostSession && canPublish)) && !isInCooldown && (
         <div className="w-full flex items-center justify-between px-2 py-1">
-          {/* Left: Team A Top 3 Gifters */}
+          {/* Left: Team A Top 3 Gifters (only during active battle) */}
           <div className="flex-1 min-w-0">
-            {isBattleSession && teamAGifters.length > 0 && (
+            {isBattleSession && isBattleActive && teamAGifters.length > 0 && (
               <TopGiftersDisplay
                 gifters={teamAGifters}
                 side="A"
@@ -1058,9 +1088,40 @@ export default function BattleGridWrapper({
             )}
           </div>
 
-          {/* Center: Timer (battle) or Start Battle (cohost) */}
+          {/* Center: Timer (active battle) / Ready UI (battle_ready) / Start Battle (cohost) */}
           <div className="flex-shrink-0 px-2">
-            {isBattleSession ? (
+            {isBattleReady ? (
+              // Battle READY phase - show ready up button or waiting status
+              <div className="flex flex-col items-center gap-1">
+                {isCurrentUserReady ? (
+                  <div className="flex items-center gap-2 px-4 py-2 bg-green-500/20 border border-green-500 rounded-lg">
+                    <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse" />
+                    <span className="text-green-400 font-medium text-sm">Waiting for others...</span>
+                  </div>
+                ) : canPublish ? (
+                  <button
+                    onClick={handleSetReady}
+                    disabled={settingReady}
+                    className="flex items-center gap-2 px-6 py-3 bg-orange-500 hover:bg-orange-600 text-white font-bold rounded-lg transition-colors disabled:opacity-50"
+                  >
+                    {settingReady ? (
+                      <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    ) : (
+                      <>
+                        <div className="w-4 h-4 border-2 border-white rounded-full" />
+                        <span>Ready Up!</span>
+                      </>
+                    )}
+                  </button>
+                ) : (
+                  <div className="text-white/60 text-sm">Battle starting soon...</div>
+                )}
+                {/* Ready count */}
+                <div className="text-white/40 text-xs">
+                  {Object.values(readyStates).filter(Boolean).length} / {Object.keys(readyStates).length} ready
+                </div>
+              </div>
+            ) : isBattleSession && isBattleActive ? (
               <BattleTimer
                 remainingSeconds={remainingSeconds}
                 phase="active"
@@ -1072,9 +1133,9 @@ export default function BattleGridWrapper({
             ) : null}
           </div>
 
-          {/* Right: Team B Top 3 Gifters (only if exists) */}
+          {/* Right: Team B Top 3 Gifters (only during active battle) */}
           <div className="flex-1 min-w-0 flex justify-end">
-            {isBattleSession && teamBGifters.length > 0 && (
+            {isBattleSession && isBattleActive && teamBGifters.length > 0 && (
               <TopGiftersDisplay
                 gifters={teamBGifters}
                 side="B"
