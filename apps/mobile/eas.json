@@ -6,6 +6,7 @@
     "development": {
       "developmentClient": true,
       "distribution": "internal",
+      "node": "20.19.4",
       "ios": {
         "autoIncrement": "buildNumber"
       },
@@ -15,6 +16,7 @@
     },
     "preview": {
       "distribution": "internal",
+      "node": "20.19.4",
       "ios": {
         "autoIncrement": "buildNumber"
       },
@@ -23,6 +25,7 @@
       }
     },
     "production": {
+      "node": "20.19.4",
       "ios": {
         "autoIncrement": "buildNumber"
       },
