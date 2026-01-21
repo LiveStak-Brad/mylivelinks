@@ -900,13 +900,16 @@ export default function BattleGridWrapper({
     try {
       const result = await setBattleReady(session.session_id, true);
       console.log('[BattleGridWrapper] Ready set:', result);
-      // If battle started, session will update via realtime
+      // Trigger immediate refresh to update ready states / session status
+      if (onRefreshSession) {
+        setTimeout(() => onRefreshSession(), 100);
+      }
     } catch (err) {
       console.error('[BattleGridWrapper] Set ready error:', err);
     } finally {
       setSettingReady(false);
     }
-  }, [session?.session_id]);
+  }, [session?.session_id, onRefreshSession]);
   
   const handleAcceptBattleInvite = useCallback(async (inviteId: string) => {
     console.log('[BattleGridWrapper] Accept battle invite:', inviteId);
