@@ -898,7 +898,24 @@ export default function BattleGridWrapper({
   }, [session?.session_id, onRefreshSession]);
   
   const handleSetReady = useCallback(async () => {
-    console.log('[BattleGridWrapper] Ready Up clicked');
+    console.log('[BattleGridWrapper] Ready Up clicked', {
+      sessionId: session?.session_id,
+      sessionStatus: session?.status,
+      sessionType: session?.type,
+      isBattleReady,
+      readyStates,
+    });
+    
+    // Validate session is in correct state before calling RPC
+    if (session?.status !== 'battle_ready') {
+      console.error('[BattleGridWrapper] Cannot set ready - session not in battle_ready state:', session?.status);
+      // Try refreshing to get latest state
+      if (onRefreshSession) {
+        onRefreshSession();
+      }
+      return;
+    }
+    
     setSettingReady(true);
     try {
       const result = await setBattleReady(session.session_id, true);
@@ -909,10 +926,14 @@ export default function BattleGridWrapper({
       }
     } catch (err) {
       console.error('[BattleGridWrapper] Set ready error:', err);
+      // Refresh session to get latest state
+      if (onRefreshSession) {
+        onRefreshSession();
+      }
     } finally {
       setSettingReady(false);
     }
-  }, [session?.session_id, onRefreshSession]);
+  }, [session?.session_id, session?.status, session?.type, isBattleReady, readyStates, onRefreshSession]);
   
   const handleAcceptBattleInvite = useCallback(async (inviteId: string) => {
     console.log('[BattleGridWrapper] Accept battle invite:', inviteId);
