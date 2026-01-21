@@ -134,12 +134,35 @@ export default function GoLiveScreen() {
   // Cleanup on unmount
   useEffect(() => {
     return () => {
-      if (videoTrack) videoTrack.stop();
-      if (audioTrack) audioTrack.stop();
-      if (roomRef.current) {
-        roomRef.current.disconnect();
+      // IMPORTANT: Disconnect room FIRST to stop the renderer from processing frames
+      // This prevents the "release() called on an object with refcount < 1" crash
+      const room = roomRef.current;
+      if (room) {
         roomRef.current = null;
+        try {
+          room.disconnect();
+        } catch (e) {
+          console.warn('[GoLive] Error disconnecting room on unmount:', e);
+        }
       }
+      
+      // Small delay to let WebRTC cleanup complete before stopping tracks
+      setTimeout(() => {
+        if (videoTrack) {
+          try {
+            videoTrack.stop();
+          } catch (e) {
+            console.warn('[GoLive] Error stopping video track on unmount:', e);
+          }
+        }
+        if (audioTrack) {
+          try {
+            audioTrack.stop();
+          } catch (e) {
+            console.warn('[GoLive] Error stopping audio track on unmount:', e);
+          }
+        }
+      }, 100);
       // Note: Database cleanup handled by handleClose/handleEndLive
     };
   }, [videoTrack, audioTrack]);
@@ -692,21 +715,37 @@ export default function GoLiveScreen() {
       }
     }
 
-    // Stop old track and create new one with new facing
-    videoTrack.stop();
+    // Stop old track with try-catch
+    try {
+      videoTrack.stop();
+    } catch (e) {
+      console.warn('[GoLive] Error stopping old video track on flip:', e);
+    }
+    
+    // Small delay to let WebRTC release resources
+    await new Promise(resolve => setTimeout(resolve, 100));
     
     try {
       const newTrack = await createLocalVideoTrack({
         facingMode: newFacing,
         resolution: VideoPresets.h720.resolution,
       });
-      attachFiltersToLocalVideoTrack(newTrack);
-      setNativeFilterParams({
-        brightness: cameraFilters.brightness,
-        contrast: cameraFilters.contrast,
-        saturation: cameraFilters.saturation,
-        softSkinLevel: cameraFilters.softSkinLevel,
-      });
+      
+      // Small delay before attaching filters
+      await new Promise(resolve => setTimeout(resolve, 50));
+      
+      try {
+        attachFiltersToLocalVideoTrack(newTrack);
+        setNativeFilterParams({
+          brightness: cameraFilters.brightness,
+          contrast: cameraFilters.contrast,
+          saturation: cameraFilters.saturation,
+          softSkinLevel: cameraFilters.softSkinLevel,
+        });
+      } catch (filterErr) {
+        console.warn('[GoLive] Failed to attach video filters on flip:', filterErr);
+      }
+      
       setVideoTrack(newTrack);
       
       // If live, republish the new track
@@ -734,28 +773,43 @@ export default function GoLiveScreen() {
         throw new Error('Camera preview requires a development build.');
       }
 
-      await new Promise(resolve => setTimeout(resolve, 100));
+      // Wait for any previous WebRTC resources to be fully released
+      // This prevents race conditions with CallSession cleanup
+      await new Promise(resolve => setTimeout(resolve, 300));
 
-      console.log('[GoLive] Creating local tracks...');
+      console.log('[GoLive] Creating local video track...');
       const video = await createLocalVideoTrack({
         facingMode: cameraFacing,
         resolution: VideoPresets.h720.resolution,
       });
-      attachFiltersToLocalVideoTrack(video);
-      setNativeFilterParams({
-        brightness: cameraFilters.brightness,
-        contrast: cameraFilters.contrast,
-        saturation: cameraFilters.saturation,
-        softSkinLevel: cameraFilters.softSkinLevel,
-      });
       
+      // Small delay to let the track initialize before attaching filters
+      await new Promise(resolve => setTimeout(resolve, 50));
+      
+      try {
+        attachFiltersToLocalVideoTrack(video);
+        setNativeFilterParams({
+          brightness: cameraFilters.brightness,
+          contrast: cameraFilters.contrast,
+          saturation: cameraFilters.saturation,
+          softSkinLevel: cameraFilters.softSkinLevel,
+        });
+      } catch (filterErr) {
+        console.warn('[GoLive] Failed to attach video filters:', filterErr);
+        // Continue without filters - they're optional
+      }
+      
+      console.log('[GoLive] Creating local audio track...');
       const audio = await createLocalAudioTrack();
+
+      // Another small delay before setting state to let renderer initialize
+      await new Promise(resolve => setTimeout(resolve, 50));
 
       setVideoTrack(video);
       setAudioTrack(audio);
       setCameraGranted(true);
       setMicGranted(true);
-      console.log('[GoLive] Tracks created');
+      console.log('[GoLive] Tracks created successfully');
     } catch (err: any) {
       console.error('[GoLive] Camera error:', err?.message || err);
       setPreviewError(err?.message || 'Failed to access camera');
@@ -766,14 +820,33 @@ export default function GoLiveScreen() {
 
   // Handle close
   const handleClose = useCallback(async () => {
-    // Stop tracks
-    if (videoTrack) videoTrack.stop();
-    if (audioTrack) audioTrack.stop();
-    
-    // Disconnect from room
-    if (roomRef.current) {
-      roomRef.current.disconnect();
+    // IMPORTANT: Disconnect room FIRST to stop the renderer from processing frames
+    const room = roomRef.current;
+    if (room) {
       roomRef.current = null;
+      try {
+        room.disconnect();
+      } catch (e) {
+        console.warn('[GoLive] Error disconnecting room on close:', e);
+      }
+    }
+    
+    // Small delay then stop tracks
+    await new Promise(resolve => setTimeout(resolve, 100));
+    
+    if (videoTrack) {
+      try {
+        videoTrack.stop();
+      } catch (e) {
+        console.warn('[GoLive] Error stopping video track on close:', e);
+      }
+    }
+    if (audioTrack) {
+      try {
+        audioTrack.stop();
+      } catch (e) {
+        console.warn('[GoLive] Error stopping audio track on close:', e);
+      }
     }
     
     // If we were live, end the stream record
@@ -933,18 +1006,34 @@ export default function GoLiveScreen() {
         onPress: async () => {
           console.log('[GoLive] Ending stream and cleaning up...');
           
-          // Disconnect from LiveKit room
-          if (roomRef.current) {
-            roomRef.current.disconnect();
+          // IMPORTANT: Disconnect room FIRST to stop the renderer from processing frames
+          const room = roomRef.current;
+          if (room) {
             roomRef.current = null;
+            try {
+              room.disconnect();
+            } catch (e) {
+              console.warn('[GoLive] Error disconnecting room on end:', e);
+            }
           }
+          
+          // Small delay to let WebRTC cleanup complete
+          await new Promise(resolve => setTimeout(resolve, 100));
           
           // Stop and clear tracks (they become stale after room disconnect)
           if (videoTrack) {
-            videoTrack.stop();
+            try {
+              videoTrack.stop();
+            } catch (e) {
+              console.warn('[GoLive] Error stopping video track on end:', e);
+            }
           }
           if (audioTrack) {
-            audioTrack.stop();
+            try {
+              audioTrack.stop();
+            } catch (e) {
+              console.warn('[GoLive] Error stopping audio track on end:', e);
+            }
           }
           setVideoTrack(null);
           setAudioTrack(null);
