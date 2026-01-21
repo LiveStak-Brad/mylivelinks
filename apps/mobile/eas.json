@@ -12,6 +12,26 @@
       "android": {
         "autoIncrement": "versionCode"
       }
+    },
+    "preview": {
+      "distribution": "internal",
+      "ios": {
+        "autoIncrement": "buildNumber"
+      },
+      "android": {
+        "autoIncrement": "versionCode"
+      }
+    },
+    "production": {
+      "ios": {
+        "autoIncrement": "buildNumber"
+      },
+      "android": {
+        "autoIncrement": "versionCode"
+      }
     }
+  },
+  "submit": {
+    "production": {}
   }
 }
