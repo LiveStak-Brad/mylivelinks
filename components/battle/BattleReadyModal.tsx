@@ -55,7 +55,7 @@ export default function BattleReadyModal({
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
       <div className="bg-gray-900 border border-gray-700 rounded-2xl shadow-2xl max-w-sm w-full mx-4 overflow-hidden">
         {/* Header */}
-        <div className="px-6 py-4 border-b border-gray-700 bg-gradient-to-r from-orange-500/20 to-red-500/20">
+        <div className="px-6 py-4 border-b border-gray-700 bg-gradient-to-r from-green-500/20 to-emerald-500/20">
           <h2 className="text-xl font-bold text-white text-center">
             Battle Starting
           </h2>
@@ -132,13 +132,13 @@ export default function BattleReadyModal({
             <button
               onClick={onSetReady}
               disabled={isSettingReady}
-              className="w-full flex items-center justify-center gap-2 py-4 bg-orange-500 hover:bg-orange-600 text-white font-bold text-lg rounded-xl transition-colors disabled:opacity-50"
+              className="w-full flex items-center justify-center gap-2 py-4 bg-green-500 hover:bg-green-600 text-white font-bold text-lg rounded-xl transition-colors disabled:opacity-50"
             >
               {isSettingReady ? (
                 <Loader2 className="w-5 h-5 animate-spin" />
               ) : (
                 <>
-                  <div className="w-5 h-5 border-2 border-white rounded-full" />
+                  <Check className="w-5 h-5" />
                   <span>Ready Up!</span>
                 </>
               )}

@@ -1179,8 +1179,8 @@ export default function BattleGridWrapper({
         />
       )}
       
-      {/* Battle Ready Modal - shown to hosts during battle_ready phase */}
-      {isBattleReady && canPublish && (
+      {/* Battle Ready Modal - shown to ALL participants during battle_ready phase */}
+      {isBattleReady && modalParticipants.some(p => p.id === currentUserId) && (
         <BattleReadyModal
           isOpen={true}
           participants={modalParticipants}
