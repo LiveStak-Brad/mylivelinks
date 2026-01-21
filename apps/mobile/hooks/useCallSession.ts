@@ -451,26 +451,46 @@ export function useCallSession(): UseCallSessionReturn {
   };
 
   // Cleanup call resources
-  const cleanupCall = () => {
+  const cleanupCall = useCallback(() => {
     // Stop duration timer
     if (durationIntervalRef.current) {
       clearInterval(durationIntervalRef.current);
       durationIntervalRef.current = null;
     }
     
-    if (localVideoTrack) {
-      localVideoTrack.stop();
-    }
-    if (localAudioTrack) {
-      localAudioTrack.stop();
-    }
-    if (roomRef.current) {
-      roomRef.current.disconnect();
+    // IMPORTANT: Disconnect room FIRST to stop the renderer from processing frames
+    // This prevents the "release() called on an object with refcount < 1" crash
+    const room = roomRef.current;
+    if (room) {
       roomRef.current = null;
+      try {
+        room.disconnect();
+      } catch (e) {
+        console.warn('[CallSession] Error disconnecting room:', e);
+      }
     }
+    
+    // Small delay to let WebRTC cleanup complete before stopping tracks
+    setTimeout(() => {
+      if (localVideoTrack) {
+        try {
+          localVideoTrack.stop();
+        } catch (e) {
+          console.warn('[CallSession] Error stopping video track:', e);
+        }
+      }
+      if (localAudioTrack) {
+        try {
+          localAudioTrack.stop();
+        } catch (e) {
+          console.warn('[CallSession] Error stopping audio track:', e);
+        }
+      }
+    }, 100);
+    
     setLocalVideoTrack(null);
     setLocalAudioTrack(null);
-  };
+  }, [localVideoTrack, localAudioTrack]);
 
   // Reset state to idle
   const resetState = () => {
