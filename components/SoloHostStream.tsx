@@ -246,6 +246,17 @@ export default function SoloHostStream() {
     refresh: refreshBattleSession,
   } = useBattleSession({ profileId: currentUserId });
   
+  // Clean up battle/cohost session when stream ends
+  useEffect(() => {
+    // If we have an active session but no live stream, end the session
+    if (battleSession && !streamer?.live_stream_id) {
+      console.log('[SoloHostStream] Stream ended - cleaning up battle/cohost session');
+      endCurrentSession().catch(err => {
+        console.error('[SoloHostStream] Failed to end session on stream end:', err);
+      });
+    }
+  }, [battleSession, streamer?.live_stream_id, endCurrentSession]);
+  
   // No longer need currentInvite state - stack handles all invites
   
   // Show cooldown sheet when battle enters cooldown
@@ -265,7 +276,13 @@ export default function SoloHostStream() {
   }, [declineInvite]);
   
   // Check if we're in an active battle/cohost session (show grid instead of solo video)
-  const isInActiveSession = battleSession && (battleSession.status === 'active' || battleSession.status === 'cooldown');
+  // Include ALL statuses where BattleGridWrapper should be shown
+  const isInActiveSession = battleSession && (
+    battleSession.status === 'active' || 
+    battleSession.status === 'cooldown' ||
+    battleSession.status === 'battle_ready' ||
+    battleSession.status === 'battle_active'
+  );
   
   // When entering a battle, unpublish from solo room to free camera for battle room
   // When exiting a battle, show a message that they can resume or auto-resume

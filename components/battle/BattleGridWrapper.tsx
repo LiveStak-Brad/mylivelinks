@@ -82,6 +82,9 @@ export default function BattleGridWrapper({
   onRoomDisconnected,
   onRefreshSession,
 }: BattleGridWrapperProps) {
+  // ============================================================================
+  // ALL HOOKS MUST BE CALLED FIRST - NO early returns before hooks!
+  // ============================================================================
   const [participants, setParticipants] = useState<GridTileParticipant[]>([]);
   const [volumes, setVolumes] = useState<ParticipantVolume[]>([]);
   const [isConnected, setIsConnected] = useState(false);
@@ -89,52 +92,52 @@ export default function BattleGridWrapper({
   const [allowEmptyState, setAllowEmptyState] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isResetting, setIsResetting] = useState(false);
-  
-  // Track reconnection trigger - increment to force reconnect
   const [reconnectTrigger, setReconnectTrigger] = useState(0);
-  
-  // Track if we've already requested a refresh for unknown participants
-  const lastRefreshRequestRef = useRef<number>(0);
-  
-  const isBattleSession = session.type === 'battle';
-  const isCohostSession = session.type === 'cohost';
-  const isInCooldown = session.status === 'cooldown';
-  const isBattleReady = session.status === 'battle_ready';
-  const isBattleActive = session.status === 'battle_active' || session.status === 'active';
-  
-  // Ready states for battle_ready phase - ensure it's a plain object
-  const readyStates = (session.ready_states && typeof session.ready_states === 'object' && !Array.isArray(session.ready_states)) 
-    ? session.ready_states as Record<string, boolean>
-    : {};
-  const isCurrentUserReady = readyStates[currentUserId] === true;
   const [settingReady, setSettingReady] = useState(false);
-  
-  // Battle scores hook (only for battle sessions)
-  const { scores, awardChatPoints } = useBattleScores({
-    sessionId: isBattleSession ? session.session_id : null,
-    autoFetch: isBattleSession,
-  });
-  
-  // Battle invite state
   const [battleInvite, setBattleInvite] = useState<{
     id: string;
     fromUsername: string;
   } | null>(null);
 
+  const lastRefreshRequestRef = useRef<number>(0);
   const roomRef = useRef<Room | null>(null);
   const localTracksRef = useRef<{ video: any; audio: any }>({ video: null, audio: null });
   const emptyStateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const hydrationIntervalRef = useRef<NodeJS.Timeout | null>(null);
   
+  // ============================================================================
+  // NOW SAFE: Derived constants from session (all hooks declared above)
+  // Use optional chaining for all session access
+  // ============================================================================
+  const isBattleSession = session?.type === 'battle';
+  const isCohostSession = session?.type === 'cohost';
+  const isInCooldown = session?.status === 'cooldown';
+  const isBattleReady = session?.status === 'battle_ready';
+  const isBattleActive = session?.status === 'battle_active' || session?.status === 'active';
+  
+  // Ready states for battle_ready phase - ensure it's a plain object
+  const readyStates = (session?.ready_states && typeof session.ready_states === 'object' && !Array.isArray(session.ready_states)) 
+    ? session.ready_states as Record<string, boolean>
+    : {};
+  const isCurrentUserReady = currentUserId ? (readyStates[currentUserId] === true) : false;
+  
+  // Battle scores hook (only for battle sessions) - also safe now as all previous hooks are declared
+  const { scores, awardChatPoints } = useBattleScores({
+    sessionId: (isBattleSession && session) ? session.session_id : null,
+    autoFetch: isBattleSession,
+  });
+  
   const roomName = useMemo(() => 
-    getSessionRoomName(session.session_id, session.type), 
-    [session.session_id, session.type]
+    session ? getSessionRoomName(session.session_id, session.type) : null, 
+    [session?.session_id, session?.type]
   );
 
   // Host metadata should not force LiveKit reconnection when only session.status/timers change.
   // We derive a stable host snapshot based on identity fields.
   // Supports both old host_a/host_b format and new participants array
   const hostSnapshot = useMemo(() => {
+    if (!session) return null;
+    
     // Use participants array if available (new multi-host format)
     if (session.participants && Array.isArray(session.participants) && session.participants.length > 0) {
       const rawParticipants = session.participants as Array<{
@@ -194,17 +197,17 @@ export default function BattleGridWrapper({
       session_id: session.session_id,
     };
   }, [
-    session.participants,
-    session.host_a?.id,
-    session.host_a?.username,
-    session.host_a?.display_name,
-    session.host_a?.avatar_url,
-    session.host_b?.id,
-    session.host_b?.username,
-    session.host_b?.display_name,
-    session.host_b?.avatar_url,
-    session.type,
-    session.session_id,
+    session?.participants,
+    session?.host_a?.id,
+    session?.host_a?.username,
+    session?.host_a?.display_name,
+    session?.host_a?.avatar_url,
+    session?.host_b?.id,
+    session?.host_b?.username,
+    session?.host_b?.display_name,
+    session?.host_b?.avatar_url,
+    session?.type,
+    session?.session_id,
   ]);
 
   const battleMode: BattleMode = 'duel';
@@ -479,13 +482,19 @@ export default function BattleGridWrapper({
       });
       return newVolumes;
     });
-  }, [canPublish, currentUserId, hostSnapshot]);
+  }, [canPublish, currentUserId, currentUserName, hostSnapshot, roomName, onRefreshSession]);
   
   // Connect to battle/cohost room
   useEffect(() => {
     let isActive = true;
     
     const connectRoom = async () => {
+      // Don't connect if no room name (session not ready yet)
+      if (!roomName) {
+        console.log('[BattleGridWrapper] Skipping connection - no room name yet');
+        return;
+      }
+      
       try {
         // Get token for battle/cohost room
         const response = await fetch(TOKEN_ENDPOINT, {
@@ -830,17 +839,6 @@ export default function BattleGridWrapper({
     });
   }, [volumes]);
   
-  if (error) {
-    return (
-      <div className={`flex items-center justify-center bg-black/90 text-white ${className}`}>
-        <div className="text-center p-4">
-          <p className="text-red-400 text-sm">{error}</p>
-          <p className="text-gray-500 text-xs mt-2">Failed to connect to session</p>
-        </div>
-      </div>
-    );
-  }
-  
   const showConnectingOverlay = !participantsReady && !allowEmptyState;
 
   // Handle cooldown actions
@@ -862,7 +860,7 @@ export default function BattleGridWrapper({
     } catch (err) {
       console.error('[BattleGridWrapper] Rematch error:', err);
     }
-  }, [session.session_id]);
+  }, [session?.session_id]);
 
   const handleStartBattle = useCallback(async () => {
     // Start battle READY phase - everyone must ready up before battle begins
@@ -874,7 +872,7 @@ export default function BattleGridWrapper({
     } catch (err) {
       console.error('[BattleGridWrapper] Start battle error:', err);
     }
-  }, [session.session_id]);
+  }, [session?.session_id]);
   
   const handleSetReady = useCallback(async () => {
     console.log('[BattleGridWrapper] Ready Up clicked');
@@ -888,7 +886,7 @@ export default function BattleGridWrapper({
     } finally {
       setSettingReady(false);
     }
-  }, [session.session_id]);
+  }, [session?.session_id]);
   
   const handleAcceptBattleInvite = useCallback(async (inviteId: string) => {
     console.log('[BattleGridWrapper] Accept battle invite:', inviteId);
@@ -1002,7 +1000,32 @@ export default function BattleGridWrapper({
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [isCohostSession, currentUserId, session.session_id, hostSnapshot]);
+  }, [isCohostSession, currentUserId, session?.session_id, hostSnapshot]);
+
+  // ============================================================================
+  // DEFENSIVE CHECKS - Early returns AFTER all hooks are declared
+  // This ensures consistent hook calls even when props/state change
+  // ============================================================================
+  if (error) {
+    return (
+      <div className={`flex items-center justify-center bg-black/90 text-white ${className}`}>
+        <div className="text-center p-4">
+          <p className="text-red-400 text-sm">{error}</p>
+          <p className="text-gray-500 text-xs mt-2">Failed to connect to session</p>
+        </div>
+      </div>
+    );
+  }
+  
+  if (!session || !currentUserId || !currentUserName) {
+    return (
+      <div className={`flex items-center justify-center bg-black/90 text-white ${className}`}>
+        <div className="text-center p-4">
+          <p className="text-gray-500 text-sm">Loading session...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={`flex flex-col ${className}`}>
