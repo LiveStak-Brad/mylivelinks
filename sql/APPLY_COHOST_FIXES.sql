@@ -17,6 +17,14 @@ ALTER TABLE public.live_sessions ADD CONSTRAINT live_sessions_status_check
   CHECK (status IN ('pending', 'active', 'battle_ready', 'battle_active', 'cooldown', 'ended'));
 
 -- =============================================================================
+-- 1b. Fix team constraint to allow 12 teams (A-L) for multi-person battles
+-- =============================================================================
+
+ALTER TABLE public.live_session_participants DROP CONSTRAINT IF EXISTS live_session_participants_team_check;
+ALTER TABLE public.live_session_participants ADD CONSTRAINT live_session_participants_team_check 
+  CHECK (team IN ('A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L'));
+
+-- =============================================================================
 -- 2. Fix rpc_respond_to_invite - proper slot finding, capacity check
 -- =============================================================================
 
