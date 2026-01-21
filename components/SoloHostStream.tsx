@@ -257,6 +257,29 @@ export default function SoloHostStream() {
     }
   }, [battleSession, streamer?.live_stream_id, endCurrentSession]);
   
+  // Auto-exit session when only 1 participant remains (return to solo mode)
+  useEffect(() => {
+    if (!battleSession) return;
+    
+    // Check if session is in an active state (not ended)
+    const isActiveStatus = ['active', 'battle_ready', 'battle_active', 'cooldown'].includes(battleSession.status);
+    if (!isActiveStatus) return;
+    
+    // Get active participant count
+    const participants = battleSession.participants;
+    if (!participants || !Array.isArray(participants)) return;
+    
+    // Filter to only active participants (those without left_at)
+    const activeParticipants = participants.filter((p: any) => !p.left_at);
+    
+    if (activeParticipants.length <= 1) {
+      console.log('[SoloHostStream] Only 1 participant remaining - exiting session to return to solo mode');
+      endCurrentSession().catch(err => {
+        console.error('[SoloHostStream] Failed to auto-exit session:', err);
+      });
+    }
+  }, [battleSession, endCurrentSession]);
+  
   // No longer need currentInvite state - stack handles all invites
   
   // Show cooldown sheet when battle enters cooldown
