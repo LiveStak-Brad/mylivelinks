@@ -616,6 +616,112 @@ END;
 $$;
 
 -- =============================================================================
+-- 9. Fix rpc_end_session to handle all session statuses and use participants table
+-- =============================================================================
+
+CREATE OR REPLACE FUNCTION public.rpc_end_session(
+  p_session_id UUID,
+  p_action TEXT DEFAULT 'end'
+)
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_user_id UUID := auth.uid();
+  v_session live_sessions%ROWTYPE;
+  v_cooldown_duration INTERVAL;
+  v_is_participant BOOLEAN := FALSE;
+BEGIN
+  IF v_user_id IS NULL THEN
+    RAISE EXCEPTION 'Not authenticated';
+  END IF;
+  
+  IF p_action NOT IN ('end', 'cooldown') THEN
+    RAISE EXCEPTION 'Invalid action: must be end or cooldown';
+  END IF;
+  
+  -- Fetch the session (include ALL active-ish statuses)
+  SELECT * INTO v_session
+  FROM live_sessions
+  WHERE id = p_session_id
+    AND status IN ('active', 'battle_ready', 'battle_active', 'cooldown')
+  FOR UPDATE;
+  
+  IF v_session IS NULL THEN
+    RAISE EXCEPTION 'Session not found or already ended';
+  END IF;
+  
+  -- Check if user is a participant via participants table (handles 2+ person sessions)
+  SELECT EXISTS (
+    SELECT 1 FROM live_session_participants
+    WHERE session_id = p_session_id
+      AND profile_id = v_user_id
+      AND left_at IS NULL
+  ) INTO v_is_participant;
+  
+  -- Also check legacy host_a/host_b columns for backwards compatibility
+  IF NOT v_is_participant THEN
+    v_is_participant := (v_session.host_a = v_user_id OR v_session.host_b = v_user_id);
+  END IF;
+  
+  IF NOT v_is_participant THEN
+    RAISE EXCEPTION 'Not authorized - you are not in this session';
+  END IF;
+  
+  IF p_action = 'end' THEN
+    -- Completely end the session
+    UPDATE live_sessions
+    SET status = 'ended', ends_at = now()
+    WHERE id = p_session_id;
+    
+    -- Mark all participants as left
+    UPDATE live_session_participants
+    SET left_at = now()
+    WHERE session_id = p_session_id AND left_at IS NULL;
+    
+    -- Cancel any pending invites for this session
+    UPDATE live_session_invites
+    SET status = 'cancelled', responded_at = now()
+    WHERE session_id = p_session_id AND status = 'pending';
+    
+    RETURN TRUE;
+  END IF;
+  
+  -- Transition to cooldown (only from battle_active)
+  IF v_session.status != 'battle_active' THEN
+    -- If not in battle_active, just end it
+    UPDATE live_sessions
+    SET status = 'ended', ends_at = now()
+    WHERE id = p_session_id;
+    
+    UPDATE live_session_participants
+    SET left_at = now()
+    WHERE session_id = p_session_id AND left_at IS NULL;
+    
+    RETURN TRUE;
+  END IF;
+  
+  IF v_session.mode = 'speed' THEN
+    v_cooldown_duration := INTERVAL '15 seconds';
+  ELSE
+    v_cooldown_duration := INTERVAL '30 seconds';
+  END IF;
+  
+  UPDATE live_sessions
+  SET 
+    status = 'cooldown',
+    cooldown_ends_at = now() + v_cooldown_duration
+  WHERE id = p_session_id;
+  
+  RETURN TRUE;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.rpc_end_session(UUID, TEXT) TO authenticated;
+
+-- =============================================================================
 -- Verification
 -- =============================================================================
 
