@@ -39,6 +39,7 @@ import BattleCooldownControls from './BattleCooldownControls';
 import BoostRoundIndicator from './BoostRoundIndicator';
 import CohostStartBattleButton from './CohostStartBattleButton';
 import BattleInvitePopup from './BattleInvitePopup';
+import BattleReadyModal from './BattleReadyModal';
 import useBattleScores from '@/hooks/useBattleScores';
 import TopGiftersDisplay, { TeamTopGifter } from './TopGiftersDisplay';
 import { createClient } from '@/lib/supabase';
@@ -210,6 +211,41 @@ export default function BattleGridWrapper({
     session?.session_id,
   ]);
 
+  // Prepare participants data for ready modal
+  const modalParticipants = useMemo(() => {
+    if (!hostSnapshot) return [];
+    
+    // Use participants array if available
+    if (hostSnapshot.participants) {
+      return hostSnapshot.participants.map(p => ({
+        id: p.id,
+        username: p.username,
+        displayName: p.display_name || undefined,
+        avatarUrl: p.avatar_url || undefined,
+      }));
+    }
+    
+    // Fallback to hostA/hostB
+    const result: Array<{ id: string; username?: string; displayName?: string; avatarUrl?: string }> = [];
+    if (hostSnapshot.hostA) {
+      result.push({
+        id: hostSnapshot.hostA.id,
+        username: hostSnapshot.hostA.username,
+        displayName: hostSnapshot.hostA.display_name || undefined,
+        avatarUrl: hostSnapshot.hostA.avatar_url || undefined,
+      });
+    }
+    if (hostSnapshot.hostB) {
+      result.push({
+        id: hostSnapshot.hostB.id,
+        username: hostSnapshot.hostB.username,
+        displayName: hostSnapshot.hostB.display_name || undefined,
+        avatarUrl: hostSnapshot.hostB.avatar_url || undefined,
+      });
+    }
+    return result;
+  }, [hostSnapshot]);
+
   const battleMode: BattleMode = 'duel';
 
   // Dynamic grid sizing based on participant count
@@ -309,23 +345,7 @@ export default function BattleGridWrapper({
 
   const renderBattleOverlay = useCallback(
     (participant: GridTileParticipant) => {
-      // During battle_ready phase, show ready/not-ready indicator
-      if (isBattleReady) {
-        const isReady = readyStates[participant.id] === true;
-        return (
-          <div className={`absolute inset-0 pointer-events-none border-4 ${
-            isReady ? 'border-green-500' : 'border-red-500'
-          } transition-colors`}>
-            <div className={`absolute top-2 right-2 px-2 py-1 rounded text-xs font-bold ${
-              isReady ? 'bg-green-500 text-white' : 'bg-red-500 text-white'
-            }`}>
-              {isReady ? 'READY' : 'NOT READY'}
-            </div>
-          </div>
-        );
-      }
-      
-      // During active battle, show battle overlay
+      // During active battle, show battle overlay (NOT during battle_ready - that uses modal)
       if (!isBattleSession || !isBattleActive) return null;
       const state = battleStates.get(participant.id);
       if (!state) return null;
@@ -339,7 +359,7 @@ export default function BattleGridWrapper({
         />
       );
     },
-    [battleStates, battleMode, isBattleSession, isBattleActive, isBattleReady, readyStates, participants.length]
+    [battleStates, battleMode, isBattleSession, isBattleActive, participants.length]
   );
   
   // Map LiveKit participants to grid participants
@@ -1113,40 +1133,10 @@ export default function BattleGridWrapper({
             )}
           </div>
 
-          {/* Center: Timer (active battle) / Ready UI (battle_ready) / Start Battle (cohost) */}
+          {/* Center: Timer (active battle) / Start Battle (cohost) */}
+          {/* Note: Ready UI is now shown in BattleReadyModal popup for hosts */}
           <div className="flex-shrink-0 px-2">
-            {isBattleReady ? (
-              // Battle READY phase - show ready up button or waiting status
-              <div className="flex flex-col items-center gap-1">
-                {isCurrentUserReady ? (
-                  <div className="flex items-center gap-2 px-4 py-2 bg-green-500/20 border border-green-500 rounded-lg">
-                    <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse" />
-                    <span className="text-green-400 font-medium text-sm">Waiting for others...</span>
-                  </div>
-                ) : canPublish ? (
-                  <button
-                    onClick={handleSetReady}
-                    disabled={settingReady}
-                    className="flex items-center gap-2 px-6 py-3 bg-orange-500 hover:bg-orange-600 text-white font-bold rounded-lg transition-colors disabled:opacity-50"
-                  >
-                    {settingReady ? (
-                      <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    ) : (
-                      <>
-                        <div className="w-4 h-4 border-2 border-white rounded-full" />
-                        <span>Ready Up!</span>
-                      </>
-                    )}
-                  </button>
-                ) : (
-                  <div className="text-white/60 text-sm">Battle starting soon...</div>
-                )}
-                {/* Ready count */}
-                <div className="text-white/40 text-xs">
-                  {Object.values(readyStates).filter(Boolean).length} / {Object.keys(readyStates).length} ready
-                </div>
-              </div>
-            ) : isBattleSession && isBattleActive ? (
+            {isBattleSession && isBattleActive ? (
               <BattleTimer
                 remainingSeconds={remainingSeconds}
                 phase="active"
@@ -1186,6 +1176,19 @@ export default function BattleGridWrapper({
           onAccept={handleAcceptBattleInvite}
           onDecline={handleDeclineBattleInvite}
           onClose={() => setBattleInvite(null)}
+        />
+      )}
+      
+      {/* Battle Ready Modal - shown to hosts during battle_ready phase */}
+      {isBattleReady && canPublish && (
+        <BattleReadyModal
+          isOpen={true}
+          participants={modalParticipants}
+          readyStates={readyStates}
+          currentUserId={currentUserId}
+          isCurrentUserReady={isCurrentUserReady}
+          isSettingReady={settingReady}
+          onSetReady={handleSetReady}
         />
       )}
     </div>
