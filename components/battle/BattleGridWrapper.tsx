@@ -260,7 +260,7 @@ export default function BattleGridWrapper({
 
   // Battle states with real scores and team-relative colors
   const battleStates = useMemo(() => {
-    if (!isBattleSession) {
+    if (!isBattleSession || !hostSnapshot) {
       return new Map<string, BattleParticipantState>();
     }
 
@@ -305,7 +305,7 @@ export default function BattleGridWrapper({
     }
 
     return states;
-  }, [hostSnapshot.hostA?.id, hostSnapshot.hostB?.id, currentUserId, isBattleSession, scores]);
+  }, [hostSnapshot?.hostA?.id, hostSnapshot?.hostB?.id, currentUserId, isBattleSession, scores]);
 
   const renderBattleOverlay = useCallback(
     (participant: GridTileParticipant) => {
@@ -942,13 +942,13 @@ export default function BattleGridWrapper({
         // Get sender username - check participants first, then hostA/hostB
         const otherHostId = invite.from_host_id;
         let otherHost: { username: string; display_name: string | null } | null = null;
-        if (hostSnapshot.participants) {
+        if (hostSnapshot?.participants) {
           const participant = hostSnapshot.participants.find(p => p.id === otherHostId);
           if (participant) {
             otherHost = { username: participant.username, display_name: participant.display_name };
           }
         }
-        if (!otherHost) {
+        if (!otherHost && hostSnapshot) {
           otherHost = otherHostId === hostSnapshot.hostA?.id ? hostSnapshot.hostA : hostSnapshot.hostB;
         }
         if (otherHost) {
