@@ -138,6 +138,9 @@ export default function BattleGridWrapper({
   const pendingUpdateRef = useRef(false);
   const rafRef = useRef<number | null>(null);
   
+  // Track participants in ref to check in callbacks
+  const participantsRef = useRef<GridTileParticipant[]>([]);
+  
   // ============================================================================
   // NOW SAFE: Derived constants from session (all hooks declared above)
   // Use optional chaining for all session access
@@ -665,6 +668,7 @@ export default function BattleGridWrapper({
     }
     
     setParticipants(gridParticipants);
+    participantsRef.current = gridParticipants; // Update ref for callbacks
     const hasParticipants = gridParticipants.length > 0;
     setParticipantsReady(hasParticipants);
 
@@ -806,6 +810,79 @@ export default function BattleGridWrapper({
     }
   }, [hostSnapshot, isConnected]); // Removed requestParticipantsUpdate from deps - uses ref internally
   
+  // CRITICAL: Preserve participantsReady during status transitions
+  // When status changes from battle_ready to battle_active, don't reset if we have participants
+  const prevStatusRef = useRef<string | null>(null);
+  useEffect(() => {
+    const currentStatus = session?.status;
+    const prevStatus = prevStatusRef.current;
+    
+    // If transitioning from battle_ready to battle_active and we have participants, preserve state
+    if (prevStatus === 'battle_ready' && 
+        (currentStatus === 'battle_active' || currentStatus === 'active') &&
+        participantsRef.current.length > 0 &&
+        !participantsReady) {
+      console.log('[LiveKit][Battle] Preserving participantsReady during battle_ready -> battle_active transition');
+      setParticipantsReady(true);
+      setAllowEmptyState(true);
+    }
+    
+    prevStatusRef.current = currentStatus || null;
+  }, [session?.status, participantsReady]);
+  
+  // CRITICAL: Watch ready_states changes and trigger refresh if needed
+  // This ensures the modal updates when other hosts set their ready state
+  const prevReadyStatesRef = useRef<string>('');
+  useEffect(() => {
+    if (!isBattleReady) {
+      prevReadyStatesRef.current = '';
+      return;
+    }
+    
+    const currentReadyStatesStr = JSON.stringify(readyStates);
+    const prevReadyStatesStr = prevReadyStatesRef.current;
+    
+    // If ready_states changed and we're in battle_ready phase, ensure we have latest data
+    if (currentReadyStatesStr !== prevReadyStatesStr && prevReadyStatesStr !== '') {
+      console.log('[LiveKit][Battle] Ready states changed - ensuring session is up to date', {
+        prev: prevReadyStatesStr,
+        current: currentReadyStatesStr,
+      });
+      // The real-time subscription should handle this, but trigger a refresh to be sure
+      if (onRefreshSession) {
+        setTimeout(() => onRefreshSession(), 100);
+      }
+    }
+    
+    prevReadyStatesRef.current = currentReadyStatesStr;
+  }, [readyStates, isBattleReady, onRefreshSession]);
+  
+  // CRITICAL: Poll session during battle_ready phase to ensure ready_states updates are seen immediately
+  // This ensures all hosts see when others press ready, even if real-time subscription has delays
+  const readyPollIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  useEffect(() => {
+    if (!isBattleReady || !onRefreshSession) {
+      if (readyPollIntervalRef.current) {
+        clearInterval(readyPollIntervalRef.current);
+        readyPollIntervalRef.current = null;
+      }
+      return;
+    }
+    
+    // Poll every 1 second during battle_ready to catch ready_states updates quickly
+    readyPollIntervalRef.current = setInterval(() => {
+      console.log('[LiveKit][Battle] Polling session for ready_states updates');
+      onRefreshSession();
+    }, 1000);
+    
+    return () => {
+      if (readyPollIntervalRef.current) {
+        clearInterval(readyPollIntervalRef.current);
+        readyPollIntervalRef.current = null;
+      }
+    };
+  }, [isBattleReady, onRefreshSession]);
+  
   // Connect to battle/cohost room
   // CRITICAL: Only reconnect if room name actually changed, not on every session update
   useEffect(() => {
@@ -901,15 +978,24 @@ export default function BattleGridWrapper({
           });
           if (isActive) {
             setIsConnected(true);
-            setParticipantsReady(false);
-            setAllowEmptyState(false);
-            if (emptyStateTimeoutRef.current) {
-              clearTimeout(emptyStateTimeoutRef.current);
+            // CRITICAL: Don't reset participantsReady if we already have participants
+            // This prevents black screen when status transitions (battle_ready -> battle_active)
+            // Only reset if we truly have no participants
+            const hasExistingParticipants = participantsRef.current.length > 0;
+            if (!hasExistingParticipants) {
+              setParticipantsReady(false);
+              setAllowEmptyState(false);
+              if (emptyStateTimeoutRef.current) {
+                clearTimeout(emptyStateTimeoutRef.current);
+              }
+              emptyStateTimeoutRef.current = setTimeout(() => {
+                setAllowEmptyState(true);
+                emptyStateTimeoutRef.current = null;
+              }, 4000);
+            } else {
+              // Preserve participantsReady state - we already have participants
+              console.log('[LiveKit][Battle] Preserving participantsReady during status transition');
             }
-            emptyStateTimeoutRef.current = setTimeout(() => {
-              setAllowEmptyState(true);
-              emptyStateTimeoutRef.current = null;
-            }, 4000);
             setError(null);
             // Don't call updateParticipants here - will be called after connect completes
             onRoomConnected?.();
@@ -1394,8 +1480,11 @@ export default function BattleGridWrapper({
       const result = await setBattleReady(session.session_id, true);
       console.log('[BattleGridWrapper] Ready set:', result);
       // Trigger immediate refresh to update ready states / session status
+      // Real-time subscription should also trigger, but immediate refresh ensures modal updates
       if (onRefreshSession) {
-        setTimeout(() => onRefreshSession(), 100);
+        onRefreshSession(); // Immediate refresh
+        // Also refresh after a short delay to catch any propagation delays
+        setTimeout(() => onRefreshSession(), 500);
       }
     } catch (err) {
       console.error('[BattleGridWrapper] Set ready error:', err);
@@ -1680,8 +1769,10 @@ export default function BattleGridWrapper({
       )}
       
       {/* Battle Ready Modal - shown to ALL participants during battle_ready phase */}
+      {/* Key includes ready_states to force re-render when ready states change */}
       {isBattleReady && modalParticipants.some(p => p.id === currentUserId) && (
         <BattleReadyModal
+          key={`battle-ready-${session?.session_id}-${JSON.stringify(readyStates)}`}
           isOpen={true}
           participants={modalParticipants}
           readyStates={readyStates}
