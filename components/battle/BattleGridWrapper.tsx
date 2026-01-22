@@ -51,6 +51,12 @@ const normalizeParticipantId = (identity: string): string => {
     .trim();
 };
 
+// Determine if an identity represents a battle grid participant (host)
+// Excludes viewers and unknown identities
+const isBattleGridIdentity = (identity: string): boolean => {
+  return !identity.includes(':unknown:') && !identity.includes(':viewer:');
+};
+
 interface BattleGridWrapperProps {
   /** Active session data */
   session: LiveSession;
@@ -105,6 +111,10 @@ export default function BattleGridWrapper({
   const localTracksRef = useRef<{ video: any; audio: any }>({ video: null, audio: null });
   const emptyStateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const hydrationIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // Debounce scheduler for updateParticipants
+  const pendingUpdateRef = useRef(false);
+  const rafRef = useRef<number | null>(null);
   
   // ============================================================================
   // NOW SAFE: Derived constants from session (all hooks declared above)
@@ -363,9 +373,13 @@ export default function BattleGridWrapper({
   );
   
   // Map LiveKit participants to grid participants
-  const updateParticipants = useCallback(() => {
+  const updateParticipants = useCallback((reason?: string) => {
     const room = roomRef.current;
     if (!room || !hostSnapshot) return;
+    
+    if (reason) {
+      console.log('[LiveKit][Battle] updateParticipants:', reason);
+    }
     
     const gridParticipants: GridTileParticipant[] = [];
     
@@ -504,6 +518,20 @@ export default function BattleGridWrapper({
     });
   }, [canPublish, currentUserId, currentUserName, hostSnapshot, roomName, onRefreshSession]);
   
+  // Debounced participant update scheduler
+  // Coalesces multiple events in same frame into single update (max ~60 updates/sec vs 200+)
+  const requestParticipantsUpdate = useCallback((reason: string) => {
+    if (pendingUpdateRef.current) return;
+    pendingUpdateRef.current = true;
+
+    // Use rAF so multiple events in same frame become 1 update
+    rafRef.current = requestAnimationFrame(() => {
+      pendingUpdateRef.current = false;
+      rafRef.current = null;
+      updateParticipants(reason);
+    });
+  }, [updateParticipants]);
+  
   // Connect to battle/cohost room
   useEffect(() => {
     let isActive = true;
@@ -581,7 +609,7 @@ export default function BattleGridWrapper({
               emptyStateTimeoutRef.current = null;
             }, 4000);
             setError(null);
-            updateParticipants();
+            // Don't call updateParticipants here - will be called after connect completes
             onRoomConnected?.();
           }
         });
@@ -604,7 +632,7 @@ export default function BattleGridWrapper({
         room.on(RoomEvent.Reconnected, () => {
           console.log('[LiveKit][Battle] reconnected', { roomName });
           if (isActive) {
-            updateParticipants();
+            requestParticipantsUpdate('reconnected');
           }
         });
         
@@ -614,38 +642,56 @@ export default function BattleGridWrapper({
             identity: participant.identity,
             trackCount: participant.trackPublications.size,
           });
-          updateParticipants();
+          if (!isBattleGridIdentity(participant.identity)) {
+            console.log('[LiveKit][Battle] Ignoring viewer/unknown participant:', participant.identity);
+            return;
+          }
+          requestParticipantsUpdate('participant_connected');
         });
+        
         room.on(RoomEvent.ParticipantDisconnected, (participant) => {
           console.log('[LiveKit][Battle] participant disconnected', {
             roomName,
             identity: participant.identity,
           });
-          updateParticipants();
+          if (!isBattleGridIdentity(participant.identity)) {
+            return;
+          }
+          requestParticipantsUpdate('participant_disconnected');
         });
+        
         room.on(RoomEvent.TrackSubscribed, (track, publication, participant) => {
           console.log('[LiveKit][Battle] track subscribed', {
             roomName,
             identity: participant.identity,
             kind: track.kind,
           });
-          updateParticipants();
+          if (!isBattleGridIdentity(participant.identity)) {
+            return;
+          }
+          requestParticipantsUpdate(`track_subscribed:${track.kind}`);
         });
+        
         room.on(RoomEvent.TrackUnsubscribed, (track, publication, participant) => {
           console.log('[LiveKit][Battle] track unsubscribed', {
             roomName,
             identity: participant.identity,
             kind: track.kind,
           });
-          updateParticipants();
+          if (!isBattleGridIdentity(participant.identity)) {
+            return;
+          }
+          requestParticipantsUpdate(`track_unsubscribed:${track.kind}`);
         });
-        room.on(RoomEvent.TrackPublished, () => updateParticipants());
-        room.on(RoomEvent.TrackUnpublished, () => updateParticipants());
-        room.on(RoomEvent.LocalTrackPublished, () => updateParticipants());
-        room.on(RoomEvent.LocalTrackUnpublished, () => updateParticipants());
         
-        await room.connect(url, token);
+        room.on(RoomEvent.TrackPublished, () => requestParticipantsUpdate('track_published'));
+        room.on(RoomEvent.TrackUnpublished, () => requestParticipantsUpdate('track_unpublished'));
+        room.on(RoomEvent.LocalTrackPublished, () => requestParticipantsUpdate('local_track_published'));
+        room.on(RoomEvent.LocalTrackUnpublished, () => requestParticipantsUpdate('local_track_unpublished'));
+        
+        // Set roomRef BEFORE connect to avoid race condition
         roomRef.current = room;
+        await room.connect(url, token);
         
         // If we can publish, create and publish local tracks
         if (canPublish && isActive) {
@@ -666,10 +712,14 @@ export default function BattleGridWrapper({
               }
             }
             
-            updateParticipants();
+            // Update participants after publishing completes
+            requestParticipantsUpdate('local_tracks_published');
           } catch (err) {
             console.error('[BattleGridWrapper] Error publishing tracks:', err);
           }
+        } else if (isActive) {
+          // For viewers, update participants after connect
+          requestParticipantsUpdate('initial_connect');
         }
         
       } catch (err: any) {
@@ -693,6 +743,13 @@ export default function BattleGridWrapper({
         hydrationIntervalRef.current = null;
       }
       
+      // Cancel any pending rAF update
+      if (rafRef.current) {
+        cancelAnimationFrame(rafRef.current);
+        rafRef.current = null;
+      }
+      pendingUpdateRef.current = false;
+      
       // Stop local tracks
       if (localTracksRef.current.video) {
         localTracksRef.current.video.stop();
@@ -708,7 +765,7 @@ export default function BattleGridWrapper({
         roomRef.current = null;
       }
     };
-  }, [roomName, currentUserName, canPublish, updateParticipants, onRoomConnected, onRoomDisconnected, reconnectTrigger]);
+  }, [roomName, currentUserName, canPublish, requestParticipantsUpdate, onRoomConnected, onRoomDisconnected, reconnectTrigger]);
 
   // Poll room participants briefly after connect to capture existing hosts even if no events fire
   useEffect(() => {
@@ -734,7 +791,7 @@ export default function BattleGridWrapper({
       if (participantCount === 0) {
         return;
       }
-      updateParticipants();
+      requestParticipantsUpdate('hydration_poll');
     }, 1000);
 
     return () => {
@@ -743,7 +800,7 @@ export default function BattleGridWrapper({
         hydrationIntervalRef.current = null;
       }
     };
-  }, [isConnected, updateParticipants]);
+  }, [isConnected, requestParticipantsUpdate]);
   
   // Handle reset connection (fixes camera issues)
   const handleResetConnection = useCallback(async () => {
