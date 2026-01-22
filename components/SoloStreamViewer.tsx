@@ -276,6 +276,19 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
   const [videoAspectRatio, setVideoAspectRatio] = useState<number>(16 / 9);
   const wasHiddenRef = useRef(false);
   const disconnectedDueToVisibilityRef = useRef(false);
+  const [areMediaRefsReady, setAreMediaRefsReady] = useState(false);
+  const pendingExistingTracksRoomRef = useRef<Room | null>(null);
+  const pendingExistingTracksAttachRef = useRef<(() => void) | null>(null);
+
+  const setVideoEl = useCallback((node: HTMLVideoElement | null) => {
+    videoRef.current = node;
+    setAreMediaRefsReady(!!node && !!audioRef.current);
+  }, []);
+
+  const setAudioEl = useCallback((node: HTMLAudioElement | null) => {
+    audioRef.current = node;
+    setAreMediaRefsReady(!!videoRef.current && !!node);
+  }, []);
 
   const extractUserId = useCallback((identity: string): string => {
     if (identity.startsWith('u_')) {
@@ -1001,11 +1014,12 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
         })));
 
         // CRITICAL: Manually attach existing tracks (for when we join AFTER host is already live)
-        // Use a small delay to ensure video/audio refs are fully ready after React render
-        const attachExistingTracks = () => {
+        // Only run once when video/audio refs are actually ready.
+          const attachExistingTracksOnce = () => {
+          if (roomRef.current !== room || room.state !== 'connected') {
+            return;
+          }
           if (!videoRef.current || !audioRef.current) {
-            console.log('[SoloStreamViewer] ⚠️ Video/audio refs not ready, retrying in 100ms...');
-            setTimeout(attachExistingTracks, 100);
             return;
           }
 
@@ -1076,8 +1090,11 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
           });
         };
 
-        // Start attaching existing tracks with a small delay
-        setTimeout(attachExistingTracks, 50);
+        pendingExistingTracksRoomRef.current = room;
+        pendingExistingTracksAttachRef.current = attachExistingTracksOnce;
+        if (areMediaRefsReady) {
+          setTimeout(attachExistingTracksOnce, 50);
+        }
 
         if (DEBUG_LIVEKIT) {
           console.log('[SoloStreamViewer] Connected to room, participants:', room.remoteParticipants.size);
@@ -1109,9 +1126,22 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
 
           // Attach video + audio tracks (HOST only, not guests)
           if (track.kind === Track.Kind.Video) {
+            let attachVideoAttempts = 0;
             const attachVideo = () => {
+              if (roomRef.current !== room || room.state !== 'connected') {
+                return;
+              }
               if (!videoRef.current) {
-                console.log('[SoloStreamViewer] ⚠️ Video ref not ready for new track, retrying in 50ms...');
+                attachVideoAttempts += 1;
+                if (DEBUG_LIVEKIT && attachVideoAttempts <= 3) {
+                  console.log('[SoloStreamViewer] ⚠️ Video ref not ready for new track, retrying in 50ms...', {
+                    attempt: attachVideoAttempts,
+                  });
+                }
+                if (attachVideoAttempts >= 20) {
+                  console.warn('[SoloStreamViewer] ⚠️ Video ref never became ready for new track; giving up');
+                  return;
+                }
                 setTimeout(attachVideo, 50);
                 return;
               }
@@ -1142,9 +1172,22 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
           }
 
           if (track.kind === Track.Kind.Audio) {
+            let attachAudioAttempts = 0;
             const attachAudio = () => {
+              if (roomRef.current !== room || room.state !== 'connected') {
+                return;
+              }
               if (!audioRef.current) {
-                console.log('[SoloStreamViewer] ⚠️ Audio ref not ready for new track, retrying in 50ms...');
+                attachAudioAttempts += 1;
+                if (DEBUG_LIVEKIT && attachAudioAttempts <= 3) {
+                  console.log('[SoloStreamViewer] ⚠️ Audio ref not ready for new track, retrying in 50ms...', {
+                    attempt: attachAudioAttempts,
+                  });
+                }
+                if (attachAudioAttempts >= 20) {
+                  console.warn('[SoloStreamViewer] ⚠️ Audio ref never became ready for new track; giving up');
+                  return;
+                }
                 setTimeout(attachAudio, 50);
                 return;
               }
@@ -1226,9 +1269,12 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
       if (DEBUG_LIVEKIT) {
         console.log('[SoloStreamViewer] Cleanup: disconnecting room');
       }
+      pendingExistingTracksRoomRef.current = null;
+      pendingExistingTracksAttachRef.current = null;
       void disconnectRoom('effect_cleanup');
     };
   }, [
+    areMediaRefsReady,
     activeRoomName,
     battleLoading,
     hasActiveSession,
@@ -1242,6 +1288,18 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
     streamer?.username,
     DEBUG_LIVEKIT,
   ]);
+
+  useEffect(() => {
+    if (!areMediaRefsReady) return;
+    const room = pendingExistingTracksRoomRef.current;
+    const attach = pendingExistingTracksAttachRef.current;
+    if (!room || roomRef.current !== room || room.state !== 'connected') {
+      return;
+    }
+    if (attach) {
+      attach();
+    }
+  }, [areMediaRefsReady]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -2175,7 +2233,7 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
                 ) : (
                   <>
                     <video
-                      ref={videoRef}
+                      ref={setVideoEl}
                       autoPlay
                       playsInline
                       muted={isMuted}
@@ -2190,7 +2248,7 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
                         ${isPortraitVideo ? 'lg:h-full lg:w-auto' : 'lg:w-full lg:h-auto'}
                       `}
                     />
-                    <audio ref={audioRef} autoPlay playsInline muted={isMuted} />
+                    <audio ref={setAudioEl} autoPlay playsInline muted={isMuted} />
                   </>
                 )}
 

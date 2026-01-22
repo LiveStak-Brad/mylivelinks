@@ -101,6 +101,7 @@ export default function BattleGridWrapper({
   } | null>(null);
 
   const lastRefreshRequestRef = useRef<number>(0);
+  const refreshedUnknownParticipantsRef = useRef<Map<string, number>>(new Map());
   const roomRef = useRef<Room | null>(null);
   const localTracksRef = useRef<{ video: any; audio: any }>({ video: null, audio: null });
   const emptyStateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -433,22 +434,40 @@ export default function BattleGridWrapper({
       
       // Skip participants who are not in our session data yet
       if (!hostInfo) {
-        console.warn('[LiveKit][Battle] Unknown participant - triggering refresh', {
+        const hasPublishableMedia = (() => {
+          let hasMedia = false;
+          participant.trackPublications.forEach((pub) => {
+            if (!pub) return;
+            const isMediaKind = pub.kind === Track.Kind.Video || pub.kind === Track.Kind.Audio;
+            const isMediaSource = pub.source === Track.Source.Camera || pub.source === Track.Source.Microphone;
+            if ((isMediaKind || isMediaSource) && (pub.isSubscribed || !!pub.track)) {
+              hasMedia = true;
+            }
+          });
+          return hasMedia;
+        })();
+
+        // Viewers should NOT trigger session refresh; only refresh once for likely hosts.
+        if (hasPublishableMedia && onRefreshSession) {
+          const now = Date.now();
+          const lastSeen = refreshedUnknownParticipantsRef.current.get(userId) || 0;
+          if (now - lastSeen > 30000 && now - lastRefreshRequestRef.current > 3000) {
+            refreshedUnknownParticipantsRef.current.set(userId, now);
+            lastRefreshRequestRef.current = now;
+            console.log('[LiveKit][Battle] Requesting session refresh for unknown publishing participant');
+            onRefreshSession();
+          }
+        }
+
+        console.warn('[LiveKit][Battle] Unknown participant - skipping render', {
           roomName,
           identity,
           normalizedUserId: userId,
           hostA: hostSnapshot.hostA?.id,
           hostB: hostSnapshot.hostB?.id,
           participantsCount: hostSnapshot.participants?.length,
+          hasPublishableMedia,
         });
-        
-        // Trigger a session refresh if we haven't recently (debounce 3 seconds)
-        const now = Date.now();
-        if (onRefreshSession && now - lastRefreshRequestRef.current > 3000) {
-          lastRefreshRequestRef.current = now;
-          console.log('[LiveKit][Battle] Requesting session refresh for unknown participant');
-          onRefreshSession();
-        }
         return; // Skip this participant for now - will be added after refresh
       }
       
