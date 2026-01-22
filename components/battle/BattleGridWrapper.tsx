@@ -470,14 +470,45 @@ export default function BattleGridWrapper({
       let videoTrack: RemoteTrack | undefined;
       let audioTrack: RemoteTrack | undefined;
       
+      console.log('[LiveKit][Battle] Checking tracks for participant:', {
+        identity,
+        userId,
+        trackPublicationsCount: participant.trackPublications.size,
+      });
+      
       participant.trackPublications.forEach((pub) => {
+        console.log('[LiveKit][Battle] Track publication:', {
+          identity,
+          kind: pub.kind,
+          source: pub.source,
+          trackExists: !!pub.track,
+          isSubscribed: pub.isSubscribed,
+          isMuted: pub.isMuted,
+        });
+        
         if (pub.track) {
           if (pub.track.kind === Track.Kind.Video && pub.source === Track.Source.Camera) {
             videoTrack = pub.track as RemoteTrack;
+            console.log('[LiveKit][Battle] ✅ Found video track for', identity);
           } else if (pub.track.kind === Track.Kind.Audio && pub.source === Track.Source.Microphone) {
             audioTrack = pub.track as RemoteTrack;
+            console.log('[LiveKit][Battle] ✅ Found audio track for', identity);
           }
+        } else if (pub.isSubscribed) {
+          console.log('[LiveKit][Battle] ⚠️ Publication is subscribed but track is null:', {
+            identity,
+            kind: pub.kind,
+            source: pub.source,
+          });
         }
+      });
+      
+      console.log('[LiveKit][Battle] Adding to grid:', {
+        userId,
+        name: hostInfo.display_name || hostInfo.username,
+        hasVideoTrack: !!videoTrack,
+        hasAudioTrack: !!audioTrack,
+        avatarUrl: hostInfo.avatar_url,
       });
       
       gridParticipants.push({
@@ -488,6 +519,17 @@ export default function BattleGridWrapper({
         isHost: true,
         avatarUrl: hostInfo.avatar_url || undefined,
       });
+    });
+    
+    console.log('[LiveKit][Battle] Final grid participants:', {
+      count: gridParticipants.length,
+      participants: gridParticipants.map(p => ({
+        id: p.id,
+        name: p.name,
+        hasVideoTrack: !!p.videoTrack,
+        hasAudioTrack: !!p.audioTrack,
+        hasAvatar: !!p.avatarUrl,
+      })),
     });
     
     setParticipants(gridParticipants);
@@ -555,6 +597,9 @@ export default function BattleGridWrapper({
             canPublish,
             canSubscribe: true,
             role: canPublish ? 'host' : 'viewer',
+            deviceType: 'web',
+            deviceId: `battle_grid_${Date.now()}`,
+            sessionId: session.id, // Pass session ID to create proper identity
           }),
         });
         
