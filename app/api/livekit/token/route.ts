@@ -497,10 +497,18 @@ export async function POST(request: NextRequest) {
 
           // Generate device-scoped identity to prevent conflicts and enable proper track routing
           // Format: [guest_]u_<userId>:platform:deviceId:sessionId
+          // CRITICAL: For viewers in battle/cohost sessions, use explicit viewer prefix
           const platform = isMobileRequest ? 'mobile' : 'web';
-          const identity = isAcceptedGuest
-            ? `guest_${userId}:${platform}:${effectiveDeviceId}:${effectiveSessionId}`
-            : `u_${userId}:${platform}:${effectiveDeviceId}:${effectiveSessionId}`;
+          let identity: string;
+          
+          if (isSessionRoom && !effectiveCanPublish) {
+            // Viewers in battle/cohost sessions get explicit viewer identity
+            identity = `viewer_${userId}:${platform}:${effectiveDeviceId}:${effectiveSessionId}`;
+          } else if (isAcceptedGuest) {
+            identity = `guest_${userId}:${platform}:${effectiveDeviceId}:${effectiveSessionId}`;
+          } else {
+            identity = `u_${userId}:${platform}:${effectiveDeviceId}:${effectiveSessionId}`;
+          }
 
           const at = new AccessToken(LIVEKIT_API_KEY, LIVEKIT_API_SECRET, {
             identity,

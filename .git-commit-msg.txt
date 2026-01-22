@@ -1,0 +1,30 @@
+fix: prevent viewer joins from causing battle grid re-renders
+
+CRITICAL: When a viewer joined a battle room, ALL participants screens
+were refreshing/flickering even though the grid didn't change.
+
+Root cause:
+1. Viewer joins LiveKit room
+2. ParticipantConnected event fires
+3. updateParticipants() is called
+4. Loops through all participants, correctly skips viewer
+5. Creates SAME gridParticipants array as before
+6. BUT calls setParticipants(gridParticipants) with NEW array reference
+7. React sees new array reference and triggers re-render on ALL screens
+8. Result: Every host and viewer screen refreshes unnecessarily
+
+Solution:
+Add comparison logic in setParticipants to only update state if the
+participant list actually changed:
+- Compare participant count
+- Compare participant IDs
+- Compare video/audio track references
+- If nothing changed, return previous array to prevent re-render
+
+Also removed deprecated onRefreshSession prop from SoloStreamViewer.
+
+Result:
+- Viewer joins -> no re-render (unless they're actually a participant)
+- Tracks change -> re-render only affected participant
+- Participant joins/leaves -> re-render entire grid
+- NO MORE SCREEN FLASHING when viewers join

@@ -1,5 +1,6 @@
 ---
 description: Frontend architecture specification for UI components, state management patterns, and business-specific UI implementations
+trigger: model_decision
 ---
 
 

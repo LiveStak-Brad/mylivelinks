@@ -1,3 +1,21 @@
+# === USER INSTRUCTIONS ===
+## Documentation Policy (HARD RULES)
+**DO NOT create new .md files outside of:**
+- `/README/**`
+- `/docs/**`
+- Root `README.md`
+- Component-level `README.md` files (only for true component docs)
+**BANNED patterns (never create these):**
+- `*_COMPLETE.md`, `*_FIX*.md`, `*_DELIVERABLE.md`, `*_AUDIT*.md`
+- `*_GUIDE*.md`, `*_SUMMARY.md`, `*_REPORT.md`
+- `DEBUG_*.md`, `PHASE*.md`, `AGENT_*.md`, `FINAL_*.md`
+**Work logs belong in git commits and PR descriptions, NOT new .md files.**
+If documentation is needed:
+1. Add to existing docs in `/README` or `/docs`
+2. OR create ONE new doc in `/README` with a stable name (no dates, no "fix/complete/final")
+See `README/AGENT_DOCS_POLICY.md` for full policy.
+# === END USER INSTRUCTIONS ===
+
 
 # main-overview
 
@@ -9,67 +27,59 @@
 - Always provide a complete PLAN with REASONING based on evidence from code and logs before making changes.
 - Explain your OBSERVATIONS clearly, then provide REASONING to identify the exact issue. Add console logs when needed to gather more information.
 
-## Documentation Policy (HARD RULES)
 
-**DO NOT create new .md files outside of:**
-- `/README/**`
-- `/docs/**`
-- Root `README.md`
-- Component-level `README.md` files (only for true component docs)
+Core Business Logic Architecture:
 
-**BANNED patterns (never create these):**
-- `*_COMPLETE.md`, `*_FIX*.md`, `*_DELIVERABLE.md`, `*_AUDIT*.md`
-- `*_GUIDE*.md`, `*_SUMMARY.md`, `*_REPORT.md`
-- `DEBUG_*.md`, `PHASE*.md`, `AGENT_*.md`, `FINAL_*.md`
+1. Virtual Economy System
+- Dual currency model: Coins (spending) and Diamonds (earning)
+- Complex conversion system with 40% platform fee
+- Diamond cashout requirements with minimum thresholds
+- Multi-context gifting across streams, posts, and creator content
+Importance Score: 95
 
-**Work logs belong in git commits and PR descriptions, NOT new .md files.**
+2. Gifter Progression System
+- 10-tier loyalty program with Diamond elite status
+- Lifetime coin contribution tracking
+- Custom badge sizes per tier level
+- 50 sub-levels per main tier (except Diamond)
+Importance Score: 90
 
-If documentation is needed:
-1. Add to existing docs in `/README` or `/docs`
-2. OR create ONE new doc in `/README` with a stable name (no dates, no "fix/complete/final")
+3. Live Streaming Platform
+- Real-time viewer tracking with heartbeat mechanism
+- Gift-based engagement system
+- Content categorization (IRL, Music, Gaming)
+- Host/viewer mode differentiation
+- Custom streaming quality presets
+Importance Score: 85
 
-See `README/AGENT_DOCS_POLICY.md` for full policy.
+4. Social Safety Features
+- User blocking with visibility restrictions
+- Custom notification filtering (16+ categories)
+- Age verification (13+/18+ gates)
+- Content moderation workflow
+Importance Score: 80
 
+5. Team Management
+- Role-based permissions (Admin, Moderator, Member)
+- Live streaming threshold requirements
+- Custom invitation system
+- Content pinning controls
+Importance Score: 75
 
-## Core Business Components
+6. Profile Type System
+- 6 creator categories (streamer, musician, comedian, business, creator, default)
+- Type-specific feature availability
+- Custom module enablement rules
+- Section ordering enforcement
+Importance Score: 85
 
-### Gifting Economy System
-Located in `apps/mobile/screens/GifterLevelsScreen.tsx`
-- 10-tier reward program based on lifetime coin contributions
-- Diamond tier system with unlimited progression
-- Dynamic badge scaling tied to tier advancement
-Importance Score: 85/100
-
-### Content Management
-Located in `apps/mobile/screens/CreatorStudioUploadScreen.tsx`
-- Content type classification (music, podcasts, movies, series) 
-- Rights verification workflow
-- Type-specific validation rules
-- Public/private visibility controls
-Importance Score: 75/100
-
-### Curator Playlists
-Located in `apps/mobile/screens/CuratorPlaylistPlayerScreen.tsx`
-- Curator-specific playlist management
-- Sequential content progression
-- Attribution system for curators
-Importance Score: 70/100
-
-### User Relationships
-Located in `apps/mobile/screens/BlockedUsersScreen.tsx`
-- Block/unblock workflow affecting gifts and messages
-- Blocked user list management
-Importance Score: 60/100
-
-## Business Domain Integration
-
-Primary business domains interconnect through:
-1. Content creator monetization via gifting economy
-2. Content rights and curation workflow
-3. User relationship management affecting gift capabilities
-4. Multi-tier progression system driving engagement
-
-The platform emphasizes creator monetization through an integrated gifting economy, with content management and curation systems supporting the core value proposition.
+Key Domain Rules:
+- Diamond status requires 60M lifetime coins
+- Content creators must verify ownership
+- Blocked users cannot exchange gifts/messages
+- Teams must meet member thresholds for live features
+- Age restrictions enforce platform access
+- Maximum 5 photos per dating profile
 
 $END$
 

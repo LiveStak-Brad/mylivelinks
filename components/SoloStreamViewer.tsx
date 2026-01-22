@@ -639,7 +639,7 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
             .from('follows')
             .select('id')
             .eq('follower_id', currentUserId)
-            .eq('following_id', profile.id)
+            .eq('followee_id', profile.id)
             .maybeSingle();
 
           if (followErr) {
@@ -1776,14 +1776,14 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
           .from('follows')
           .delete()
           .eq('follower_id', currentUserId)
-          .eq('following_id', streamer.profile_id);
+          .eq('followee_id', streamer.profile_id);
         setIsFollowing(false);
       } else {
         await supabase
           .from('follows')
           .insert({
             follower_id: currentUserId,
-            following_id: streamer.profile_id,
+            followee_id: streamer.profile_id,
           });
         setIsFollowing(true);
       }
