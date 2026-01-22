@@ -276,6 +276,8 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
   const [videoAspectRatio, setVideoAspectRatio] = useState<number>(16 / 9);
   const wasHiddenRef = useRef(false);
   const disconnectedDueToVisibilityRef = useRef(false);
+  const attachExistingTracksTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const attachExistingTracksAttemptsRef = useRef(0);
 
   const extractUserId = useCallback((identity: string): string => {
     if (identity.startsWith('u_')) {
@@ -1002,11 +1004,39 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
 
         // CRITICAL: Manually attach existing tracks (for when we join AFTER host is already live)
         // Use a small delay to ensure video/audio refs are fully ready after React render
+        const ATTACH_EXISTING_MAX_RETRIES = 30;
         const attachExistingTracks = () => {
-          if (!videoRef.current || !audioRef.current) {
-            console.log('[SoloStreamViewer] ⚠️ Video/audio refs not ready, retrying in 100ms...');
-            setTimeout(attachExistingTracks, 100);
+          if (roomRef.current !== room || room.state !== 'connected') {
             return;
+          }
+
+          if (!videoRef.current || !audioRef.current) {
+            attachExistingTracksAttemptsRef.current += 1;
+            if (
+              DEBUG_LIVEKIT &&
+              (attachExistingTracksAttemptsRef.current === 1 ||
+                attachExistingTracksAttemptsRef.current === ATTACH_EXISTING_MAX_RETRIES)
+            ) {
+              console.log('[SoloStreamViewer] ⚠️ Video/audio refs not ready, retrying in 100ms...', {
+                attempt: attachExistingTracksAttemptsRef.current,
+                max: ATTACH_EXISTING_MAX_RETRIES,
+              });
+            }
+            if (attachExistingTracksAttemptsRef.current >= ATTACH_EXISTING_MAX_RETRIES) {
+              console.warn('[SoloStreamViewer] ⚠️ Video/audio refs never became ready; aborting attachExistingTracks');
+              return;
+            }
+            if (attachExistingTracksTimeoutRef.current) {
+              clearTimeout(attachExistingTracksTimeoutRef.current);
+            }
+            attachExistingTracksTimeoutRef.current = setTimeout(attachExistingTracks, 100);
+            return;
+          }
+
+          attachExistingTracksAttemptsRef.current = 0;
+          if (attachExistingTracksTimeoutRef.current) {
+            clearTimeout(attachExistingTracksTimeoutRef.current);
+            attachExistingTracksTimeoutRef.current = null;
           }
 
           room.remoteParticipants.forEach((participant) => {
@@ -1077,7 +1107,11 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
         };
 
         // Start attaching existing tracks with a small delay
-        setTimeout(attachExistingTracks, 50);
+        attachExistingTracksAttemptsRef.current = 0;
+        if (attachExistingTracksTimeoutRef.current) {
+          clearTimeout(attachExistingTracksTimeoutRef.current);
+        }
+        attachExistingTracksTimeoutRef.current = setTimeout(attachExistingTracks, 50);
 
         if (DEBUG_LIVEKIT) {
           console.log('[SoloStreamViewer] Connected to room, participants:', room.remoteParticipants.size);
@@ -1109,9 +1143,22 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
 
           // Attach video + audio tracks (HOST only, not guests)
           if (track.kind === Track.Kind.Video) {
+            let attachVideoAttempts = 0;
             const attachVideo = () => {
+              if (roomRef.current !== room || room.state !== 'connected') {
+                return;
+              }
               if (!videoRef.current) {
-                console.log('[SoloStreamViewer] ⚠️ Video ref not ready for new track, retrying in 50ms...');
+                attachVideoAttempts += 1;
+                if (DEBUG_LIVEKIT && attachVideoAttempts <= 3) {
+                  console.log('[SoloStreamViewer] ⚠️ Video ref not ready for new track, retrying in 50ms...', {
+                    attempt: attachVideoAttempts,
+                  });
+                }
+                if (attachVideoAttempts >= 20) {
+                  console.warn('[SoloStreamViewer] ⚠️ Video ref never became ready for new track; giving up');
+                  return;
+                }
                 setTimeout(attachVideo, 50);
                 return;
               }
@@ -1142,9 +1189,22 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
           }
 
           if (track.kind === Track.Kind.Audio) {
+            let attachAudioAttempts = 0;
             const attachAudio = () => {
+              if (roomRef.current !== room || room.state !== 'connected') {
+                return;
+              }
               if (!audioRef.current) {
-                console.log('[SoloStreamViewer] ⚠️ Audio ref not ready for new track, retrying in 50ms...');
+                attachAudioAttempts += 1;
+                if (DEBUG_LIVEKIT && attachAudioAttempts <= 3) {
+                  console.log('[SoloStreamViewer] ⚠️ Audio ref not ready for new track, retrying in 50ms...', {
+                    attempt: attachAudioAttempts,
+                  });
+                }
+                if (attachAudioAttempts >= 20) {
+                  console.warn('[SoloStreamViewer] ⚠️ Audio ref never became ready for new track; giving up');
+                  return;
+                }
                 setTimeout(attachAudio, 50);
                 return;
               }
@@ -1226,6 +1286,11 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
       if (DEBUG_LIVEKIT) {
         console.log('[SoloStreamViewer] Cleanup: disconnecting room');
       }
+      if (attachExistingTracksTimeoutRef.current) {
+        clearTimeout(attachExistingTracksTimeoutRef.current);
+        attachExistingTracksTimeoutRef.current = null;
+      }
+      attachExistingTracksAttemptsRef.current = 0;
       void disconnectRoom('effect_cleanup');
     };
   }, [
