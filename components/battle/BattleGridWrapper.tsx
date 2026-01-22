@@ -712,8 +712,10 @@ export default function BattleGridWrapper({
             kind: track.kind,
           });
           if (!isBattleGridIdentity(participant.identity)) {
+            console.log('[LiveKit][Battle] ❌ Ignoring track from viewer/unknown:', participant.identity);
             return;
           }
+          console.log('[LiveKit][Battle] ✅ Triggering update for battle participant track:', participant.identity);
           requestParticipantsUpdate(`track_subscribed:${track.kind}`);
         });
         
@@ -724,8 +726,10 @@ export default function BattleGridWrapper({
             kind: track.kind,
           });
           if (!isBattleGridIdentity(participant.identity)) {
+            console.log('[LiveKit][Battle] ❌ Ignoring unsubscribe from viewer/unknown:', participant.identity);
             return;
           }
+          console.log('[LiveKit][Battle] ✅ Triggering update for battle participant unsubscribe:', participant.identity);
           requestParticipantsUpdate(`track_unsubscribed:${track.kind}`);
         });
         
