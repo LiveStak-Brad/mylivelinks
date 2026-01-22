@@ -831,8 +831,16 @@ export default function BattleGridWrapper({
       if (!room) {
         return;
       }
-      const participantCount = room.remoteParticipants.size + (room.localParticipant ? 1 : 0);
-      if (participantCount === 0) {
+      
+      // Count only battle grid participants (exclude viewers)
+      let battleParticipantCount = room.localParticipant && canPublish ? 1 : 0;
+      room.remoteParticipants.forEach((participant) => {
+        if (isBattleGridIdentity(participant.identity)) {
+          battleParticipantCount++;
+        }
+      });
+      
+      if (battleParticipantCount === 0) {
         return;
       }
       requestParticipantsUpdate('hydration_poll');
