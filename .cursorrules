@@ -9,6 +9,27 @@
 - Always provide a complete PLAN with REASONING based on evidence from code and logs before making changes.
 - Explain your OBSERVATIONS clearly, then provide REASONING to identify the exact issue. Add console logs when needed to gather more information.
 
+## Documentation Policy (HARD RULES)
+
+**DO NOT create new .md files outside of:**
+- `/README/**`
+- `/docs/**`
+- Root `README.md`
+- Component-level `README.md` files (only for true component docs)
+
+**BANNED patterns (never create these):**
+- `*_COMPLETE.md`, `*_FIX*.md`, `*_DELIVERABLE.md`, `*_AUDIT*.md`
+- `*_GUIDE*.md`, `*_SUMMARY.md`, `*_REPORT.md`
+- `DEBUG_*.md`, `PHASE*.md`, `AGENT_*.md`, `FINAL_*.md`
+
+**Work logs belong in git commits and PR descriptions, NOT new .md files.**
+
+If documentation is needed:
+1. Add to existing docs in `/README` or `/docs`
+2. OR create ONE new doc in `/README` with a stable name (no dates, no "fix/complete/final")
+
+See `README/AGENT_DOCS_POLICY.md` for full policy.
+
 
 ## Core Business Components
 
