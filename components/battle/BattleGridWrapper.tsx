@@ -141,6 +141,9 @@ export default function BattleGridWrapper({
   // Track participants in ref to check in callbacks
   const participantsRef = useRef<GridTileParticipant[]>([]);
   
+  // Track when status transition started to limit preservation window
+  const statusTransitionTimeRef = useRef<number | null>(null);
+  
   // ============================================================================
   // NOW SAFE: Derived constants from session (all hooks declared above)
   // Use optional chaining for all session access
@@ -667,6 +670,38 @@ export default function BattleGridWrapper({
       }
     }
     
+    // CRITICAL: During status transitions (battle_ready -> battle_active), preserve existing participants
+    // if updateParticipants temporarily finds none (due to timing/track subscription delays)
+    // This prevents black screen for viewers when battle starts
+    const isTransitioning = prevStatusRef.current === 'battle_ready' && 
+                           (session?.status === 'battle_active' || session?.status === 'active');
+    const hadParticipants = participantsRef.current.length > 0;
+    const foundParticipants = gridParticipants.length > 0;
+    
+    // If we're transitioning and had participants but temporarily don't find any, preserve them
+    // But only for a short window (3 seconds) to prevent infinite preservation
+    const transitionTime = statusTransitionTimeRef.current;
+    const isInTransitionWindow = transitionTime && (Date.now() - transitionTime) < 3000;
+    
+    if (isTransitioning && hadParticipants && !foundParticipants && isInTransitionWindow) {
+      console.log('[LiveKit][Battle] Preserving existing participants during status transition (temporary empty result)', {
+        reason,
+        prevCount: participantsRef.current.length,
+        newCount: gridParticipants.length,
+        sessionStatus: session?.status,
+        transitionAge: transitionTime ? Date.now() - transitionTime : null,
+      });
+      // Keep existing participants - don't clear them
+      // Don't update state - keep existing participants visible
+      // Don't change participantsReady - keep it true
+      return; // Exit early to preserve existing state
+    }
+    
+    // If we found participants or transition window expired, clear the transition time
+    if (foundParticipants || !isInTransitionWindow) {
+      statusTransitionTimeRef.current = null;
+    }
+    
     setParticipants(gridParticipants);
     participantsRef.current = gridParticipants; // Update ref for callbacks
     const hasParticipants = gridParticipants.length > 0;
@@ -817,14 +852,20 @@ export default function BattleGridWrapper({
     const currentStatus = session?.status;
     const prevStatus = prevStatusRef.current;
     
-    // If transitioning from battle_ready to battle_active and we have participants, preserve state
+    // If transitioning from battle_ready to battle_active, mark transition start time
     if (prevStatus === 'battle_ready' && 
-        (currentStatus === 'battle_active' || currentStatus === 'active') &&
-        participantsRef.current.length > 0 &&
-        !participantsReady) {
-      console.log('[LiveKit][Battle] Preserving participantsReady during battle_ready -> battle_active transition');
-      setParticipantsReady(true);
-      setAllowEmptyState(true);
+        (currentStatus === 'battle_active' || currentStatus === 'active')) {
+      if (participantsRef.current.length > 0) {
+        console.log('[LiveKit][Battle] Status transition detected - marking transition start time');
+        statusTransitionTimeRef.current = Date.now();
+      }
+      
+      // If we have participants, preserve state
+      if (participantsRef.current.length > 0 && !participantsReady) {
+        console.log('[LiveKit][Battle] Preserving participantsReady during battle_ready -> battle_active transition');
+        setParticipantsReady(true);
+        setAllowEmptyState(true);
+      }
     }
     
     prevStatusRef.current = currentStatus || null;
