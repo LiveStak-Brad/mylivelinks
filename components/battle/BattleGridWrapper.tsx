@@ -734,7 +734,7 @@ export default function BattleGridWrapper({
     const prevSnapshot = prevHostSnapshotRef.current;
     
     // Get participant IDs from both snapshots for comparison
-    const getParticipantIds = (snapshot: typeof hostSnapshot): string[] => {
+    const getParticipantIds = (snapshot: typeof hostSnapshot | null): string[] => {
       if (!snapshot) return [];
       const ids: string[] = [];
       if (snapshot.hostA?.id) ids.push(snapshot.hostA.id);

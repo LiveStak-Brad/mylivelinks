@@ -12,22 +12,15 @@
 
 import { useEffect, useState, useRef } from 'react';
 import { Room, Track, RemoteTrack, RoomEvent, RemoteParticipant } from 'livekit-client';
-import GridTile from './battle/GridTile';
+import GridTile, { GridTileParticipant } from './battle/GridTile';
 
 interface ViewerBattleGridProps {
   room: Room | null;
   className?: string;
 }
 
-interface ParticipantTrack {
-  id: string;
-  name: string;
-  videoTrack?: RemoteTrack;
-  audioTrack?: RemoteTrack;
-}
-
 export default function ViewerBattleGrid({ room, className = '' }: ViewerBattleGridProps) {
-  const [participants, setParticipants] = useState<ParticipantTrack[]>([]);
+  const [participants, setParticipants] = useState<GridTileParticipant[]>([]);
   
   // Update participants when room changes or tracks update
   useEffect(() => {
@@ -47,7 +40,7 @@ export default function ViewerBattleGrid({ room, className = '' }: ViewerBattleG
     });
     
     const updateParticipants = () => {
-      const tracks: ParticipantTrack[] = [];
+      const tracks: GridTileParticipant[] = [];
       
       console.log('[ViewerBattleGrid] Updating participants, remote count:', room.remoteParticipants.size);
       
@@ -141,12 +134,10 @@ export default function ViewerBattleGrid({ room, className = '' }: ViewerBattleG
         <GridTile
           key={p.id}
           participant={p}
-          isHost={false}
           isMuted={false}
           volume={0.7}
-          onVolumeChange={() => {}}
-          onMuteToggle={() => {}}
-          showVolumeControl={false}
+          onVolumeChange={(participantId: string, volume: number) => {}}
+          onMuteToggle={(participantId: string) => {}}
         />
       ))}
     </div>
