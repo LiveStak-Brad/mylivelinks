@@ -989,89 +989,6 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
           }))
         })));
 
-        // CRITICAL: Manually attach existing tracks (for when we join AFTER host is already live)
-        // Use a small delay to ensure video/audio refs are fully ready after React render
-        const attachExistingTracks = () => {
-          if (!videoRef.current || !audioRef.current) {
-            console.log('[SoloStreamViewer] ⚠️ Video/audio refs not ready, retrying in 100ms...');
-            setTimeout(attachExistingTracks, 100);
-            return;
-          }
-
-          room.remoteParticipants.forEach((participant) => {
-            console.log('[SoloStreamViewer] 🔍 Checking existing participant:', participant.identity);
-            
-            // IMPORTANT: Skip guest participants - they go to GuestVideoOverlay
-            const isGuest = participant.identity.startsWith('guest_');
-            if (isGuest) {
-              console.log('[SoloStreamViewer] 🚫 Skipping GUEST participant tracks:', participant.identity);
-              return;
-            }
-            
-            participant.trackPublications.forEach((publication) => {
-              console.log('[SoloStreamViewer] 📹 Found existing track publication:', {
-                kind: publication.kind,
-                source: publication.source,
-                subscribed: publication.isSubscribed,
-                track: publication.track,
-              });
-              
-              if (publication.track && publication.kind === Track.Kind.Video && videoRef.current) {
-                console.log('[SoloStreamViewer] 🎥 Attaching EXISTING HOST video track to video element');
-                try {
-                  publication.track.attach(videoRef.current);
-                  
-                  // Detect aspect ratio
-                  const video = videoRef.current;
-                  const detectAspectRatio = () => {
-                    if (video.videoWidth && video.videoHeight) {
-                      const ratio = video.videoWidth / video.videoHeight;
-                      setVideoAspectRatio(ratio);
-                      if (DEBUG_LIVEKIT) {
-                        console.log('[SoloStreamViewer] Video aspect ratio:', ratio);
-                      }
-                    }
-                  };
-                  
-                  video.addEventListener('loadedmetadata', detectAspectRatio);
-                  detectAspectRatio();
-                } catch (err) {
-                  console.error('[SoloStreamViewer] Error attaching existing video track:', err);
-                }
-              }
-
-              if (publication.track && publication.kind === Track.Kind.Audio && audioRef.current) {
-                const participantUserId = extractUserId(participant.identity);
-                const isSelfAudio = !!currentUserId && participantUserId === currentUserId;
-                if (isSelfAudio) {
-                  console.log('[SoloStreamViewer] 🔇 Skipping self audio track');
-                  try {
-                    publication.track.detach();
-                  } catch {
-                    // ignore
-                  }
-                } else {
-                  console.log('[SoloStreamViewer] 🔊 Attaching EXISTING audio track to audio element');
-                  try {
-                    publication.track.attach(audioRef.current);
-                  } catch (err) {
-                    console.error('[SoloStreamViewer] Error attaching existing audio track:', err);
-                  }
-                }
-              }
-
-              void resumePlayback('existing_track_attach');
-            });
-          });
-        };
-
-        // Start attaching existing tracks with a small delay
-        setTimeout(attachExistingTracks, 50);
-
-        if (DEBUG_LIVEKIT) {
-          console.log('[SoloStreamViewer] Connected to room, participants:', room.remoteParticipants.size);
-        }
-
         // Handle track subscriptions - subscribe to streamer's tracks
         room.on(RoomEvent.TrackSubscribed, (track: RemoteTrack, publication: TrackPublication, participant: RemoteParticipant) => {
           console.log('[SoloStreamViewer] 🎬 Track subscribed!', {
@@ -1098,65 +1015,59 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
 
           // Attach video + audio tracks (HOST only, not guests)
           if (track.kind === Track.Kind.Video) {
-            const attachVideo = () => {
-              if (!videoRef.current) {
-                console.log('[SoloStreamViewer] ⚠️ Video ref not ready for new track, retrying in 50ms...');
-                setTimeout(attachVideo, 50);
-                return;
-              }
+            // Guard: ref must be ready
+            if (!videoRef.current) {
+              console.log('[SoloStreamViewer] ⚠️ Video ref not ready for new track, skipping attach');
+              return;
+            }
+            
+            console.log('[SoloStreamViewer] 🎥 Attaching HOST VIDEO track to video element');
+            try {
+              track.attach(videoRef.current);
               
-              console.log('[SoloStreamViewer] 🎥 Attaching HOST VIDEO track to video element');
-              try {
-                track.attach(videoRef.current);
-                
-                // Detect aspect ratio
-                const video = videoRef.current;
-                const detectAspectRatio = () => {
-                  if (video.videoWidth && video.videoHeight) {
-                    const ratio = video.videoWidth / video.videoHeight;
-                    setVideoAspectRatio(ratio);
-                    if (DEBUG_LIVEKIT) {
-                      console.log('[SoloStreamViewer] Video aspect ratio:', ratio);
-                    }
+              // Detect aspect ratio
+              const video = videoRef.current;
+              const detectAspectRatio = () => {
+                if (video.videoWidth && video.videoHeight) {
+                  const ratio = video.videoWidth / video.videoHeight;
+                  setVideoAspectRatio(ratio);
+                  if (DEBUG_LIVEKIT) {
+                    console.log('[SoloStreamViewer] Video aspect ratio:', ratio);
                   }
-                };
-                
-                video.addEventListener('loadedmetadata', detectAspectRatio);
-                detectAspectRatio();
-              } catch (err) {
-                console.error('[SoloStreamViewer] Error attaching video track:', err);
-              }
-            };
-            attachVideo();
+                }
+              };
+              
+              video.addEventListener('loadedmetadata', detectAspectRatio);
+              detectAspectRatio();
+            } catch (err) {
+              console.error('[SoloStreamViewer] Error attaching video track:', err);
+            }
           }
 
           if (track.kind === Track.Kind.Audio) {
-            const attachAudio = () => {
-              if (!audioRef.current) {
-                console.log('[SoloStreamViewer] ⚠️ Audio ref not ready for new track, retrying in 50ms...');
-                setTimeout(attachAudio, 50);
-                return;
+            // Guard: ref must be ready
+            if (!audioRef.current) {
+              console.log('[SoloStreamViewer] ⚠️ Audio ref not ready for new track, skipping attach');
+              return;
+            }
+            
+            const participantUserId = extractUserId(participant.identity);
+            const isSelfAudio = !!currentUserId && participantUserId === currentUserId;
+            if (isSelfAudio) {
+              console.log('[SoloStreamViewer] 🔇 Skipping self audio track');
+              try {
+                track.detach();
+              } catch {
+                // ignore
               }
-              
-              const participantUserId = extractUserId(participant.identity);
-              const isSelfAudio = !!currentUserId && participantUserId === currentUserId;
-              if (isSelfAudio) {
-                console.log('[SoloStreamViewer] 🔇 Skipping self audio track');
-                try {
-                  track.detach();
-                } catch {
-                  // ignore
-                }
-              } else {
-                console.log('[SoloStreamViewer] 🔊 Attaching AUDIO track to audio element');
-                try {
-                  track.attach(audioRef.current);
-                } catch (err) {
-                  console.error('[SoloStreamViewer] Error attaching audio track:', err);
-                }
+            } else {
+              console.log('[SoloStreamViewer] 🔊 Attaching AUDIO track to audio element');
+              try {
+                track.attach(audioRef.current);
+              } catch (err) {
+                console.error('[SoloStreamViewer] Error attaching audio track:', err);
               }
-            };
-            attachAudio();
+            }
           }
 
           void resumePlayback('track_subscribed');
@@ -1231,6 +1142,84 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
     streamer?.username,
     DEBUG_LIVEKIT,
   ]);
+
+  // Attach existing tracks when room connects - runs once after connection
+  useEffect(() => {
+    if (!isRoomConnected || !roomRef.current) return;
+    
+    const room = roomRef.current;
+    
+    // Guard: refs must be ready
+    if (!videoRef.current || !audioRef.current) return;
+
+    console.log('[SoloStreamViewer] 🔍 Attaching existing tracks after connection');
+    
+    room.remoteParticipants.forEach((participant) => {
+      console.log('[SoloStreamViewer] 🔍 Checking existing participant:', participant.identity);
+      
+      // IMPORTANT: Skip guest participants - they go to GuestVideoOverlay
+      const isGuest = participant.identity.startsWith('guest_');
+      if (isGuest) {
+        console.log('[SoloStreamViewer] 🚫 Skipping GUEST participant tracks:', participant.identity);
+        return;
+      }
+      
+      participant.trackPublications.forEach((publication) => {
+        console.log('[SoloStreamViewer] 📹 Found existing track publication:', {
+          kind: publication.kind,
+          source: publication.source,
+          subscribed: publication.isSubscribed,
+          track: publication.track,
+        });
+        
+        if (publication.track && publication.kind === Track.Kind.Video && videoRef.current) {
+          console.log('[SoloStreamViewer] 🎥 Attaching EXISTING HOST video track to video element');
+          try {
+            publication.track.attach(videoRef.current);
+            
+            // Detect aspect ratio
+            const video = videoRef.current;
+            const detectAspectRatio = () => {
+              if (video.videoWidth && video.videoHeight) {
+                const ratio = video.videoWidth / video.videoHeight;
+                setVideoAspectRatio(ratio);
+                if (DEBUG_LIVEKIT) {
+                  console.log('[SoloStreamViewer] Video aspect ratio:', ratio);
+                }
+              }
+            };
+            
+            video.addEventListener('loadedmetadata', detectAspectRatio);
+            detectAspectRatio();
+          } catch (err) {
+            console.error('[SoloStreamViewer] Error attaching existing video track:', err);
+          }
+        }
+
+        if (publication.track && publication.kind === Track.Kind.Audio && audioRef.current) {
+          const participantUserId = extractUserId(participant.identity);
+          const isSelfAudio = !!currentUserId && participantUserId === currentUserId;
+          if (isSelfAudio) {
+            console.log('[SoloStreamViewer] 🔇 Skipping self audio track');
+            try {
+              publication.track.detach();
+            } catch {
+              // ignore
+            }
+          } else {
+            console.log('[SoloStreamViewer] 🔊 Attaching EXISTING audio track to audio element');
+            try {
+              publication.track.attach(audioRef.current);
+            } catch (err) {
+              console.error('[SoloStreamViewer] Error attaching existing audio track:', err);
+            }
+          }
+        }
+
+        void resumePlayback('existing_track_attach');
+      });
+    });
+  }, [isRoomConnected, currentUserId, extractUserId, resumePlayback, DEBUG_LIVEKIT]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
