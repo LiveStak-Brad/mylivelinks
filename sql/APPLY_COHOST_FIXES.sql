@@ -458,14 +458,29 @@ BEGIN
   FROM battle_scores
   WHERE session_id = p_session_id;
   
-  -- Check if all participants are ready
-  FOR v_key, v_value IN SELECT * FROM jsonb_each_text(v_ready_states)
-  LOOP
-    IF v_value = 'false' THEN
+  -- SAFETY: If ready_states is NULL or empty, we're NOT all ready
+  IF v_ready_states IS NULL OR v_ready_states = '{}'::jsonb THEN
+    v_all_ready := FALSE;
+  ELSE
+    -- Check if all participants are ready
+    -- Must find at least one 'false' to set v_all_ready = FALSE
+    -- Also ensure we have at least 2 participants
+    v_all_ready := TRUE;
+    
+    -- First check: must have at least 2 entries
+    IF (SELECT COUNT(*) FROM jsonb_each_text(v_ready_states)) < 2 THEN
       v_all_ready := FALSE;
-      EXIT;
+    ELSE
+      -- Second check: all values must be 'true'
+      FOR v_key, v_value IN SELECT * FROM jsonb_each_text(v_ready_states)
+      LOOP
+        IF v_value != 'true' THEN
+          v_all_ready := FALSE;
+          EXIT;
+        END IF;
+      END LOOP;
     END IF;
-  END LOOP;
+  END IF;
   
   IF v_all_ready THEN
     -- All ready - start the battle!
