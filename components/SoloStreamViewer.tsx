@@ -842,9 +842,10 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
   const hasActiveSession = !!battleRoomName;
   const activeRoomName = useMemo(() => {
     if (!streamer?.live_available) return null;
-    if (battleRoomName) return battleRoomName;
+    // VIEWERS ALWAYS watch from solo room, never session room
+    // Hosts publish to both solo and session rooms
     return streamer?.profile_id ? `solo_${streamer.profile_id}` : null;
-  }, [battleRoomName, streamer?.live_available, streamer?.profile_id]);
+  }, [streamer?.live_available, streamer?.profile_id]);
 
   useEffect(() => {
     if (!streamer?.profile_id || !streamer.username || !streamer.live_available) {
@@ -854,18 +855,6 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
     if (battleLoading) {
       if (DEBUG_LIVEKIT) {
         console.log('[LiveKit][Viewer] waiting for session resolution before connecting');
-      }
-      return;
-    }
-
-    if (hasActiveSession) {
-      if (DEBUG_LIVEKIT) {
-        console.log('[LiveKit][Viewer] active session detected – ensuring solo room is disconnected', {
-          sessionRoom: battleRoomName,
-        });
-      }
-      if (connectedRoomNameRef.current && connectedRoomNameRef.current !== battleRoomName) {
-        void disconnectRoom('switch_to_session', { preserveConnectedUsername: true });
       }
       return;
     }
