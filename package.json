@@ -8,6 +8,7 @@
     "prebuild": "npm run verify:money-schema",
     "verify:money-schema": "node scripts/verify-money-schema.js",
     "verify:gifting": "node scripts/verify-gifting.js",
+    "verify:md-policy": "node scripts/check-md-policy.js",
     "build": "next build",
     "start": "next start -p 3000",
     "lint": "next lint",
