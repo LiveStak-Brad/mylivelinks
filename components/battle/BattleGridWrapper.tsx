@@ -684,10 +684,9 @@ export default function BattleGridWrapper({
           requestParticipantsUpdate(`track_unsubscribed:${track.kind}`);
         });
         
-        room.on(RoomEvent.TrackPublished, () => requestParticipantsUpdate('track_published'));
-        room.on(RoomEvent.TrackUnpublished, () => requestParticipantsUpdate('track_unpublished'));
-        room.on(RoomEvent.LocalTrackPublished, () => requestParticipantsUpdate('local_track_published'));
-        room.on(RoomEvent.LocalTrackUnpublished, () => requestParticipantsUpdate('local_track_unpublished'));
+        // REMOVED: TrackPublished/Unpublished events fire for ALL participants including viewers
+        // These don't provide participant identity, so we can't filter viewers
+        // TrackSubscribed/Unsubscribed already handle grid updates with proper filtering
         
         // Set roomRef BEFORE connect to avoid race condition
         roomRef.current = room;

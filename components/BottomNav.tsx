@@ -6,8 +6,6 @@ import { usePathname, useRouter } from 'next/navigation';
 import { Home, Rss, Video, Tv, User, Play } from 'lucide-react';
 import { createClient } from '@/lib/supabase';
 import { isRouteActive } from '@/lib/navigation';
-import { canUserGoLive } from '@/lib/livekit-constants';
-import { Modal } from './ui/Modal';
 
 interface NavItem {
   href: string;
@@ -43,9 +41,7 @@ export default function BottomNav() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
   const [username, setUsername] = useState<string | null>(null);
-  const [isOwner, setIsOwner] = useState(false);
   const [mounted, setMounted] = useState(false);
-  const [showGoLiveModal, setShowGoLiveModal] = useState(false);
   const supabase = createClient();
 
   useEffect(() => {
@@ -66,8 +62,6 @@ export default function BottomNav() {
       const { data: { user } } = await supabase.auth.getUser();
       setIsLoggedIn(!!user);
       setUserId(user?.id ?? null);
-      const canGoLive = canUserGoLive(user ? { id: user.id, email: user.email } : null);
-      setIsOwner(canGoLive);
       
       // Get username for profile link
       if (user?.id) {
@@ -82,7 +76,6 @@ export default function BottomNav() {
       }
     } catch (error) {
       setIsLoggedIn(false);
-      setIsOwner(false);
       setUserId(null);
       setUsername(null);
     }
@@ -163,13 +156,12 @@ export default function BottomNav() {
                 type="button"
                 data-href={item.href}
                 onClick={() => {
-                  if (isOwner) {
-                    // Owner: Route to dedicated host stream page
-                    router.push('/live/host');
+                  // Everyone can go live - route to host stream page
+                  if (!isLoggedIn) {
+                    router.push('/login');
                     return;
                   }
-                  // Non-owner: show coming soon modal
-                  setShowGoLiveModal(true);
+                  router.push('/live/host');
                 }}
                 className={`bottom-nav-item ${isActive ? 'bottom-nav-item-active' : ''}`}
                 aria-label={item.ariaLabel}
@@ -198,34 +190,6 @@ export default function BottomNav() {
           );
         })}
       </div>
-
-      <Modal
-        isOpen={showGoLiveModal}
-        onClose={() => setShowGoLiveModal(false)}
-        title="Go Live (Coming Soon)"
-        description="Go Live is currently limited to the owner account. Everyone can still watch live streams."
-        footer={
-          <button
-            type="button"
-            onClick={() => setShowGoLiveModal(false)}
-            className="px-4 py-2 rounded-lg bg-muted hover:bg-muted/80 transition-colors"
-          >
-            Got it
-          </button>
-        }
-      >
-        <div className="space-y-3">
-          <div className="rounded-xl border border-border bg-muted/30 p-4">
-            <div className="flex items-center gap-2">
-              <Video className="w-5 h-5 text-red-500" />
-              <div className="font-semibold text-foreground">Go Live</div>
-            </div>
-            <div className="text-sm text-muted-foreground mt-2">
-              This feature is rolling out soon.
-            </div>
-          </div>
-        </div>
-      </Modal>
     </nav>
   );
 }
