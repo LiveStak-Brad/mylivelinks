@@ -36,10 +36,10 @@ export async function POST(request: NextRequest) {
       );
     }
     
-    // Get session to determine which side the recipient is on
+    // Get session to determine status and type
     const { data: session, error: sessionError } = await supabase
       .from('live_sessions')
-      .select('host_a, host_b, status, type')
+      .select('status, type')
       .eq('id', session_id)
       .single();
     
@@ -50,15 +50,6 @@ export async function POST(request: NextRequest) {
         { status: 404 }
       );
     }
-    
-    console.log('[battle/score] Session found:', {
-      session_id,
-      type: session.type,
-      status: session.status,
-      recipient_id,
-      has_host_a: !!session.host_a,
-      has_host_b: !!session.host_b,
-    });
     
     // Only award points for active battle sessions (include battle_ready and battle_active)
     const isActiveBattle = session.type === 'battle' && 
@@ -78,35 +69,35 @@ export async function POST(request: NextRequest) {
       );
     }
     
-    // Determine which side the recipient is on
-    let side: 'A' | 'B' | null = null;
+    // Look up the recipient's team from live_session_participants table
+    const { data: participant, error: participantError } = await supabase
+      .from('live_session_participants')
+      .select('team')
+      .eq('session_id', session_id)
+      .eq('profile_id', recipient_id)
+      .is('left_at', null)
+      .single();
     
-    if (recipient_id === session.host_a) {
-      side = 'A';
-      console.log('[battle/score] Found recipient in host_a');
-    } else if (recipient_id === session.host_b) {
-      side = 'B';
-      console.log('[battle/score] Found recipient in host_b');
-    } else {
-      console.warn('[battle/score] Recipient not found in session:', {
-        recipient_id,
-        host_a: session.host_a,
-        host_b: session.host_b,
-      });
-    }
-    
-    if (!side) {
+    if (participantError || !participant) {
       console.error('[battle/score] Recipient is not a participant in this battle:', {
         recipient_id,
         session_id,
-        host_a: session.host_a,
-        host_b: session.host_b,
+        error: participantError,
       });
       return NextResponse.json(
         { error: 'Recipient is not a participant in this battle' },
         { status: 400 }
       );
     }
+    
+    const side = participant.team; // Can be 'A', 'B', 'C', 'D', etc.
+    
+    console.log('[battle/score] Found recipient team:', {
+      session_id,
+      recipient_id,
+      team: side,
+      status: session.status,
+    });
     
     // Get current boost state to apply multiplier
     const { data: scoreData, error: scoreError } = await supabase
