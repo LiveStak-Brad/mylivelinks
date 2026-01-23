@@ -167,13 +167,12 @@ export default function BattleGridWrapper({
   // Force refresh scores when battle status changes (ready or active)
   const prevBattleStatusRef = useRef<string | null>(null);
   useEffect(() => {
-    if (!isBattleSession || !session) return;
-    
-    const currentStatus = session.status;
+    // Always run effect but only refresh in battle sessions
+    const currentStatus = session?.status || null;
     const prevStatus = prevBattleStatusRef.current;
     
-    // If status changed to battle_ready or battle_active, force refresh scores
-    if (prevStatus !== currentStatus && 
+    // Only refresh if: it's a battle session AND status changed to battle_ready or battle_active
+    if (isBattleSession && session && prevStatus !== currentStatus && 
         (currentStatus === 'battle_ready' || currentStatus === 'battle_active')) {
       console.log('[BattleGridWrapper] Battle status changed to', currentStatus, '- refreshing scores');
       refreshScores?.();
