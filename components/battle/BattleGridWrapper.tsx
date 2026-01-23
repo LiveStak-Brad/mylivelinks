@@ -479,11 +479,12 @@ export default function BattleGridWrapper({
           sessionParticipants: hostSnapshot.participants?.map(p => p.id),
         });
         
-        // Trigger refresh if needed
+        // Trigger refresh if needed (immediate - no debounce for unknown participants joining)
         if (onRefreshSession) {
           const now = Date.now();
-          if (now - lastRefreshRequestRef.current > 3000) {
+          if (now - lastRefreshRequestRef.current > 500) {
             lastRefreshRequestRef.current = now;
+            console.log('[LiveKit][Battle] Unknown participant detected - triggering immediate session refresh');
             onRefreshSession();
           }
         }
@@ -1050,13 +1051,13 @@ export default function BattleGridWrapper({
       // If we found a participant that should be in our session, trigger refresh
       if (foundUnknownParticipant && onRefreshSession) {
         const now = Date.now();
-        if (now - lastRefreshRequestRef.current > 2000) {
+        if (now - lastRefreshRequestRef.current > 500) {
           lastRefreshRequestRef.current = now;
-          console.log('[LiveKit][Battle] Polling detected unknown participant - refreshing session');
+          console.log('[LiveKit][Battle] Polling detected unknown participant - refreshing session immediately');
           onRefreshSession();
           setTimeout(() => {
             updateParticipantsRef.current('after_polling_refresh');
-          }, 1000);
+          }, 500);
         }
       }
       
