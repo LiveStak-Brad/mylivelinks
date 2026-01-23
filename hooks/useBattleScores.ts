@@ -19,7 +19,7 @@ export interface BattleSupporter {
   username: string;
   display_name: string | null;
   avatar_url: string | null;
-  side: 'A' | 'B';
+  side: string; // Multi-team support: A, B, C, D, E, F, G, H, I, J, K, L
   points: number;
   chat_awarded: boolean;
 }
@@ -33,10 +33,7 @@ export interface BoostState {
 
 export interface BattleScoreSnapshot {
   session_id: string;
-  points: {
-    A: number;
-    B: number;
-  };
+  points: Record<string, number>; // Multi-team support: A, B, C, D, E, F, G, H, I, J, K, L
   supporters: BattleSupporter[];
   participantStates: Record<string, any>;
   boost: BoostState;
@@ -59,7 +56,7 @@ export interface UseBattleScoresReturn {
   /** Refresh scores */
   refresh: () => Promise<void>;
   /** Award chat points to a user (once per battle) */
-  awardChatPoints: (profileId: string, username: string, side: 'A' | 'B') => Promise<void>;
+  awardChatPoints: (profileId: string, username: string, side: string) => Promise<void>;
 }
 
 export function useBattleScores({
@@ -101,7 +98,7 @@ export function useBattleScores({
   const awardChatPoints = useCallback(async (
     profileId: string,
     username: string,
-    side: 'A' | 'B'
+    side: string
   ) => {
     if (!sessionId) return;
     
