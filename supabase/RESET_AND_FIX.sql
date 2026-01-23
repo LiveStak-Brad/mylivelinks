@@ -29,6 +29,295 @@ ALTER TABLE public.live_session_participants ADD CONSTRAINT live_session_partici
   CHECK (team IN ('A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L'));
 
 -- =============================================================================
+-- 2B. UPDATE rpc_send_invite to support adding to existing sessions (3rd+ person)
+-- =============================================================================
+DROP FUNCTION IF EXISTS public.rpc_send_invite(UUID, TEXT, TEXT);
+DROP FUNCTION IF EXISTS public.rpc_send_invite(UUID, TEXT, TEXT, UUID);
+
+CREATE OR REPLACE FUNCTION public.rpc_send_invite(
+  p_to_host_id UUID,
+  p_type TEXT,
+  p_mode TEXT DEFAULT 'standard',
+  p_session_id UUID DEFAULT NULL
+)
+RETURNS UUID
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_user_id UUID := auth.uid();
+  v_invite_id UUID;
+  v_current_session_id UUID;
+  v_active_count INT;
+  v_pending_count INT;
+  v_available INT;
+BEGIN
+  IF v_user_id IS NULL THEN
+    RAISE EXCEPTION 'Not authenticated';
+  END IF;
+  
+  IF v_user_id = p_to_host_id THEN
+    RAISE EXCEPTION 'Cannot invite yourself';
+  END IF;
+  
+  -- Delete any existing pending invites FROM this user TO this target
+  DELETE FROM live_session_invites
+  WHERE from_host_id = v_user_id
+    AND to_host_id = p_to_host_id
+    AND status = 'pending';
+  
+  -- If sender is already in a session, use that session_id
+  IF p_session_id IS NULL THEN
+    SELECT ls.id INTO v_current_session_id
+    FROM live_sessions ls
+    JOIN live_session_participants lsp ON lsp.session_id = ls.id
+    WHERE lsp.profile_id = v_user_id
+      AND lsp.left_at IS NULL
+      AND ls.status IN ('active', 'cooldown', 'battle_ready', 'battle_active')
+    LIMIT 1;
+    
+    p_session_id := v_current_session_id;
+  END IF;
+  
+  -- If we have a session, check capacity
+  IF p_session_id IS NOT NULL THEN
+    -- Count active participants
+    SELECT COUNT(*) INTO v_active_count
+    FROM live_session_participants
+    WHERE session_id = p_session_id AND left_at IS NULL;
+    
+    -- Count pending invites for this session
+    SELECT COUNT(*) INTO v_pending_count
+    FROM live_session_invites
+    WHERE session_id = p_session_id AND status = 'pending';
+    
+    v_available := 12 - v_active_count - v_pending_count;
+    
+    IF v_available <= 0 THEN
+      RAISE EXCEPTION 'Session is at capacity (active: %, pending: %)', v_active_count, v_pending_count;
+    END IF;
+    
+    -- Check if target is already in session
+    IF EXISTS (
+      SELECT 1 FROM live_session_participants
+      WHERE session_id = p_session_id AND profile_id = p_to_host_id AND left_at IS NULL
+    ) THEN
+      RAISE EXCEPTION 'User is already in this session';
+    END IF;
+  END IF;
+  
+  -- Create the invite
+  INSERT INTO live_session_invites (from_host_id, to_host_id, type, mode, status, session_id)
+  VALUES (v_user_id, p_to_host_id, p_type, COALESCE(p_mode, 'standard'), 'pending', p_session_id)
+  RETURNING id INTO v_invite_id;
+  
+  RETURN v_invite_id;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.rpc_send_invite(UUID, TEXT, TEXT, UUID) TO authenticated;
+
+-- =============================================================================
+-- 2C. UPDATE rpc_respond_to_invite to handle slot finding and rejoin
+-- =============================================================================
+CREATE OR REPLACE FUNCTION public.rpc_respond_to_invite(
+  p_invite_id UUID,
+  p_response TEXT
+)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_user_id UUID := auth.uid();
+  v_invite live_session_invites%ROWTYPE;
+  v_session_id UUID;
+  v_battle_duration INTERVAL;
+  v_next_slot INT;
+  v_participant_count INT;
+  v_existing_row live_session_participants%ROWTYPE;
+  v_occupied_slots INT[];
+BEGIN
+  IF v_user_id IS NULL THEN
+    RAISE EXCEPTION 'Not authenticated';
+  END IF;
+  
+  SELECT * INTO v_invite
+  FROM live_session_invites
+  WHERE id = p_invite_id AND to_host_id = v_user_id
+  FOR UPDATE;
+  
+  IF v_invite IS NULL THEN
+    RAISE EXCEPTION 'Invite not found';
+  END IF;
+  
+  DELETE FROM live_session_invites WHERE id = p_invite_id;
+  
+  IF p_response = 'declined' THEN
+    RETURN jsonb_build_object('status', 'declined', 'invite_id', p_invite_id);
+  END IF;
+  
+  -- ACCEPTED
+  IF v_invite.session_id IS NOT NULL THEN
+    v_session_id := v_invite.session_id;
+    
+    SELECT COUNT(*) INTO v_participant_count
+    FROM live_session_participants
+    WHERE session_id = v_session_id AND left_at IS NULL;
+    
+    IF v_participant_count >= 12 THEN
+      RETURN jsonb_build_object('status', 'session_full', 'session_id', v_session_id, 'message', 'Session is full');
+    END IF;
+    
+    SELECT * INTO v_existing_row
+    FROM live_session_participants
+    WHERE session_id = v_session_id AND profile_id = v_user_id;
+    
+    IF v_existing_row.id IS NOT NULL THEN
+      IF v_existing_row.left_at IS NULL THEN
+        RETURN jsonb_build_object('status', 'already_in_session', 'session_id', v_session_id);
+      ELSE
+        -- Rejoin: find a free slot
+        SELECT ARRAY_AGG(slot_index) INTO v_occupied_slots
+        FROM live_session_participants WHERE session_id = v_session_id AND left_at IS NULL;
+        
+        SELECT MIN(s.slot) INTO v_next_slot FROM generate_series(0, 11) AS s(slot)
+        WHERE s.slot != ALL(COALESCE(v_occupied_slots, ARRAY[]::INT[]));
+        
+        IF v_next_slot IS NULL THEN
+          RETURN jsonb_build_object('status', 'session_full', 'message', 'No free slots');
+        END IF;
+        
+        UPDATE live_session_participants
+        SET left_at = NULL, slot_index = v_next_slot, joined_at = now()
+        WHERE id = v_existing_row.id;
+      END IF;
+    ELSE
+      -- New participant: find a free slot
+      SELECT ARRAY_AGG(slot_index) INTO v_occupied_slots
+      FROM live_session_participants WHERE session_id = v_session_id AND left_at IS NULL;
+      
+      SELECT MIN(s.slot) INTO v_next_slot FROM generate_series(0, 11) AS s(slot)
+      WHERE s.slot != ALL(COALESCE(v_occupied_slots, ARRAY[]::INT[]));
+      
+      IF v_next_slot IS NULL THEN
+        RETURN jsonb_build_object('status', 'session_full', 'message', 'No free slots');
+      END IF;
+      
+      INSERT INTO live_session_participants (session_id, profile_id, team, slot_index)
+      VALUES (v_session_id, v_user_id, 'A', v_next_slot);
+    END IF;
+  ELSE
+    -- Creating new session
+    INSERT INTO live_sessions (type, mode, host_a, host_b, status, started_at)
+    VALUES ('cohost', COALESCE(v_invite.mode, 'standard'), v_invite.from_host_id, v_user_id, 'active', now())
+    RETURNING id INTO v_session_id;
+    
+    INSERT INTO live_session_participants (session_id, profile_id, team, slot_index)
+    VALUES 
+      (v_session_id, v_invite.from_host_id, 'A', 0),
+      (v_session_id, v_user_id, 'A', 1);
+  END IF;
+  
+  SELECT COUNT(*) INTO v_participant_count
+  FROM live_session_participants WHERE session_id = v_session_id AND left_at IS NULL;
+  
+  RETURN jsonb_build_object(
+    'status', 'accepted',
+    'session_id', v_session_id,
+    'participant_count', v_participant_count
+  );
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.rpc_respond_to_invite(UUID, TEXT) TO authenticated;
+
+-- =============================================================================
+-- 2D. UPDATE rpc_start_battle_ready to handle 3+ participants
+-- =============================================================================
+CREATE OR REPLACE FUNCTION public.rpc_start_battle_ready(
+  p_session_id UUID
+)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_user_id UUID := auth.uid();
+  v_session live_sessions%ROWTYPE;
+  v_ready_states JSONB := '{}'::jsonb;
+  v_participant RECORD;
+  v_participant_count INT := 0;
+BEGIN
+  IF v_user_id IS NULL THEN
+    RAISE EXCEPTION 'Not authenticated';
+  END IF;
+  
+  SELECT * INTO v_session FROM live_sessions
+  WHERE id = p_session_id AND status = 'active' AND type = 'cohost'
+  FOR UPDATE;
+  
+  IF v_session IS NULL THEN
+    RAISE EXCEPTION 'Session not found or not in active cohost state';
+  END IF;
+  
+  IF NOT EXISTS (
+    SELECT 1 FROM live_session_participants
+    WHERE session_id = p_session_id AND profile_id = v_user_id AND left_at IS NULL
+  ) THEN
+    RAISE EXCEPTION 'You are not in this session';
+  END IF;
+  
+  -- Build ready states for all participants
+  FOR v_participant IN
+    SELECT profile_id, slot_index FROM live_session_participants
+    WHERE session_id = p_session_id AND left_at IS NULL
+    ORDER BY slot_index
+  LOOP
+    v_ready_states := v_ready_states || jsonb_build_object(v_participant.profile_id::text, false);
+    v_participant_count := v_participant_count + 1;
+  END LOOP;
+  
+  IF v_participant_count < 2 THEN
+    RAISE EXCEPTION 'Need at least 2 participants to start battle';
+  END IF;
+  
+  UPDATE live_sessions SET status = 'battle_ready', type = 'battle' WHERE id = p_session_id;
+  
+  -- Assign teams based on participant count
+  IF v_participant_count = 2 THEN
+    -- 1v1: slot 0 = A, slot 1 = B
+    UPDATE live_session_participants SET team = 'A' WHERE session_id = p_session_id AND slot_index = 0;
+    UPDATE live_session_participants SET team = 'B' WHERE session_id = p_session_id AND slot_index = 1;
+  ELSE
+    -- 3+: free for all, each gets own team based on slot
+    UPDATE live_session_participants
+    SET team = CHR(65 + slot_index)
+    WHERE session_id = p_session_id AND left_at IS NULL;
+  END IF;
+  
+  INSERT INTO battle_scores (session_id, points_a, points_b, supporter_stats, participant_states)
+  VALUES (p_session_id, 0, 0, '{"supporters": []}'::jsonb, jsonb_build_object('ready', v_ready_states))
+  ON CONFLICT (session_id) DO UPDATE SET
+    points_a = 0, points_b = 0,
+    supporter_stats = '{"supporters": []}'::jsonb,
+    participant_states = jsonb_build_object('ready', v_ready_states);
+  
+  RETURN jsonb_build_object(
+    'status', 'battle_ready',
+    'session_id', p_session_id,
+    'participant_count', v_participant_count,
+    'ready_states', v_ready_states
+  );
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.rpc_start_battle_ready(UUID) TO authenticated;
+
+-- =============================================================================
 -- 3. FIX rpc_battle_score_apply (TEAMS A-L)
 -- =============================================================================
 CREATE OR REPLACE FUNCTION public.rpc_battle_score_apply(

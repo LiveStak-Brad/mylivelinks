@@ -35,6 +35,14 @@ SELECT
     WHERE routine_name = 'rpc_end_session'
   ) as result;
 
+-- Check rpc_start_battle_ready exists
+SELECT 
+  'rpc_start_battle_ready_exists' as check_name,
+  EXISTS (
+    SELECT 1 FROM information_schema.routines
+    WHERE routine_name = 'rpc_start_battle_ready'
+  ) as result;
+
 -- Check team constraint on live_session_participants
 SELECT 
   'team_constraint' as check_name,
