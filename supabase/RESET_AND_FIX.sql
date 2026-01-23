@@ -22,6 +22,29 @@ BEGIN
 END $$;
 
 -- =============================================================================
+-- 1B. ENSURE REALTIME IS ENABLED FOR battle_scores
+-- =============================================================================
+-- Set replica identity to full so real-time gets all column values
+ALTER TABLE battle_scores REPLICA IDENTITY FULL;
+
+-- Enable realtime publication (if not already)
+DO $$
+BEGIN
+  -- Check if publication exists for battle_scores
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_publication_tables 
+    WHERE pubname = 'supabase_realtime' 
+    AND tablename = 'battle_scores'
+  ) THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE battle_scores;
+  END IF;
+EXCEPTION
+  WHEN undefined_object THEN
+    -- Publication doesn't exist, create it
+    CREATE PUBLICATION supabase_realtime FOR TABLE battle_scores;
+END $$;
+
+-- =============================================================================
 -- 2. UPDATE TEAM CONSTRAINT (A-L for 12 teams)
 -- =============================================================================
 ALTER TABLE public.live_session_participants DROP CONSTRAINT IF EXISTS live_session_participants_team_check;

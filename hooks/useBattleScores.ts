@@ -158,7 +158,9 @@ export function useBattleScores({
           fetchScores();
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log('[useBattleScores] Subscription status:', status);
+      });
     
     channelRef.current = channel;
     
@@ -169,6 +171,21 @@ export function useBattleScores({
       }
     };
   }, [sessionId, supabase, fetchScores]);
+  
+  // Polling fallback: Refresh scores every 3 seconds during active battle
+  // This ensures updates even if real-time isn't working
+  useEffect(() => {
+    if (!sessionId) return;
+    
+    const pollInterval = setInterval(() => {
+      console.log('[useBattleScores] Polling scores (fallback)...');
+      fetchScores();
+    }, 3000); // Poll every 3 seconds
+    
+    return () => {
+      clearInterval(pollInterval);
+    };
+  }, [sessionId, fetchScores]);
   
   // Initial fetch
   useEffect(() => {
