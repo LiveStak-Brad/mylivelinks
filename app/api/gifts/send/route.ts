@@ -196,32 +196,61 @@ export async function POST(request: NextRequest) {
           .eq('id', user.id)
           .single();
 
-        // Award battle points via internal API
-        const battleScoreResponse = await fetch(`${request.nextUrl.origin}/api/battle/score`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': request.headers.get('Authorization') || '',
-          },
-          body: JSON.stringify({
-            session_id: battleSession.session_id || battleSession.id,
-            recipient_id: toUserId,
-            sender_id: user.id,
-            sender_username: senderProfile?.username || 'Unknown',
-            sender_display_name: senderProfile?.display_name,
-            sender_avatar_url: senderProfile?.avatar_url,
-            coin_amount: coinsAmount,
-          }),
-        });
+        // Award battle points directly using admin client
+        // First, get the participant's team from live_session_participants
+        const { data: participant, error: participantError } = await adminSupabase
+          .from('live_session_participants')
+          .select('team')
+          .eq('session_id', battleSession.session_id || battleSession.id)
+          .eq('profile_id', toUserId)
+          .is('left_at', null)
+          .single();
+        
+        if (!participantError && participant) {
+          const teamSide = participant.team; // Can be 'A', 'B', 'C', 'D', etc.
+          
+          // Award battle points via RPC
+          const { data: scoreData, error: scoreError } = await adminSupabase.rpc(
+            'rpc_battle_score_apply',
+            {
+              p_session_id: battleSession.session_id || battleSession.id,
+              p_side: teamSide,
+              p_points_delta: coinsAmount,
+              p_supporter: {
+                profile_id: user.id,
+                username: senderProfile?.username || 'Unknown',
+                display_name: senderProfile?.display_name,
+                avatar_url: senderProfile?.avatar_url,
+                side: teamSide,
+                points_delta: coinsAmount,
+                chat_award: false,
+              },
+            }
+          );
 
-        if (battleScoreResponse.ok) {
-          const battleData = await battleScoreResponse.json();
-          battlePointsAwarded = {
-            side: battleData.side,
-            points: battleData.points_awarded,
-            boost_applied: battleData.boost_applied,
-            boost_multiplier: battleData.boost_multiplier,
-          };
+          if (!scoreError) {
+            battlePointsAwarded = {
+              side: teamSide,
+              points: coinsAmount,
+              boost_applied: false,
+              boost_multiplier: 1,
+            };
+            console.log('[GIFT] Battle points awarded:', {
+              requestId,
+              teamSide,
+              points: coinsAmount,
+              recipient: toUserId,
+            });
+          } else {
+            console.error('[GIFT] Battle score RPC error:', { requestId, error: scoreError });
+          }
+        } else {
+          console.warn('[GIFT] Recipient not found in battle participants:', {
+            requestId,
+            recipientId: toUserId,
+            sessionId: battleSession.session_id || battleSession.id,
+            error: participantError,
+          });
         }
       }
     } catch (battleErr) {
