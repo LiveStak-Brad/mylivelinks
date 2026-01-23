@@ -133,6 +133,7 @@ export default function BattleGridWrapper({
   const localTracksRef = useRef<{ video: any; audio: any }>({ video: null, audio: null });
   const emptyStateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const hydrationIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const supabase = useMemo(() => createClient(), []);
   
   // Debounce scheduler for updateParticipants
   const pendingUpdateRef = useRef(false);
@@ -140,9 +141,6 @@ export default function BattleGridWrapper({
   
   // Track participants in ref to check in callbacks
   const participantsRef = useRef<GridTileParticipant[]>([]);
-  
-  // Track when status transition started to limit preservation window
-  const statusTransitionTimeRef = useRef<number | null>(null);
   
   // ============================================================================
   // NOW SAFE: Derived constants from session (all hooks declared above)
@@ -175,72 +173,38 @@ export default function BattleGridWrapper({
   
   // Track the actual room we're connected to (stable reference)
   const connectedRoomNameRef = useRef<string | null>(null);
-  
-  // Track last session data to detect when host_b gets added
-  const lastSessionDataRef = useRef<{ hostA?: string; hostB?: string; participantsCount?: number } | null>(null);
 
-  // Host metadata should not force LiveKit reconnection when only session.status/timers change.
-  // We derive a stable host snapshot based on identity fields.
-  // Supports both old host_a/host_b format and new participants array
+  // Simplified: Always use participants array for all grid operations
   // CRITICAL: Only depend on identity fields, not status/timers/other metadata
   const hostSnapshot = useMemo(() => {
     if (!session) return null;
     
-    // Use participants array if available (new multi-host format)
-    if (session.participants && Array.isArray(session.participants) && session.participants.length > 0) {
-      const rawParticipants = session.participants as Array<{
-        profile_id: string;
-        username: string;
-        display_name: string | null;
-        avatar_url: string | null;
-        team: string;
-        slot_index: number;
-      }>;
-      
-      // Map to normalized format with 'id' instead of 'profile_id'
-      const participantList = rawParticipants.map(p => ({
+    // ALWAYS use participants array (unified approach for 1-9 hosts)
+    const rawParticipants = (session.participants && Array.isArray(session.participants) && session.participants.length > 0)
+      ? session.participants as Array<{
+          profile_id: string;
+          username: string;
+          display_name: string | null;
+          avatar_url: string | null;
+          team: string;
+          slot_index: number;
+        }>
+      : [];
+    
+    // Map to normalized format with 'id' instead of 'profile_id'
+    const participantList = rawParticipants
+      .map(p => ({
         id: p.profile_id,
         username: p.username,
         display_name: p.display_name,
         avatar_url: p.avatar_url,
         team: p.team,
         slot_index: p.slot_index,
-      }));
-      
-      return {
-        hostA: participantList[0] ? {
-          id: participantList[0].id,
-          username: participantList[0].username,
-          display_name: participantList[0].display_name,
-          avatar_url: participantList[0].avatar_url,
-        } : null,
-        hostB: participantList[1] ? {
-          id: participantList[1].id,
-          username: participantList[1].username,
-          display_name: participantList[1].display_name,
-          avatar_url: participantList[1].avatar_url,
-        } : null,
-        participants: participantList,
-        type: session.type,
-        session_id: session.session_id,
-      };
-    }
+      }))
+      .sort((a, b) => a.slot_index - b.slot_index); // Ensure consistent ordering by slot
     
-    // Fallback to old host_a/host_b format
     return {
-      hostA: session.host_a ? {
-        id: session.host_a.id,
-        username: session.host_a.username,
-        display_name: session.host_a.display_name,
-        avatar_url: session.host_a.avatar_url,
-      } : null,
-      hostB: session.host_b ? {
-        id: session.host_b.id,
-        username: session.host_b.username,
-        display_name: session.host_b.display_name,
-        avatar_url: session.host_b.avatar_url,
-      } : null,
-      participants: null,
+      participants: participantList,
       type: session.type,
       session_id: session.session_id,
     };
@@ -248,51 +212,20 @@ export default function BattleGridWrapper({
     // CRITICAL: Only depend on identity fields that affect room connection
     // Exclude: status, ends_at, cooldown_ends_at, ready_states, etc.
     session?.participants,
-    session?.host_a?.id,
-    session?.host_a?.username,
-    session?.host_a?.display_name,
-    session?.host_a?.avatar_url,
-    session?.host_b?.id,
-    session?.host_b?.username,
-    session?.host_b?.display_name,
-    session?.host_b?.avatar_url,
     session?.type,
     session?.session_id,
   ]);
 
   // Prepare participants data for ready modal
   const modalParticipants = useMemo(() => {
-    if (!hostSnapshot) return [];
+    if (!hostSnapshot || !hostSnapshot.participants) return [];
     
-    // Use participants array if available
-    if (hostSnapshot.participants) {
-      return hostSnapshot.participants.map(p => ({
-        id: p.id,
-        username: p.username,
-        displayName: p.display_name || undefined,
-        avatarUrl: p.avatar_url || undefined,
-      }));
-    }
-    
-    // Fallback to hostA/hostB
-    const result: Array<{ id: string; username?: string; displayName?: string; avatarUrl?: string }> = [];
-    if (hostSnapshot.hostA) {
-      result.push({
-        id: hostSnapshot.hostA.id,
-        username: hostSnapshot.hostA.username,
-        displayName: hostSnapshot.hostA.display_name || undefined,
-        avatarUrl: hostSnapshot.hostA.avatar_url || undefined,
-      });
-    }
-    if (hostSnapshot.hostB) {
-      result.push({
-        id: hostSnapshot.hostB.id,
-        username: hostSnapshot.hostB.username,
-        displayName: hostSnapshot.hostB.display_name || undefined,
-        avatarUrl: hostSnapshot.hostB.avatar_url || undefined,
-      });
-    }
-    return result;
+    return hostSnapshot.participants.map(p => ({
+      id: p.id,
+      username: p.username,
+      displayName: p.display_name || undefined,
+      avatarUrl: p.avatar_url || undefined,
+    }));
   }, [hostSnapshot]);
 
   const battleMode: BattleMode = 'duel';
@@ -345,52 +278,68 @@ export default function BattleGridWrapper({
 
   // Battle states with real scores and team-relative colors
   const battleStates = useMemo(() => {
-    if (!isBattleSession || !hostSnapshot) {
+    if (!isBattleSession || !hostSnapshot || !hostSnapshot.participants) {
       return new Map<string, BattleParticipantState>();
     }
 
     const states = new Map<string, BattleParticipantState>();
+    const allParticipants = hostSnapshot.participants;
     
-    // Determine if current user is host A or B
-    const isCurrentUserHostA = currentUserId === hostSnapshot.hostA?.id;
-    
-    // Team-relative color assignment:
-    // Current user always sees THEIR color on their side
-    // For host A: they see pink (A) on left, blue (B) on right
-    // For host B: they see blue (B) on left, pink (A) on right (colors swap)
-    const currentUserColor = isCurrentUserHostA ? TEAM_COLORS.A : TEAM_COLORS.B;
-    const otherUserColor = isCurrentUserHostA ? TEAM_COLORS.B : TEAM_COLORS.A;
-    
-    // Use scores if available, otherwise default to 0
-    const scoreA = scores?.points.A || 0;
-    const scoreB = scores?.points.B || 0;
-    const isALeading = scoreA >= scoreB;
+    // For 1v1 (2 people): traditional team A vs B logic
+    if (allParticipants.length === 2) {
+      const hostA = allParticipants[0];
+      const hostB = allParticipants[1];
+      const isCurrentUserHostA = currentUserId === hostA?.id;
+      
+      // Team-relative color assignment for current user
+      const currentUserColor = isCurrentUserHostA ? TEAM_COLORS.A : TEAM_COLORS.B;
+      const otherUserColor = isCurrentUserHostA ? TEAM_COLORS.B : TEAM_COLORS.A;
+      
+      const scoreA = scores?.points.A || 0;
+      const scoreB = scores?.points.B || 0;
+      const isALeading = scoreA >= scoreB;
 
-    // Current user state (always first in grid)
-    states.set(currentUserId, {
-      participantId: currentUserId,
-      score: isCurrentUserHostA ? scoreA : scoreB,
-      color: currentUserColor,
-      teamId: isCurrentUserHostA ? 'A' : 'B',
-      rank: isCurrentUserHostA ? (isALeading ? 1 : 2) : (isALeading ? 2 : 1),
-      isLeading: isCurrentUserHostA ? isALeading : !isALeading,
-    });
+      // Current user state
+      states.set(currentUserId, {
+        participantId: currentUserId,
+        score: isCurrentUserHostA ? scoreA : scoreB,
+        color: currentUserColor,
+        teamId: isCurrentUserHostA ? 'A' : 'B',
+        rank: isCurrentUserHostA ? (isALeading ? 1 : 2) : (isALeading ? 2 : 1),
+        isLeading: isCurrentUserHostA ? isALeading : !isALeading,
+      });
 
-    // Other host state (second in grid)
-    const otherHostId = isCurrentUserHostA ? hostSnapshot.hostB?.id : hostSnapshot.hostA?.id;
-    if (otherHostId) {
-      states.set(otherHostId, {
-      participantId: otherHostId,
-      score: isCurrentUserHostA ? scoreB : scoreA,
-      color: otherUserColor,
-      teamId: isCurrentUserHostA ? 'B' : 'A',
-      rank: isCurrentUserHostA ? (isALeading ? 2 : 1) : (isALeading ? 1 : 2),
-      isLeading: isCurrentUserHostA ? !isALeading : isALeading,
+      // Other host state
+      const otherHostId = isCurrentUserHostA ? hostB?.id : hostA?.id;
+      if (otherHostId) {
+        states.set(otherHostId, {
+          participantId: otherHostId,
+          score: isCurrentUserHostA ? scoreB : scoreA,
+          color: otherUserColor,
+          teamId: isCurrentUserHostA ? 'B' : 'A',
+          rank: isCurrentUserHostA ? (isALeading ? 2 : 1) : (isALeading ? 1 : 2),
+          isLeading: isCurrentUserHostA ? !isALeading : isALeading,
+        });
+      }
+    } else {
+      // For 3+ people: free-for-all with individual scores
+      allParticipants.forEach((p, index) => {
+        const teamId = p.team || String.fromCharCode(65 + index); // A, B, C, D, etc.
+        const score = (scores?.points as any)?.[teamId] || 0;
+        
+        states.set(p.id, {
+          participantId: p.id,
+          score,
+          color: TEAM_COLORS[teamId as keyof typeof TEAM_COLORS] || TEAM_COLORS.A,
+          teamId,
+          rank: 1, // TODO: calculate rank based on scores
+          isLeading: false, // TODO: determine if leading
+        });
       });
     }
 
     return states;
-  }, [hostSnapshot?.hostA?.id, hostSnapshot?.hostB?.id, currentUserId, isBattleSession, scores]);
+  }, [hostSnapshot?.participants, currentUserId, isBattleSession, scores]);
 
   const renderBattleOverlay = useCallback(
     (participant: GridTileParticipant) => {
@@ -419,6 +368,10 @@ export default function BattleGridWrapper({
       return;
     }
     
+    // NOTE: We don't early return here for viewers in battle_ready because we need to allow
+    // updateParticipants to run normally to find participants. The preservation logic below
+    // will handle preventing state changes if needed.
+    
     if (reason) {
       console.log('[LiveKit][Battle] updateParticipants:', reason);
     }
@@ -426,12 +379,7 @@ export default function BattleGridWrapper({
     console.log('[LiveKit][Battle] Current state:', {
       roomState: room.state,
       remoteParticipantsCount: room.remoteParticipants.size,
-      hostSnapshot: {
-        hostA: hostSnapshot.hostA?.id,
-        hostB: hostSnapshot.hostB?.id,
-        participantsCount: hostSnapshot.participants?.length,
-        participants: hostSnapshot.participants?.map(p => ({ id: p.id, username: p.username })),
-      },
+      sessionParticipants: hostSnapshot.participants.map(p => ({ id: p.id, username: p.username, slot: p.slot_index })),
       remoteParticipantIdentities: Array.from(room.remoteParticipants.values()).map(p => ({
         identity: p.identity,
         normalized: normalizeParticipantId(p.identity),
@@ -447,25 +395,10 @@ export default function BattleGridWrapper({
       const videoTrack = local.getTrackPublication(Track.Source.Camera)?.track;
       const audioTrack = local.getTrackPublication(Track.Source.Microphone)?.track;
       
-      // Determine display info - use participants array first, fallback to hostA/hostB, then use props
-      let displayName = currentUserName;
-      let avatarUrl: string | undefined = undefined;
-      
-      if (hostSnapshot.participants) {
-        const participant = hostSnapshot.participants.find(p => p.id === currentUserId);
-        if (participant) {
-          displayName = participant.display_name || participant.username;
-          avatarUrl = participant.avatar_url || undefined;
-        }
-      }
-      if (!avatarUrl) {
-        const isHostA = currentUserId === hostSnapshot.hostA?.id;
-        const hostInfo = isHostA ? hostSnapshot.hostA : hostSnapshot.hostB;
-        if (hostInfo) {
-          displayName = hostInfo.display_name || hostInfo.username;
-          avatarUrl = hostInfo.avatar_url || undefined;
-        }
-      }
+      // Find current user in participants array
+      const currentUserInfo = hostSnapshot.participants?.find(p => p.id === currentUserId);
+      const displayName = currentUserInfo?.display_name || currentUserInfo?.username || currentUserName;
+      const avatarUrl = currentUserInfo?.avatar_url || undefined;
       
       // Always add local participant to grid when publishing
       gridParticipants.push({
@@ -490,114 +423,94 @@ export default function BattleGridWrapper({
       
       const userId = normalizeParticipantId(identity);
       
-      // Determine participant info from session - check participants array first, then hostA/hostB
-      let hostInfo: { id: string; username: string; display_name: string | null; avatar_url: string | null } | null = null;
-      if (hostSnapshot.participants) {
-        const participant = hostSnapshot.participants.find(p => p.id === userId);
-        if (participant) {
-          hostInfo = {
-            id: participant.id,
-            username: participant.username,
-            display_name: participant.display_name,
-            avatar_url: participant.avatar_url,
-          };
+      // Find participant info from session
+      const participantInfo = hostSnapshot.participants?.find(p => p.id === userId);
+      
+      // For cohost sessions, if we see a participant not in our snapshot, add temporarily and trigger refresh
+      if (!participantInfo && isCohostSession) {
+        console.log('[LiveKit][Battle] Detected new cohost participant not in snapshot:', userId);
+        
+        // Trigger session refresh
+        if (onRefreshSession) {
+          const now = Date.now();
+          if (now - lastRefreshRequestRef.current > 3000) {
+            lastRefreshRequestRef.current = now;
+            onRefreshSession();
+          }
         }
-      }
-      if (!hostInfo) {
-        const isHostA = userId === hostSnapshot.hostA?.id;
-        const isHostB = userId === hostSnapshot.hostB?.id;
-        hostInfo = isHostA ? hostSnapshot.hostA : isHostB ? hostSnapshot.hostB : null;
+        
+        // Add with minimal info temporarily
+        const videoTrack = Array.from(participant.trackPublications.values())
+          .find(pub => pub.track?.kind === Track.Kind.Video && pub.source === Track.Source.Camera)
+          ?.track as RemoteTrack | undefined;
+        const audioTrack = Array.from(participant.trackPublications.values())
+          .find(pub => pub.track?.kind === Track.Kind.Audio && pub.source === Track.Source.Microphone)
+          ?.track as RemoteTrack | undefined;
+        
+        gridParticipants.push({
+          id: userId,
+          name: `user_${userId.substring(0, 8)}`,
+          videoTrack: videoTrack || undefined,
+          audioTrack: audioTrack || undefined,
+          isHost: true,
+          avatarUrl: undefined,
+        });
+        return;
       }
       
-      // CRITICAL FALLBACK: If we see a participant in the room that's not in our snapshot,
-      // but we only have one host in the snapshot (hostA), this might be hostB who just joined.
-      // Try to fetch their profile and add them temporarily until session refreshes.
-      if (!hostInfo && hostSnapshot.hostA && !hostSnapshot.hostB && userId !== hostSnapshot.hostA.id && userId !== currentUserId) {
-        console.log('[LiveKit][Battle] Detected potential Host B - fetching profile:', userId);
-        // This is likely Host B - we'll add them with minimal info and let the session refresh fill in details
-        // For now, we'll skip and trigger refresh, but this helps with debugging
-      }
-      
-      // Skip participants who are not in our session data yet
-      if (!hostInfo) {
-        console.warn('[LiveKit][Battle] Unknown participant in room - will refresh session if needed', {
-          roomName,
+      // Skip if not in session
+      if (!participantInfo) {
+        console.warn('[LiveKit][Battle] Unknown participant in room:', {
           identity,
           normalizedUserId: userId,
-          hostA: hostSnapshot.hostA?.id,
-          hostB: hostSnapshot.hostB?.id,
-          participantsCount: hostSnapshot.participants?.length,
-          participants: hostSnapshot.participants?.map(p => ({ id: p.id, username: p.username })),
+          sessionParticipants: hostSnapshot.participants?.map(p => p.id),
         });
         
-        // Only refresh if we haven't refreshed recently (prevent loops)
-        // The missing participants check at the end will handle the refresh more intelligently
-        const now = Date.now();
-        if (onRefreshSession && now - lastRefreshRequestRef.current > 3000) { // 3 second debounce
-          lastRefreshRequestRef.current = now;
-          console.log('[LiveKit][Battle] Requesting session refresh for unknown participant - likely new host joined');
-          onRefreshSession();
+        // Trigger refresh if needed
+        if (onRefreshSession) {
+          const now = Date.now();
+          if (now - lastRefreshRequestRef.current > 3000) {
+            lastRefreshRequestRef.current = now;
+            onRefreshSession();
+          }
         }
-        return; // Skip this participant for now - will be added after refresh
+        return;
       }
       
       // Find video and audio tracks
-      let videoTrack: RemoteTrack | undefined;
-      let audioTrack: RemoteTrack | undefined;
-      
-      console.log('[LiveKit][Battle] Checking tracks for participant:', {
-        identity,
-        userId,
-        trackPublicationsCount: participant.trackPublications.size,
-      });
-      
-      participant.trackPublications.forEach((pub) => {
-        console.log('[LiveKit][Battle] Track publication:', {
-          identity,
-          kind: pub.kind,
-          source: pub.source,
-          trackExists: !!pub.track,
-          isSubscribed: pub.isSubscribed,
-          isMuted: pub.isMuted,
-        });
-        
-        if (pub.track) {
-          if (pub.track.kind === Track.Kind.Video && pub.source === Track.Source.Camera) {
-            videoTrack = pub.track as RemoteTrack;
-            console.log('[LiveKit][Battle] ✅ Found video track for', identity);
-          } else if (pub.track.kind === Track.Kind.Audio && pub.source === Track.Source.Microphone) {
-            audioTrack = pub.track as RemoteTrack;
-            console.log('[LiveKit][Battle] ✅ Found audio track for', identity);
-          }
-        } else if (pub.isSubscribed) {
-          console.log('[LiveKit][Battle] ⚠️ Publication is subscribed but track is null:', {
-            identity,
-            kind: pub.kind,
-            source: pub.source,
-          });
-        }
-      });
+      const videoTrack = Array.from(participant.trackPublications.values())
+        .find(pub => pub.track?.kind === Track.Kind.Video && pub.source === Track.Source.Camera)
+        ?.track as RemoteTrack | undefined;
+      const audioTrack = Array.from(participant.trackPublications.values())
+        .find(pub => pub.track?.kind === Track.Kind.Audio && pub.source === Track.Source.Microphone)
+        ?.track as RemoteTrack | undefined;
       
       console.log('[LiveKit][Battle] Adding to grid:', {
         userId,
-        name: hostInfo.display_name || hostInfo.username,
+        name: participantInfo.display_name || participantInfo.username,
         hasVideoTrack: !!videoTrack,
         hasAudioTrack: !!audioTrack,
-        avatarUrl: hostInfo.avatar_url,
-        isHostA: userId === hostSnapshot.hostA?.id,
-        isHostB: userId === hostSnapshot.hostB?.id,
+        slot: participantInfo.slot_index,
       });
       
-      // CRITICAL: Add participant even if they don't have tracks yet
-      // This ensures Host B appears immediately when they join, even before tracks are published
       gridParticipants.push({
         id: userId,
-        name: hostInfo.display_name || hostInfo.username,
+        name: participantInfo.display_name || participantInfo.username,
         videoTrack: videoTrack || undefined,
         audioTrack: audioTrack || undefined,
         isHost: true,
-        avatarUrl: hostInfo.avatar_url || undefined,
+        avatarUrl: participantInfo.avatar_url || undefined,
       });
+    });
+    
+    // Sort participants: current user first, then by slot_index
+    gridParticipants.sort((a, b) => {
+      if (a.id === currentUserId) return -1;
+      if (b.id === currentUserId) return 1;
+      
+      const aSlot = hostSnapshot.participants?.find(p => p.id === a.id)?.slot_index || 99;
+      const bSlot = hostSnapshot.participants?.find(p => p.id === b.id)?.slot_index || 99;
+      return aSlot - bSlot;
     });
     
     console.log('[LiveKit][Battle] Final grid participants:', {
@@ -607,107 +520,18 @@ export default function BattleGridWrapper({
         name: p.name,
         hasVideoTrack: !!p.videoTrack,
         hasAudioTrack: !!p.audioTrack,
-        hasAvatar: !!p.avatarUrl,
+        isCurrentUser: p.id === currentUserId,
       })),
-      expectedCount: (hostSnapshot.hostA ? 1 : 0) + (hostSnapshot.hostB ? 1 : 0) + (hostSnapshot.participants?.length || 0),
-      hostA: hostSnapshot.hostA?.id,
-      hostB: hostSnapshot.hostB?.id,
+      expectedCount: hostSnapshot.participants?.length || 0,
     });
     
-    // CRITICAL: If we're missing expected participants, log a warning and force refresh
-    const expectedParticipantIds = new Set<string>();
-    if (hostSnapshot.hostA?.id) expectedParticipantIds.add(hostSnapshot.hostA.id);
-    if (hostSnapshot.hostB?.id) expectedParticipantIds.add(hostSnapshot.hostB.id);
-    if (hostSnapshot.participants) {
-      hostSnapshot.participants.forEach(p => expectedParticipantIds.add(p.id));
-    }
-    
-    const foundParticipantIds = new Set(gridParticipants.map(p => p.id));
-    const missingParticipants = Array.from(expectedParticipantIds).filter(id => !foundParticipantIds.has(id) && id !== currentUserId);
-    
-    // Also check if we have fewer participants than expected (e.g., only 1 when we should have 2)
-    const expectedCount = expectedParticipantIds.size;
-    const actualCount = gridParticipants.length;
-    const isMissingParticipants = missingParticipants.length > 0 || (expectedCount > 1 && actualCount < expectedCount);
-    
-    if (isMissingParticipants) {
-      console.warn('[LiveKit][Battle] Missing expected participants in grid:', {
-        missing: missingParticipants,
-        expected: Array.from(expectedParticipantIds),
-        found: Array.from(foundParticipantIds),
-        currentUserId,
-        expectedCount,
-        actualCount,
-        hostSnapshot: {
-          hasHostA: !!hostSnapshot.hostA,
-          hasHostB: !!hostSnapshot.hostB,
-          participantsCount: hostSnapshot.participants?.length || 0,
-        },
-      });
-      
-      // Only refresh if we're truly missing a participant AND haven't refreshed recently
-      // This prevents constant refresh loops
-      if (isConnected && onRefreshSession && missingParticipants.length > 0) {
-        const now = Date.now();
-        // Increased debounce to 5 seconds to prevent refresh loops
-        if (now - lastRefreshRequestRef.current > 5000) {
-          lastRefreshRequestRef.current = now;
-          console.log('[LiveKit][Battle] Missing participants detected - requesting session refresh (debounced)');
-          // Schedule refresh but don't force immediate disconnect
-          onRefreshSession();
-        } else {
-          console.log('[LiveKit][Battle] Skipping refresh - too soon since last refresh');
-        }
-      }
-    } else {
-      // Log success when we have all expected participants
-      if (expectedCount > 0 && actualCount === expectedCount) {
-        console.log('[LiveKit][Battle] ✅ All expected participants present:', {
-          expectedCount,
-          actualCount,
-          participantIds: Array.from(foundParticipantIds),
-        });
-      }
-    }
-    
-    // CRITICAL: During status transitions (battle_ready -> battle_active), preserve existing participants
-    // if updateParticipants temporarily finds none (due to timing/track subscription delays)
-    // This prevents black screen for viewers when battle starts
-    const isTransitioning = prevStatusRef.current === 'battle_ready' && 
-                           (session?.status === 'battle_active' || session?.status === 'active');
-    const hadParticipants = participantsRef.current.length > 0;
-    const foundParticipants = gridParticipants.length > 0;
-    
-    // If we're transitioning and had participants but temporarily don't find any, preserve them
-    // But only for a short window (3 seconds) to prevent infinite preservation
-    const transitionTime = statusTransitionTimeRef.current;
-    const isInTransitionWindow = transitionTime && (Date.now() - transitionTime) < 3000;
-    
-    if (isTransitioning && hadParticipants && !foundParticipants && isInTransitionWindow) {
-      console.log('[LiveKit][Battle] Preserving existing participants during status transition (temporary empty result)', {
-        reason,
-        prevCount: participantsRef.current.length,
-        newCount: gridParticipants.length,
-        sessionStatus: session?.status,
-        transitionAge: transitionTime ? Date.now() - transitionTime : null,
-      });
-      // Keep existing participants - don't clear them
-      // Don't update state - keep existing participants visible
-      // Don't change participantsReady - keep it true
-      return; // Exit early to preserve existing state
-    }
-    
-    // If we found participants or transition window expired, clear the transition time
-    if (foundParticipants || !isInTransitionWindow) {
-      statusTransitionTimeRef.current = null;
-    }
-    
+    // Simplified: Just set participants - no complex preservation logic
     setParticipants(gridParticipants);
-    participantsRef.current = gridParticipants; // Update ref for callbacks
+    participantsRef.current = gridParticipants;
     const hasParticipants = gridParticipants.length > 0;
-    setParticipantsReady(hasParticipants);
-
+    
     if (hasParticipants) {
+      setParticipantsReady(true);
       if (emptyStateTimeoutRef.current) {
         clearTimeout(emptyStateTimeoutRef.current);
         emptyStateTimeoutRef.current = null;
@@ -717,6 +541,8 @@ export default function BattleGridWrapper({
         hydrationIntervalRef.current = null;
       }
       setAllowEmptyState(true);
+    } else {
+      setParticipantsReady(false);
     }
     
     // Initialize volumes for new participants
@@ -752,68 +578,36 @@ export default function BattleGridWrapper({
     });
   }, []); // No dependencies - uses ref
   
-  // CRITICAL: Watch hostSnapshot changes and update participants when new hosts join
-  // This ensures Host A sees Host B when Host B accepts the invite
-  // Also ensures viewers see both hosts when the second host joins
+  // Watch hostSnapshot changes and update participants when new hosts join
   const prevHostSnapshotRef = useRef<typeof hostSnapshot>(null);
   useEffect(() => {
     if (!hostSnapshot || !isConnected) {
       prevHostSnapshotRef.current = hostSnapshot;
-      if (hostSnapshot) {
-        lastSessionDataRef.current = {
-          hostA: hostSnapshot.hostA?.id,
-          hostB: hostSnapshot.hostB?.id,
-          participantsCount: hostSnapshot.participants?.length || 0,
-        };
-      }
       return;
     }
     
     // Check if participants actually changed (not just a reference change)
     const prevSnapshot = prevHostSnapshotRef.current;
     
-    // Get participant IDs from both snapshots for comparison
+    // Get participant IDs from snapshot
     const getParticipantIds = (snapshot: typeof hostSnapshot | null): string[] => {
-      if (!snapshot) return [];
-      const ids: string[] = [];
-      if (snapshot.hostA?.id) ids.push(snapshot.hostA.id);
-      if (snapshot.hostB?.id) ids.push(snapshot.hostB.id);
-      if (snapshot.participants) {
-        snapshot.participants.forEach(p => {
-          if (!ids.includes(p.id)) ids.push(p.id);
-        });
-      }
-      return ids.sort();
+      if (!snapshot || !snapshot.participants) return [];
+      return snapshot.participants.map(p => p.id).sort();
     };
     
     const prevIds = getParticipantIds(prevSnapshot);
     const currentIds = getParticipantIds(hostSnapshot);
     const participantsChanged = prevIds.join(',') !== currentIds.join(',');
     
-    // Also check if hostB was added (common case when invite is accepted)
-    const prevHadHostB = prevSnapshot?.hostB?.id || (prevSnapshot?.participants && prevSnapshot.participants.length >= 2);
-    const currentHasHostB = hostSnapshot.hostB?.id || (hostSnapshot.participants && hostSnapshot.participants.length >= 2);
-    const hostBWasAdded = !prevHadHostB && currentHasHostB;
-    
-    if (participantsChanged || hostBWasAdded) {
+    if (participantsChanged) {
       console.log('[LiveKit][Battle] Host snapshot changed - participants updated', {
         prevIds,
         currentIds,
         prevCount: prevIds.length,
         newCount: currentIds.length,
-        hostBWasAdded,
-        prevHadHostB,
-        currentHasHostB,
       });
       
-      // Update last session data
-      lastSessionDataRef.current = {
-        hostA: hostSnapshot.hostA?.id,
-        hostB: hostSnapshot.hostB?.id,
-        participantsCount: hostSnapshot.participants?.length || 0,
-      };
-      
-      // Trigger update when hostSnapshot changes (new participants added)
+      // Trigger update when hostSnapshot changes (new participants added/removed)
       // Use multiple attempts with delays to catch participants who join at different times
       const timeoutId1 = setTimeout(() => {
         updateParticipantsRef.current('host_snapshot_changed_1');
@@ -836,40 +630,10 @@ export default function BattleGridWrapper({
     }
     
     prevHostSnapshotRef.current = hostSnapshot;
-    if (hostSnapshot) {
-      lastSessionDataRef.current = {
-        hostA: hostSnapshot.hostA?.id,
-        hostB: hostSnapshot.hostB?.id,
-        participantsCount: hostSnapshot.participants?.length || 0,
-      };
-    }
-  }, [hostSnapshot, isConnected]); // Removed requestParticipantsUpdate from deps - uses ref internally
+  }, [hostSnapshot, isConnected]);
   
-  // CRITICAL: Preserve participantsReady during status transitions
-  // When status changes from battle_ready to battle_active, don't reset if we have participants
+  // No longer needed - removed complex status transition logic
   const prevStatusRef = useRef<string | null>(null);
-  useEffect(() => {
-    const currentStatus = session?.status;
-    const prevStatus = prevStatusRef.current;
-    
-    // If transitioning from battle_ready to battle_active, mark transition start time
-    if (prevStatus === 'battle_ready' && 
-        (currentStatus === 'battle_active' || currentStatus === 'active')) {
-      if (participantsRef.current.length > 0) {
-        console.log('[LiveKit][Battle] Status transition detected - marking transition start time');
-        statusTransitionTimeRef.current = Date.now();
-      }
-      
-      // If we have participants, preserve state
-      if (participantsRef.current.length > 0 && !participantsReady) {
-        console.log('[LiveKit][Battle] Preserving participantsReady during battle_ready -> battle_active transition');
-        setParticipantsReady(true);
-        setAllowEmptyState(true);
-      }
-    }
-    
-    prevStatusRef.current = currentStatus || null;
-  }, [session?.status, participantsReady]);
   
   // CRITICAL: Watch ready_states changes and trigger refresh if needed
   // This ensures the modal updates when other hosts set their ready state
@@ -1019,26 +783,16 @@ export default function BattleGridWrapper({
           });
           if (isActive) {
             setIsConnected(true);
-            // CRITICAL: Don't reset participantsReady if we already have participants
-            // This prevents black screen when status transitions (battle_ready -> battle_active)
-            // Only reset if we truly have no participants
-            const hasExistingParticipants = participantsRef.current.length > 0;
-            if (!hasExistingParticipants) {
-              setParticipantsReady(false);
-              setAllowEmptyState(false);
-              if (emptyStateTimeoutRef.current) {
-                clearTimeout(emptyStateTimeoutRef.current);
-              }
-              emptyStateTimeoutRef.current = setTimeout(() => {
-                setAllowEmptyState(true);
-                emptyStateTimeoutRef.current = null;
-              }, 4000);
-            } else {
-              // Preserve participantsReady state - we already have participants
-              console.log('[LiveKit][Battle] Preserving participantsReady during status transition');
+            setParticipantsReady(false);
+            setAllowEmptyState(false);
+            if (emptyStateTimeoutRef.current) {
+              clearTimeout(emptyStateTimeoutRef.current);
             }
+            emptyStateTimeoutRef.current = setTimeout(() => {
+              setAllowEmptyState(true);
+              emptyStateTimeoutRef.current = null;
+            }, 4000);
             setError(null);
-            // Don't call updateParticipants here - will be called after connect completes
             onRoomConnected?.();
           }
         });
@@ -1079,9 +833,7 @@ export default function BattleGridWrapper({
           // CRITICAL: When a battle participant connects, check if they're in our session
           // If not, trigger a session refresh immediately
           const userId = normalizeParticipantId(participant.identity);
-          const isInSession = hostSnapshot?.participants?.some(p => p.id === userId) ||
-                              userId === hostSnapshot?.hostA?.id ||
-                              userId === hostSnapshot?.hostB?.id;
+          const isInSession = hostSnapshot?.participants?.some(p => p.id === userId);
           
           if (!isInSession && onRefreshSession) {
             console.log('[LiveKit][Battle] Participant connected but not in session snapshot - will refresh if needed', {
@@ -1236,9 +988,7 @@ export default function BattleGridWrapper({
     };
   }, [roomName, isConnected, onRoomConnected, onRoomDisconnected, reconnectTrigger, updateParticipantsRef]);
 
-  // Poll room participants briefly after connect to capture existing hosts even if no events fire
-  // CRITICAL: Also check if we see participants in the room that should be in our session
-  // Also check if we're missing expected participants (e.g., only 1 when should have 2)
+  // Poll room participants briefly after connect to capture existing hosts
   useEffect(() => {
     if (!isConnected) {
       if (hydrationIntervalRef.current) {
@@ -1255,14 +1005,13 @@ export default function BattleGridWrapper({
 
     hydrationIntervalRef.current = setInterval(() => {
       const room = roomRef.current;
-      if (!room || !hostSnapshot) {
+      if (!room || !hostSnapshot || !hostSnapshot.participants) {
         return;
       }
       
-      // Count only battle grid participants (exclude viewers)
+      // Count battle grid participants (exclude viewers)
       let battleParticipantCount = room.localParticipant && canPublish ? 1 : 0;
       let foundUnknownParticipant = false;
-      const roomParticipantIds = new Set<string>();
       
       room.remoteParticipants.forEach((participant) => {
         if (!isBattleGridIdentity(participant.identity)) {
@@ -1271,50 +1020,27 @@ export default function BattleGridWrapper({
         
         battleParticipantCount++;
         const userId = normalizeParticipantId(participant.identity);
-        roomParticipantIds.add(userId);
         
-        // CRITICAL: Check if this participant should be in our session but isn't in hostSnapshot
-        const isInSnapshot = hostSnapshot.participants?.some(p => p.id === userId) ||
-                             userId === hostSnapshot.hostA?.id ||
-                             userId === hostSnapshot.hostB?.id;
+        // Check if this participant should be in our session but isn't in hostSnapshot
+        const isInSnapshot = hostSnapshot.participants.some(p => p.id === userId);
         
         if (!isInSnapshot) {
           console.log('[LiveKit][Battle] Found participant in room not in snapshot - triggering refresh', {
             userId,
             identity: participant.identity,
-            hostSnapshotParticipants: hostSnapshot.participants?.map(p => p.id),
-            hostA: hostSnapshot.hostA?.id,
-            hostB: hostSnapshot.hostB?.id,
+            hostSnapshotParticipants: hostSnapshot.participants.map(p => p.id),
           });
           foundUnknownParticipant = true;
         }
       });
       
-      // CRITICAL: Check if we should have 2 hosts but only see 1 in the room
-      const expectedHostCount = (hostSnapshot.hostA ? 1 : 0) + (hostSnapshot.hostB ? 1 : 0);
-      const actualHostCount = battleParticipantCount;
-      const isMissingHost = expectedHostCount > 1 && actualHostCount < expectedHostCount;
-      
-      if (isMissingHost) {
-        console.log('[LiveKit][Battle] Polling detected missing host - should have', expectedHostCount, 'but only see', actualHostCount, {
-          hostA: hostSnapshot.hostA?.id,
-          hostB: hostSnapshot.hostB?.id,
-          roomParticipants: Array.from(roomParticipantIds),
-          currentUserId,
-        });
-      }
-      
-      // If we found a participant that should be in our session, or we're missing a host, trigger refresh
-      if ((foundUnknownParticipant || isMissingHost) && onRefreshSession) {
+      // If we found a participant that should be in our session, trigger refresh
+      if (foundUnknownParticipant && onRefreshSession) {
         const now = Date.now();
-        if (now - lastRefreshRequestRef.current > 2000) { // 2 second debounce for polling
+        if (now - lastRefreshRequestRef.current > 2000) {
           lastRefreshRequestRef.current = now;
-          console.log('[LiveKit][Battle] Polling detected issue - refreshing session', {
-            foundUnknownParticipant,
-            isMissingHost,
-          });
+          console.log('[LiveKit][Battle] Polling detected unknown participant - refreshing session');
           onRefreshSession();
-          // Also trigger participant update after refresh
           setTimeout(() => {
             updateParticipantsRef.current('after_polling_refresh');
           }, 1000);
@@ -1459,6 +1185,7 @@ export default function BattleGridWrapper({
     });
   }, [volumes]);
   
+  // Simplified connecting overlay check
   const showConnectingOverlay = !participantsReady && !allowEmptyState;
 
   // Handle cooldown actions
@@ -1589,7 +1316,7 @@ export default function BattleGridWrapper({
     // Helper to process an invite and show popup
     const processInvite = (invite: any) => {
       if (invite.to_host_id === currentUserId && invite.type === 'battle' && invite.status === 'pending') {
-        // Get sender username - check participants first, then hostA/hostB
+        // Get sender username from participants
         const otherHostId = invite.from_host_id;
         let otherHost: { username: string; display_name: string | null } | null = null;
         if (hostSnapshot?.participants) {
@@ -1597,9 +1324,6 @@ export default function BattleGridWrapper({
           if (participant) {
             otherHost = { username: participant.username, display_name: participant.display_name };
           }
-        }
-        if (!otherHost && hostSnapshot) {
-          otherHost = otherHostId === hostSnapshot.hostA?.id ? hostSnapshot.hostA : hostSnapshot.hostB;
         }
         if (otherHost) {
           setBattleInvite({
@@ -1809,9 +1533,10 @@ export default function BattleGridWrapper({
         />
       )}
       
-      {/* Battle Ready Modal - shown to ALL participants during battle_ready phase */}
-      {/* Key includes ready_states to force re-render when ready states change */}
-      {isBattleReady && modalParticipants.some(p => p.id === currentUserId) && (
+      {/* Battle Ready Modal - shown ONLY to HOSTS during battle_ready phase (battle/cohost only) */}
+      {/* Viewers should NOT see this modal - they should see no changes until battle starts */}
+      {/* Only show for battle/cohost sessions, NOT solo streams */}
+      {isBattleReady && (isBattleSession || isCohostSession) && canPublish && modalParticipants.some(p => p.id === currentUserId) && (
         <BattleReadyModal
           key={`battle-ready-${session?.session_id}-${JSON.stringify(readyStates)}`}
           isOpen={true}

@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, TextInput, Image, ActivityIndicator, Alert, AppState, AppStateStatus } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import ReportModal from '../components/ReportModal';
 import ShareModal from '../components/ShareModal';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { Room, RoomEvent, RemoteTrack, Track, RemoteParticipant } from 'livekit-client';
-import { VideoView } from '@livekit/react-native';
+import { VideoView, AudioSession } from '@livekit/react-native';
 
 import { supabase } from '../lib/supabase';
 import { fetchMobileToken, generateSoloRoomName } from '../lib/livekit';
@@ -38,6 +39,7 @@ export default function LiveUserScreen() {
   const navigation = useNavigation<any>();
   const route = useRoute<RouteProp<{ params: LiveUserRouteParams }, 'params'>>();
   const { username, streamId, profileId } = route.params || {};
+  const insets = useSafeAreaInsets();
 
   // State
   const [chatInput, setChatInput] = useState('');
@@ -54,6 +56,7 @@ export default function LiveUserScreen() {
   const [isConnected, setIsConnected] = useState(false);
   const [remoteVideoTrack, setRemoteVideoTrack] = useState<RemoteTrack | null>(null);
   const [remoteAudioTrack, setRemoteAudioTrack] = useState<RemoteTrack | null>(null);
+  const [videoReady, setVideoReady] = useState(false);
   const roomRef = useRef<Room | null>(null);
 
   // Chat
@@ -92,6 +95,14 @@ export default function LiveUserScreen() {
     if (endIdx < 0) return null;
     return rest.slice(0, endIdx).trim() || null;
   };
+
+  // Configure audio session for media playback
+  useEffect(() => {
+    AudioSession.startAudioSession();
+    return () => {
+      AudioSession.stopAudioSession();
+    };
+  }, []);
 
   // Load current user
   useEffect(() => {
@@ -319,12 +330,19 @@ export default function LiveUserScreen() {
 
   // Connect to LiveKit as viewer
   useEffect(() => {
-    if (!streamerData?.profile_id || !streamerData.is_live) return;
+    if (!streamerData?.profile_id || !streamerData.is_live) {
+      return;
+    }
 
+    // Prevent duplicate connections
+    if (roomRef.current?.state === 'connected') {
+      return;
+    }
+
+    let mounted = true;
     const connectToRoom = async () => {
       try {
         const roomName = generateSoloRoomName(streamerData.profile_id);
-        console.log('[LiveUserScreen] Connecting to room:', roomName);
 
         const { token, url } = await fetchMobileToken(
           roomName,
@@ -333,72 +351,138 @@ export default function LiveUserScreen() {
           false // isHost = false (viewer mode)
         );
 
+        if (!mounted || !mountedRef.current) {
+          return;
+        }
+
+        // Double-check we're not already connected
+        if (roomRef.current?.state === 'connected') {
+          return;
+        }
+
         const room = new Room({
           adaptiveStream: true,
           dynacast: true,
+          // Mobile-specific optimizations
+          videoCaptureDefaults: {
+            resolution: {
+              width: 1280,
+              height: 720,
+              frameRate: 30,
+            },
+          },
         });
 
         roomRef.current = room;
 
         // Handle track subscriptions
         room.on(RoomEvent.TrackSubscribed, (track: RemoteTrack, publication, participant: RemoteParticipant) => {
-          console.log('[LiveUserScreen] Track subscribed:', track.kind, participant.identity);
+          if (!mounted) return;
           
           // Skip guest tracks
-          if (participant.identity.startsWith('guest_')) return;
+          if (participant.identity.startsWith('guest_')) {
+            return;
+          }
 
-          if (track.kind === Track.Kind.Video) {
-            setRemoteVideoTrack(track);
-          } else if (track.kind === Track.Kind.Audio) {
-            setRemoteAudioTrack(track);
+          try {
+            if (track.kind === Track.Kind.Video) {
+              // Detach old video track before setting new one
+              if (remoteVideoTrack) {
+                setVideoReady(false);
+                setRemoteVideoTrack(null);
+              }
+              // Set new track after a small delay
+              setTimeout(() => {
+                if (mounted) {
+                  setRemoteVideoTrack(track);
+                  setTimeout(() => {
+                    if (mounted) {
+                      setVideoReady(true);
+                    }
+                  }, 100);
+                }
+              }, 50);
+            } else if (track.kind === Track.Kind.Audio) {
+              // Detach old audio track before setting new one
+              if (remoteAudioTrack) {
+                setRemoteAudioTrack(null);
+              }
+              setTimeout(() => {
+                if (mounted) {
+                  setRemoteAudioTrack(track);
+                }
+              }, 50);
+            }
+          } catch (err) {
+            console.error('[LiveUserScreen] Error handling track:', err);
           }
         });
 
         room.on(RoomEvent.TrackUnsubscribed, (track: RemoteTrack) => {
-          if (track.kind === Track.Kind.Video) {
-            setRemoteVideoTrack(null);
-          } else if (track.kind === Track.Kind.Audio) {
-            setRemoteAudioTrack(null);
+          if (!mounted) return;
+          try {
+            if (track.kind === Track.Kind.Video) {
+              setRemoteVideoTrack(null);
+              setVideoReady(false);
+            } else if (track.kind === Track.Kind.Audio) {
+              setRemoteAudioTrack(null);
+            }
+          } catch (err) {
+            console.error('[LiveUserScreen] Error unsubscribing track:', err);
           }
         });
 
         room.on(RoomEvent.Connected, () => {
           console.log('[LiveUserScreen] Connected to room');
-          if (mountedRef.current) {
+          if (!mounted || !mountedRef.current) return;
+          
+          try {
             setIsConnected(true);
-          }
 
-          // Attach existing tracks
-          room.remoteParticipants.forEach((participant) => {
-            if (participant.identity.startsWith('guest_')) return;
-            
-            participant.trackPublications.forEach((pub) => {
-              if (pub.track) {
-                if (pub.kind === Track.Kind.Video) {
-                  setRemoteVideoTrack(pub.track as RemoteTrack);
-                } else if (pub.kind === Track.Kind.Audio) {
-                  setRemoteAudioTrack(pub.track as RemoteTrack);
-                }
+            // Attach existing tracks
+            room.remoteParticipants.forEach((participant) => {
+              if (participant.identity.startsWith('guest_')) {
+                return;
               }
+              
+              participant.trackPublications.forEach((pub) => {
+                if (pub.track && pub.isSubscribed) {
+                  try {
+                    if (pub.kind === Track.Kind.Video) {
+                      setRemoteVideoTrack(pub.track as RemoteTrack);
+                      setTimeout(() => {
+                        if (mounted) {
+                          setVideoReady(true);
+                        }
+                      }, 100);
+                    } else if (pub.kind === Track.Kind.Audio) {
+                      setRemoteAudioTrack(pub.track as RemoteTrack);
+                    }
+                  } catch (err) {
+                    console.error('[LiveUserScreen] Error attaching existing track:', err);
+                  }
+                }
+              });
             });
-          });
+          } catch (err) {
+            console.error('[LiveUserScreen] Error in Connected handler:', err);
+          }
         });
 
-        room.on(RoomEvent.Disconnected, () => {
-          console.log('[LiveUserScreen] Disconnected from room');
+        room.on(RoomEvent.Disconnected, (reason) => {
           if (mountedRef.current) {
             setIsConnected(false);
             setRemoteVideoTrack(null);
             setRemoteAudioTrack(null);
+            setVideoReady(false);
           }
         });
 
         room.on(RoomEvent.Reconnecting, () => {
-          console.log('[LiveUserScreen] Reconnecting...');
+          // Reconnecting
         });
 
         room.on(RoomEvent.Reconnected, () => {
-          console.log('[LiveUserScreen] Reconnected');
           if (mountedRef.current) {
             setIsConnected(true);
           }
@@ -407,18 +491,25 @@ export default function LiveUserScreen() {
         await room.connect(url, token);
       } catch (err: any) {
         console.error('[LiveUserScreen] LiveKit connection error:', err);
+        if (mounted && mountedRef.current) {
+          // Don't show error for intentional disconnects
+          if (!err.message?.includes('Client initiated disconnect')) {
+            setError('Failed to connect to stream. Please try again.');
+          }
+          setIsConnected(false);
+        }
       }
     };
 
     connectToRoom();
 
     return () => {
-      if (roomRef.current) {
-        roomRef.current.disconnect();
-        roomRef.current = null;
-      }
+      mounted = false;
+      
+      // DON'T disconnect here - let the final cleanup handle it
+      // This cleanup runs on every dependency change
     };
-  }, [streamerData?.profile_id, streamerData?.is_live, currentUserId, currentUserProfile?.username]);
+  }, [streamerData?.profile_id]);
 
   // Subscribe to chat messages
   useEffect(() => {
@@ -717,14 +808,27 @@ export default function LiveUserScreen() {
   // Cleanup
   useEffect(() => {
     mountedRef.current = true;
+    
     return () => {
       mountedRef.current = false;
+      
+      // Clear tracks first to prevent render after cleanup
+      setRemoteVideoTrack(null);
+      setRemoteAudioTrack(null);
+      setVideoReady(false);
+      setIsConnected(false);
+      
+      // Then cleanup room connection
       if (roomRef.current) {
-        roomRef.current.disconnect();
+        try {
+          roomRef.current.disconnect();
+        } catch (err) {
+          console.error('[LiveUserScreen] Error disconnecting on unmount:', err);
+        }
         roomRef.current = null;
       }
     };
-  }, []);
+  }, []); // Empty deps - only run once on mount/unmount
 
   // Viewer heartbeat - tracks presence in active_viewers
   useEffect(() => {
@@ -778,7 +882,7 @@ export default function LiveUserScreen() {
         .eq('viewer_id', viewerId)
         .eq('live_stream_id', liveStreamId)
         .then(() => {
-          console.log('[LiveUserScreen] Viewer presence removed');
+          // Viewer presence removed
         })
         .catch((err) => {
           console.error('[LiveUserScreen] Error removing viewer presence:', err);
@@ -796,19 +900,19 @@ export default function LiveUserScreen() {
   // Loading state
   if (loading) {
     return (
-      <SafeAreaView style={styles.container} edges={['top']}>
+      <View style={styles.fullScreenContainer}>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#FF6B9D" />
           <Text style={styles.loadingText}>Loading stream...</Text>
         </View>
-      </SafeAreaView>
+      </View>
     );
   }
 
   // Error state
   if (error || !streamerData) {
     return (
-      <SafeAreaView style={styles.container} edges={['top']}>
+      <View style={styles.fullScreenContainer}>
         <View style={styles.errorContainer}>
           <Ionicons name="alert-circle-outline" size={48} color="#FF6B9D" />
           <Text style={styles.errorText}>{error || 'Stream not found'}</Text>
@@ -819,19 +923,20 @@ export default function LiveUserScreen() {
             <Text style={styles.backButtonText}>Go Back</Text>
           </TouchableOpacity>
         </View>
-      </SafeAreaView>
+      </View>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      {/* Video Area */}
+    <View style={styles.fullScreenContainer}>
+      {/* Video Area - Full screen background */}
       <View style={styles.videoContainer}>
-        {remoteVideoTrack ? (
+        {remoteVideoTrack && videoReady && remoteVideoTrack.kind === Track.Kind.Video ? (
           <VideoView
             style={styles.videoView}
             videoTrack={remoteVideoTrack as any}
             objectFit="cover"
+            mirror={false}
           />
         ) : (
           <View style={styles.videoPlaceholder}>
@@ -850,117 +955,185 @@ export default function LiveUserScreen() {
             )}
           </View>
         )}
-
-        <GiftOverlay
-          gifts={giftOverlays}
-          onComplete={(giftId) => {
-            setGiftOverlays((prev) => prev.filter((gift) => gift.id !== giftId));
-          }}
-        />
-
-        {/* Top Overlay */}
-        <View style={styles.topOverlay}>
-          <View style={styles.creatorInfo}>
-            <View style={styles.creatorAvatar}>
-              {streamerData.avatar_url ? (
-                <Image source={{ uri: streamerData.avatar_url }} style={styles.avatarImage} />
-              ) : (
-                <Ionicons name="person" size={24} color="#fff" />
-              )}
-            </View>
-            <View style={styles.creatorDetails}>
-              <Text style={styles.creatorName}>@{streamerData.username}</Text>
-              <Text style={styles.streamTitle}>{streamerData.display_name}</Text>
-            </View>
-          </View>
-
-          <View style={styles.topActions}>
-            <View style={styles.viewerCountBadge}>
-              <Ionicons name="eye" size={14} color="#fff" />
-              <Text style={styles.viewerCountText}>{formatViewerCount(viewerCount)}</Text>
-            </View>
-            <TouchableOpacity style={styles.iconButton} onPress={() => setShowReportModal(true)}>
-              <Ionicons name="flag-outline" size={20} color="#fff" />
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.iconButton} onPress={handleClose}>
-              <Ionicons name="close" size={24} color="#fff" />
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        {/* Right-Side Vertical Actions Rail */}
-        <View style={styles.rightRail}>
-          <TouchableOpacity style={styles.railAction} onPress={handleLike}>
-            <Ionicons name={isLiked ? "heart" : "heart-outline"} size={28} color={isLiked ? "#FF4458" : "#fff"} />
-            <Text style={styles.railActionText}>{formatViewerCount(likesCount)}</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.railAction}>
-            <Ionicons name="chatbubble-outline" size={26} color="#fff" />
-            <Text style={styles.railActionText}>{chatMessages.length}</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.railAction} onPress={() => setShowShareModal(true)}>
-            <Ionicons name="share-social-outline" size={26} color="#fff" />
-            <Text style={styles.railActionText}>Share</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.railAction} onPress={() => setShowGiftModal(true)}>
-            <Ionicons name="gift-outline" size={26} color="#fff" />
-            <Text style={styles.railActionText}>Gift</Text>
-          </TouchableOpacity>
-        </View>
       </View>
 
+      {/* Gift Overlay */}
+      <GiftOverlay
+        gifts={giftOverlays}
+        onComplete={(giftId) => {
+          setGiftOverlays((prev) => prev.filter((gift) => gift.id !== giftId));
+        }}
+      />
+
+      {/* Top Gradient Overlay */}
+      <LinearGradient
+        colors={['rgba(0,0,0,0.7)', 'rgba(0,0,0,0.4)', 'transparent']}
+        style={styles.topGradient}
+        pointerEvents="none"
+      />
+
+      {/* Top Overlay */}
+      <View style={[styles.topOverlay, { paddingTop: Math.max(insets.top, 12) }]}>
+          {/* Left: Profile Info (no back button) */}
+          <View style={styles.leftTopSection}>
+            {/* Profile Info Container */}
+            <View style={styles.profileInfoContainer}>
+              {/* Main profile bubble with avatar, name, stats, star */}
+              <View style={styles.profileBubble}>
+                <TouchableOpacity style={styles.avatarButton}>
+                  {streamerData.avatar_url ? (
+                    <Image source={{ uri: streamerData.avatar_url }} style={styles.avatarImage} />
+                  ) : (
+                    <View style={styles.avatarPlaceholder}>
+                      <Ionicons name="person" size={20} color="#fff" />
+                    </View>
+                  )}
+                </TouchableOpacity>
+
+                <View style={styles.profileDetails}>
+                  {/* Username row */}
+                  <Text style={styles.usernameText}>{streamerData.display_name || streamerData.username}</Text>
+                  
+                  {/* Trending & Leaderboard row */}
+                  <View style={styles.statsRow}>
+                    <TouchableOpacity style={styles.statButton}>
+                      <Ionicons name="flame" size={16} color="#FF6B35" />
+                      <Text style={styles.statText}>1</Text>
+                    </TouchableOpacity>
+                    
+                    <Text style={styles.statDivider}>•</Text>
+                    
+                    <TouchableOpacity style={styles.statButton}>
+                      <Ionicons name="trophy" size={16} color="#FFD700" />
+                      <Text style={styles.statText}>1</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+
+                {/* Follow Star Button */}
+                {currentUserId && currentUserId !== streamerData.profile_id && (
+                  <TouchableOpacity
+                    onPress={handleFollow}
+                    disabled={followLoading}
+                    style={styles.starButton}
+                  >
+                    {followLoading ? (
+                      <ActivityIndicator size="small" color="#FFD700" />
+                    ) : (
+                      <Ionicons
+                        name={isFollowing ? "star" : "star-outline"}
+                        size={20}
+                        color="#FFD700"
+                      />
+                    )}
+                  </TouchableOpacity>
+                )}
+              </View>
+
+              {/* Rank badge below profile bubble */}
+              <View style={styles.rankBadge}>
+                <Text style={styles.rankText}>1st</Text>
+                <Text style={styles.rankDivider}>•</Text>
+                <Ionicons name="trophy" size={12} color="#FFE168" />
+                <Text style={styles.rankDivider}>•</Text>
+                <Text style={styles.rankPointsText}>+0</Text>
+              </View>
+            </View>
+          </View>
+
+          {/* Right: Actions vertical */}
+          <View style={styles.rightTopSection}>
+            {/* Top row: Viewer Count and X */}
+            <View style={styles.topRightRow}>
+              {/* Viewer Count */}
+              <TouchableOpacity style={styles.viewerCountBadge}>
+                <Ionicons name="eye" size={14} color="#fff" />
+                <Text style={styles.viewerCountText}>{formatViewerCount(viewerCount)}</Text>
+              </TouchableOpacity>
+
+              {/* Close/X Button */}
+              <TouchableOpacity
+                style={styles.topIconButton}
+                onPress={() => navigation.goBack()}
+              >
+                <Ionicons name="close" size={24} color="#fff" />
+              </TouchableOpacity>
+            </View>
+
+            {/* Report Button */}
+            <TouchableOpacity
+              style={styles.topIconButton}
+              onPress={() => setShowReportModal(true)}
+            >
+              <Ionicons name="flag-outline" size={20} color="#fff" />
+            </TouchableOpacity>
+
+            {/* Share Button */}
+            <TouchableOpacity
+              style={styles.topIconButton}
+              onPress={() => setShowShareModal(true)}
+            >
+              <Ionicons name="share-social-outline" size={20} color="#fff" />
+            </TouchableOpacity>
+          </View>
+        </View>
+
+      {/* Bottom Gradient Overlay */}
+      <LinearGradient
+        colors={['transparent', 'rgba(0,0,0,0.4)', 'rgba(0,0,0,0.7)']}
+        style={styles.bottomGradient}
+        pointerEvents="none"
+      />
+
       {/* Bottom Area: Chat + Input Bar */}
-      <View style={styles.bottomArea}>
+      <View style={[styles.bottomArea, { paddingBottom: Math.max(insets.bottom, 12) }]}>
         {/* Chat Messages */}
         <View style={styles.chatList}>
           <ChatOverlay messages={chatMessages} />
         </View>
 
-        {/* Input Bar + Quick Actions */}
+        {/* Input Bar with icons matching screenshot */}
         <View style={styles.inputContainer}>
           <View style={styles.inputRow}>
+            {/* Settings/Gear icon */}
+            <TouchableOpacity style={styles.inputIconButton}>
+              <Ionicons name="settings-outline" size={24} color="#fff" />
+            </TouchableOpacity>
+
+            {/* Chat Input */}
             <TextInput
               style={styles.chatInput}
-              placeholder="Say something..."
-              placeholderTextColor="#999"
+              placeholder="Type a message..."
+              placeholderTextColor="#ccc"
               value={chatInput}
               onChangeText={setChatInput}
               onSubmitEditing={handleSendMessage}
               returnKeyType="send"
             />
-            <TouchableOpacity style={styles.sendButton} onPress={handleSendMessage}>
-              <Ionicons name="send" size={20} color="#fff" />
-            </TouchableOpacity>
-          </View>
 
-          {/* Quick Action Buttons */}
-          <View style={styles.quickActions}>
-            <TouchableOpacity style={styles.quickActionButton} onPress={() => setShowGiftModal(true)}>
-              <Ionicons name="gift" size={18} color="#FF6B9D" />
-              <Text style={styles.quickActionText}>Gift</Text>
+            {/* Add Friend icon */}
+            <TouchableOpacity style={styles.inputIconButton}>
+              <Ionicons name="person-add-outline" size={24} color="#A855F7" />
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.quickActionButton} onPress={handleLike}>
-              <Ionicons name={isLiked ? "heart" : "heart-outline"} size={18} color="#FF4458" />
-              <Text style={styles.quickActionText}>{isLiked ? 'Liked' : 'Like'}</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity 
-              style={[styles.quickActionButton, isFollowing && styles.quickActionButtonActive]} 
-              onPress={handleFollow}
-              disabled={followLoading}
+            {/* Gift icon */}
+            <TouchableOpacity
+              style={styles.inputIconButton}
+              onPress={() => setShowGiftModal(true)}
             >
-              {followLoading ? (
-                <ActivityIndicator size="small" color="#FFD700" />
-              ) : (
-                <>
-                  <Ionicons name={isFollowing ? "checkmark-circle" : "star"} size={18} color="#FFD700" />
-                  <Text style={styles.quickActionText}>{isFollowing ? 'Following' : 'Follow'}</Text>
-                </>
-              )}
+              <Ionicons name="gift" size={24} color="#FF6B9D" />
+            </TouchableOpacity>
+
+            {/* Heart/Like icon */}
+            <TouchableOpacity
+              style={styles.inputIconButton}
+              onPress={handleLike}
+            >
+              <Ionicons
+                name={isLiked ? "heart" : "heart-outline"}
+                size={24}
+                color="#FF4458"
+              />
             </TouchableOpacity>
           </View>
         </View>
@@ -1000,21 +1173,32 @@ export default function LiveUserScreen() {
         isLive={true}
         liveStreamId={streamerData.live_stream_id}
       />
-    </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  fullScreenContainer: {
+    flex: 1,
+    backgroundColor: '#000',
+  },
   container: {
     flex: 1,
     backgroundColor: '#000',
   },
   videoContainer: {
-    flex: 1,
-    position: 'relative',
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
   },
   videoPlaceholder: {
-    flex: 1,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     backgroundColor: '#1a1a1a',
     alignItems: 'center',
     justifyContent: 'center',
@@ -1032,155 +1216,192 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    padding: 12,
-    paddingTop: 16,
-    backgroundColor: 'rgba(0,0,0,0.4)',
+    paddingHorizontal: 0,
+    paddingBottom: 8,
+    zIndex: 20,
   },
-  creatorInfo: {
+  leftTopSection: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    flex: 1,
+    paddingLeft: 12,
+  },
+  profileInfoContainer: {
+    flexDirection: 'column',
+    alignItems: 'flex-start',
+  },
+  profileBubble: {
     flexDirection: 'row',
     alignItems: 'center',
-    flex: 1,
-  },
-  creatorAvatar: {
-    width: 40,
-    height: 40,
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
+    backdropFilter: 'blur(10px)',
     borderRadius: 20,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    gap: 8,
+  },
+  avatarButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    overflow: 'hidden',
+  },
+  avatarPlaceholder: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     backgroundColor: '#333',
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 10,
   },
-  creatorDetails: {
-    flex: 1,
+  profileDetails: {
+    flexDirection: 'column',
+    gap: 2,
   },
-  creatorName: {
+  usernameText: {
     color: '#fff',
     fontSize: 14,
     fontWeight: '700',
   },
-  streamTitle: {
-    color: '#ddd',
-    fontSize: 12,
-    marginTop: 2,
+  statsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
   },
-  topActions: {
+  statButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  statText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  statDivider: {
+    color: 'rgba(255, 255, 255, 0.4)',
+    fontSize: 12,
+  },
+  starButton: {
+    width: 28,
+    height: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  rankBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFB800',
+    borderRadius: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    marginTop: 6,
+    marginLeft: 8,
+    gap: 4,
+  },
+  rankText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  rankDivider: {
+    color: 'rgba(255, 255, 255, 0.6)',
+    fontSize: 10,
+  },
+  rankPointsText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  rightTopSection: {
+    flexDirection: 'column',
+    alignItems: 'flex-end',
+    gap: 12,
+    paddingRight: 12,
+  },
+  topRightRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
   },
+  topIconButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   viewerCountBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    paddingHorizontal: 10,
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
+    paddingHorizontal: 12,
     paddingVertical: 6,
-    borderRadius: 16,
+    borderRadius: 20,
     gap: 4,
   },
   viewerCountText: {
     color: '#fff',
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: '700',
   },
-  iconButton: {
-    width: 36,
-    height: 36,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    borderRadius: 18,
-  },
-  rightRail: {
+  topGradient: {
     position: 'absolute',
-    right: 12,
-    bottom: 120,
-    gap: 20,
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 120,
+    zIndex: 5,
   },
-  railAction: {
-    alignItems: 'center',
-    gap: 4,
-  },
-  railActionText: {
-    color: '#fff',
-    fontSize: 11,
-    fontWeight: '600',
+  bottomGradient: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 200,
+    zIndex: 5,
   },
   bottomArea: {
-    backgroundColor: '#1a1a1a',
-    maxHeight: 280,
+    maxHeight: 200,
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    zIndex: 10,
   },
   chatList: {
     maxHeight: 120,
     paddingHorizontal: 16,
-    paddingVertical: 8,
-  },
-  chatMessage: {
-    flexDirection: 'row',
-    marginBottom: 6,
-  },
-  chatUsername: {
-    color: '#FF6B9D',
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  chatText: {
-    color: '#fff',
-    fontSize: 13,
-    flex: 1,
+    paddingTop: 8,
+    backgroundColor: 'transparent',
   },
   inputContainer: {
-    paddingHorizontal: 16,
+    paddingHorizontal: 12,
     paddingVertical: 12,
-    borderTopWidth: 1,
-    borderTopColor: '#333',
+    backgroundColor: 'transparent',
   },
   inputRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    marginBottom: 12,
+    backgroundColor: 'transparent',
+    borderRadius: 24,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+  },
+  inputIconButton: {
+    width: 36,
+    height: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   chatInput: {
     flex: 1,
-    backgroundColor: '#2a2a2a',
-    borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
     color: '#fff',
     fontSize: 14,
-  },
-  sendButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#FF6B9D',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  quickActions: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    gap: 12,
-  },
-  quickActionButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#2a2a2a',
-    paddingVertical: 10,
-    borderRadius: 12,
-    gap: 6,
-  },
-  quickActionText: {
-    color: '#fff',
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  quickActionButtonActive: {
-    backgroundColor: 'rgba(255, 215, 0, 0.2)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 215, 0, 0.4)',
+    paddingVertical: 8,
+    paddingHorizontal: 8,
   },
   loadingContainer: {
     flex: 1,
@@ -1228,7 +1449,11 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   videoView: {
-    flex: 1,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     backgroundColor: '#000',
   },
   avatarImage: {

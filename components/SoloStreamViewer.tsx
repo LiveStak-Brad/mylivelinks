@@ -230,7 +230,14 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
   });
   
   // Check if streamer is in an active battle/cohost session
-  const isInActiveSession = battleSession && (battleSession.status === 'active' || battleSession.status === 'cooldown');
+  // Include battle_ready status so BattleGridWrapper stays mounted during ready phase
+  // This prevents viewers from seeing black screen when "start battle" is pressed
+  const isInActiveSession = battleSession && (
+    battleSession.status === 'active' || 
+    battleSession.status === 'cooldown' || 
+    battleSession.status === 'battle_ready' ||
+    battleSession.status === 'battle_active'
+  );
   
   // Track previous session state for cleanup
   const prevIsInActiveSessionRef = useRef(false);

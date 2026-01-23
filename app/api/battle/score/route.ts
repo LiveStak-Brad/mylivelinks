@@ -44,14 +44,34 @@ export async function POST(request: NextRequest) {
       .single();
     
     if (sessionError || !session) {
+      console.error('[battle/score] Session not found:', { session_id, error: sessionError });
       return NextResponse.json(
         { error: 'Session not found' },
         { status: 404 }
       );
     }
     
-    // Only award points for active battle sessions
-    if (session.type !== 'battle' || session.status !== 'active') {
+    console.log('[battle/score] Session found:', {
+      session_id,
+      type: session.type,
+      status: session.status,
+      recipient_id,
+      has_host_a: !!session.host_a,
+      has_host_b: !!session.host_b,
+    });
+    
+    // Only award points for active battle sessions (include battle_ready and battle_active)
+    const isActiveBattle = session.type === 'battle' && 
+      (session.status === 'active' || 
+       session.status === 'battle_active' || 
+       session.status === 'battle_ready');
+    
+    if (!isActiveBattle) {
+      console.warn('[battle/score] Session is not an active battle:', {
+        session_id,
+        type: session.type,
+        status: session.status,
+      });
       return NextResponse.json(
         { error: 'Session is not an active battle' },
         { status: 400 }
@@ -59,12 +79,29 @@ export async function POST(request: NextRequest) {
     }
     
     // Determine which side the recipient is on
-    let side: 'A' | 'B';
+    let side: 'A' | 'B' | null = null;
+    
     if (recipient_id === session.host_a) {
       side = 'A';
+      console.log('[battle/score] Found recipient in host_a');
     } else if (recipient_id === session.host_b) {
       side = 'B';
+      console.log('[battle/score] Found recipient in host_b');
     } else {
+      console.warn('[battle/score] Recipient not found in session:', {
+        recipient_id,
+        host_a: session.host_a,
+        host_b: session.host_b,
+      });
+    }
+    
+    if (!side) {
+      console.error('[battle/score] Recipient is not a participant in this battle:', {
+        recipient_id,
+        session_id,
+        host_a: session.host_a,
+        host_b: session.host_b,
+      });
       return NextResponse.json(
         { error: 'Recipient is not a participant in this battle' },
         { status: 400 }
@@ -84,6 +121,15 @@ export async function POST(request: NextRequest) {
     
     // Calculate battle points (coins × boost multiplier)
     const battlePoints = Math.floor(coin_amount * boostMultiplier);
+    
+    console.log('[battle/score] Applying battle points:', {
+      session_id,
+      side,
+      coin_amount,
+      battlePoints,
+      boostMultiplier,
+      sender_id,
+    });
     
     // Apply score update via RPC
     const { data: updatedScores, error: applyError } = await supabase.rpc(
@@ -105,12 +151,24 @@ export async function POST(request: NextRequest) {
     );
     
     if (applyError) {
-      console.error('[battle/score] RPC error:', applyError);
+      console.error('[battle/score] RPC error:', {
+        error: applyError,
+        session_id,
+        side,
+        battlePoints,
+      });
       return NextResponse.json(
         { error: 'Failed to update battle scores' },
         { status: 500 }
       );
     }
+    
+    console.log('[battle/score] Successfully applied battle points:', {
+      session_id,
+      side,
+      points_awarded: battlePoints,
+      updatedScores,
+    });
     
     return NextResponse.json({
       success: true,

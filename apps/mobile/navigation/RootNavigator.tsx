@@ -285,9 +285,17 @@ export default function RootNavigator({ header }: { header: () => React.ReactNod
       <RootStack.Screen name="LinkScreen" component={LinkScreen} />
       <RootStack.Screen name="LinkSettingsScreen" component={LinkSettingsScreen} />
       <RootStack.Screen name="IMThreadScreen" component={IMThreadScreen} />
-      <RootStack.Screen name="LiveHostScreen" component={LiveHostScreen} />
+      <RootStack.Screen 
+        name="LiveHostScreen" 
+        component={LiveHostScreen}
+        options={{ headerShown: false }}
+      />
       <RootStack.Screen name="LiveScreen" component={LiveScreen} />
-      <RootStack.Screen name="LiveUserScreen" component={LiveUserScreen} />
+      <RootStack.Screen 
+        name="LiveUserScreen" 
+        component={LiveUserScreen}
+        options={{ headerShown: false }}
+      />
       <RootStack.Screen name="ReplayScreen" component={ReplayScreen} />
       <RootStack.Screen name="ReplayPlaylistsScreen" component={ReplayPlaylistsScreen} />
       <RootStack.Screen name="CuratorPlaylistPlayerScreen" component={CuratorPlaylistPlayerScreen} />

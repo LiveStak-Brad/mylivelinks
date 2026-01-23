@@ -171,17 +171,24 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if recipient is in an active battle and award battle points
+    // Include battle_ready and battle_active statuses (gifts should count during ready phase too)
+    // Use RPC function to properly handle both old (host_a/host_b) and new (participants array) formats
     let battlePointsAwarded = null;
     try {
-      const { data: activeSession } = await adminSupabase
-        .from('live_sessions')
-        .select('id, type, status, host_a, host_b')
-        .or(`host_a.eq.${toUserId},host_b.eq.${toUserId}`)
-        .eq('type', 'battle')
-        .eq('status', 'active')
-        .maybeSingle();
+      const { data: activeSession } = await adminSupabase.rpc('rpc_get_active_session_for_host', {
+        p_host_id: toUserId,
+      });
+      
+      // Filter to only battle sessions in active/battle_active/battle_ready status
+      const battleSession = activeSession && 
+        activeSession.type === 'battle' && 
+        (activeSession.status === 'active' || 
+         activeSession.status === 'battle_active' || 
+         activeSession.status === 'battle_ready')
+        ? activeSession
+        : null;
 
-      if (activeSession) {
+      if (battleSession) {
         // Get sender profile data for battle supporter tracking
         const { data: senderProfile } = await adminSupabase
           .from('profiles')
@@ -197,7 +204,7 @@ export async function POST(request: NextRequest) {
             'Authorization': request.headers.get('Authorization') || '',
           },
           body: JSON.stringify({
-            session_id: activeSession.id,
+            session_id: battleSession.session_id || battleSession.id,
             recipient_id: toUserId,
             sender_id: user.id,
             sender_username: senderProfile?.username || 'Unknown',
