@@ -179,6 +179,15 @@ export default function BattleGridWrapper({
   const hostSnapshot = useMemo(() => {
     if (!session) return null;
     
+    console.log('[BattleGridWrapper] Building hostSnapshot from session:', {
+      session_id: session.session_id,
+      type: session.type,
+      status: session.status,
+      participants: session.participants,
+      host_a: session.host_a,
+      host_b: session.host_b,
+    });
+    
     // ALWAYS use participants array (unified approach for 1-9 hosts)
     const rawParticipants = (session.participants && Array.isArray(session.participants) && session.participants.length > 0)
       ? session.participants as Array<{
@@ -191,6 +200,8 @@ export default function BattleGridWrapper({
         }>
       : [];
     
+    console.log('[BattleGridWrapper] Raw participants from session:', rawParticipants);
+    
     // Map to normalized format with 'id' instead of 'profile_id'
     const participantList = rawParticipants
       .map(p => ({
@@ -202,6 +213,8 @@ export default function BattleGridWrapper({
         slot_index: p.slot_index,
       }))
       .sort((a, b) => a.slot_index - b.slot_index); // Ensure consistent ordering by slot
+    
+    console.log('[BattleGridWrapper] Mapped and sorted participants:', participantList);
     
     return {
       participants: participantList,
