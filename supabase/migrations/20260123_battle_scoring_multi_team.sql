@@ -267,4 +267,69 @@ $$;
 GRANT EXECUTE ON FUNCTION public.rpc_battle_score_snapshot(UUID) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.rpc_battle_score_snapshot(UUID) TO anon;
 
+-- =============================================================================
+-- Update rpc_end_session to support 3+ participants
+-- =============================================================================
+
+CREATE OR REPLACE FUNCTION public.rpc_end_session(
+  p_session_id UUID,
+  p_action TEXT DEFAULT 'cooldown'
+)
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_user_id UUID := auth.uid();
+  v_session live_sessions%ROWTYPE;
+  v_cooldown_duration INTERVAL;
+BEGIN
+  IF v_user_id IS NULL THEN
+    RAISE EXCEPTION 'Not authenticated';
+  END IF;
+  
+  IF p_action NOT IN ('end', 'cooldown') THEN
+    RAISE EXCEPTION 'Invalid action: must be end or cooldown';
+  END IF;
+  
+  -- Fetch the session and verify user is a participant (supports 3+ participants)
+  SELECT ls.* INTO v_session
+  FROM live_sessions ls
+  JOIN live_session_participants lsp ON lsp.session_id = ls.id
+  WHERE ls.id = p_session_id
+    AND lsp.profile_id = v_user_id
+    AND lsp.left_at IS NULL
+  FOR UPDATE;
+  
+  IF v_session IS NULL THEN
+    RAISE EXCEPTION 'Session not found or unauthorized';
+  END IF;
+  
+  IF p_action = 'end' THEN
+    -- Completely end the session
+    UPDATE live_sessions
+    SET status = 'ended', ends_at = now()
+    WHERE id = p_session_id;
+    
+    RETURN TRUE;
+  END IF;
+  
+  -- Transition to cooldown
+  IF v_session.mode = 'speed' THEN
+    v_cooldown_duration := INTERVAL '15 seconds';
+  ELSE
+    v_cooldown_duration := INTERVAL '30 seconds';
+  END IF;
+  
+  UPDATE live_sessions
+  SET status = 'cooldown', cooldown_ends_at = now() + v_cooldown_duration
+  WHERE id = p_session_id;
+  
+  RETURN TRUE;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.rpc_end_session(UUID, TEXT) TO authenticated;
+
 SELECT 'Multi-team battle scoring enabled!' AS status;
