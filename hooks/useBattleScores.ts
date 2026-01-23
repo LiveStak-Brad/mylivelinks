@@ -153,7 +153,8 @@ export function useBattleScores({
           filter: `session_id=eq.${sessionId}`,
         },
         (payload) => {
-          console.log('[useBattleScores] Score update:', payload);
+          console.log('[useBattleScores] Real-time score update received:', payload);
+          // Force immediate refresh when battle_scores changes
           fetchScores();
         }
       )

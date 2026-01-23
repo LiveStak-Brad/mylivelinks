@@ -299,10 +299,12 @@ BEGIN
     WHERE session_id = p_session_id AND left_at IS NULL;
   END IF;
   
-  INSERT INTO battle_scores (session_id, points_a, points_b, supporter_stats, participant_states)
-  VALUES (p_session_id, 0, 0, '{"supporters": []}'::jsonb, jsonb_build_object('ready', v_ready_states))
+  INSERT INTO battle_scores (session_id, points_a, points_b, points, supporter_stats, participant_states)
+  VALUES (p_session_id, 0, 0, '{}'::jsonb, '{"supporters": []}'::jsonb, jsonb_build_object('ready', v_ready_states))
   ON CONFLICT (session_id) DO UPDATE SET
-    points_a = 0, points_b = 0,
+    points_a = 0,
+    points_b = 0,
+    points = '{}'::jsonb,
     supporter_stats = '{"supporters": []}'::jsonb,
     participant_states = jsonb_build_object('ready', v_ready_states);
   

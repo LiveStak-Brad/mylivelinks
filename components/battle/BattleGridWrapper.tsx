@@ -159,10 +159,28 @@ export default function BattleGridWrapper({
   const isCurrentUserReady = currentUserId ? (readyStates[currentUserId] === true) : false;
   
   // Battle scores hook (only for battle sessions) - also safe now as all previous hooks are declared
-  const { scores, awardChatPoints } = useBattleScores({
+  const { scores, refresh: refreshScores, awardChatPoints } = useBattleScores({
     sessionId: (isBattleSession && session) ? session.session_id : null,
     autoFetch: isBattleSession,
   });
+  
+  // Force refresh scores when battle status changes (ready or active)
+  const prevBattleStatusRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!isBattleSession || !session) return;
+    
+    const currentStatus = session.status;
+    const prevStatus = prevBattleStatusRef.current;
+    
+    // If status changed to battle_ready or battle_active, force refresh scores
+    if (prevStatus !== currentStatus && 
+        (currentStatus === 'battle_ready' || currentStatus === 'battle_active')) {
+      console.log('[BattleGridWrapper] Battle status changed to', currentStatus, '- refreshing scores');
+      refreshScores?.();
+    }
+    
+    prevBattleStatusRef.current = currentStatus;
+  }, [isBattleSession, session?.status, refreshScores]);
   
   // CRITICAL: Use stable room name - only change when session_id or type actually changes
   // Don't recreate on every session object update (status changes, timer updates, etc.)
