@@ -20,8 +20,8 @@ export interface BattleSupporter {
   display_name: string | null;
   avatar_url: string | null;
   side: string; // Multi-team support: A, B, C, D, E, F, G, H, I, J, K, L
-  points: number;
-  chat_awarded: boolean;
+  points_contributed: number; // Changed from 'points' to match database schema
+  chat_messages_sent?: number; // Optional for chat tracking
 }
 
 export interface BoostState {

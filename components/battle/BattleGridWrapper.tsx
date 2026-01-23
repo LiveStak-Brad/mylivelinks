@@ -270,19 +270,19 @@ export default function BattleGridWrapper({
       username: s.username,
       display_name: s.display_name,
       avatar_url: s.avatar_url,
-      points: s.points,
+      points_contributed: s.points_contributed,
       rank,
     });
 
     const teamA = scores.supporters
       .filter(s => s.side === 'A')
-      .sort((a, b) => b.points - a.points)
+      .sort((a, b) => b.points_contributed - a.points_contributed)
       .slice(0, 3)
       .map((s, i) => mapToGifter(s, (i + 1) as 1 | 2 | 3));
 
     const teamB = scores.supporters
       .filter(s => s.side === 'B')
-      .sort((a, b) => b.points - a.points)
+      .sort((a, b) => b.points_contributed - a.points_contributed)
       .slice(0, 3)
       .map((s, i) => mapToGifter(s, (i + 1) as 1 | 2 | 3));
 

@@ -16,7 +16,7 @@ export interface TeamTopGifter {
   username: string;
   display_name: string | null;
   avatar_url: string | null;
-  points: number;
+  points_contributed: number; // Changed from 'points' to match database schema
   rank: 1 | 2 | 3;
 }
 
@@ -92,7 +92,7 @@ export default function TopGiftersDisplay({
               className="text-[10px] font-bold ml-auto"
               style={{ color }}
             >
-              {formatPoints(gifter.points)}
+              {formatPoints(gifter.points_contributed)}
             </span>
           </div>
         );
