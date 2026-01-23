@@ -2382,6 +2382,7 @@ export default function SoloHostStream() {
       <CoHostInviteModal
         isOpen={showCoHost}
         onClose={() => setShowCoHost(false)}
+        activeCount={battleSession?.participants?.length || 1}
       />
 
       {/* Guest Requests Modal */}
