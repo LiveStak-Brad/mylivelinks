@@ -517,11 +517,16 @@ export default function BattleGridWrapper({
       });
     });
     
-    // Sort participants: current user first, then by slot_index
+    // Sort participants:
+    // - Hosts: current user first (personalized view)
+    // - Viewers: by slot_index (see original host first)
     gridParticipants.sort((a, b) => {
-      if (a.id === currentUserId) return -1;
-      if (b.id === currentUserId) return 1;
-      
+      if (canPublish) {
+        // Host view: current user first, then by slot
+        if (a.id === currentUserId) return -1;
+        if (b.id === currentUserId) return 1;
+      }
+      // Viewer view (or remaining hosts): sort by slot_index
       const aSlot = hostSnapshot.participants?.find(p => p.id === a.id)?.slot_index || 99;
       const bSlot = hostSnapshot.participants?.find(p => p.id === b.id)?.slot_index || 99;
       return aSlot - bSlot;
