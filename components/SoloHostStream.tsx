@@ -2436,12 +2436,13 @@ export default function SoloHostStream() {
             setShowCooldown(false);
           }}
           onBackToPool={async () => {
-            await endCurrentSession();
-            await joinBattlePool();
+            // For multi-host cohosts, don't end session - just close modal and stay in cohost
+            // Timer will auto-convert back to cohost when it expires
             setShowCooldown(false);
           }}
           onQuit={async () => {
-            await endCurrentSession();
+            // For multi-host cohosts, don't end session - just close modal and stay in cohost
+            // Timer will auto-convert back to cohost when it expires
             setShowCooldown(false);
           }}
           onClose={() => setShowCooldown(false)}

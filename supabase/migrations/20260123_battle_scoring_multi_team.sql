@@ -208,4 +208,63 @@ $$;
 
 GRANT EXECUTE ON FUNCTION public.rpc_cooldown_to_cohost(UUID) TO authenticated;
 
+-- =============================================================================
+-- Update rpc_battle_score_snapshot to return multi-team points
+-- =============================================================================
+
+CREATE OR REPLACE FUNCTION public.rpc_battle_score_snapshot(
+  p_session_id UUID
+)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_row battle_scores%ROWTYPE;
+  v_points JSONB;
+BEGIN
+  SELECT * INTO v_row
+  FROM public.battle_scores
+  WHERE session_id = p_session_id;
+
+  IF NOT FOUND THEN
+    RETURN jsonb_build_object(
+      'session_id', p_session_id,
+      'points', jsonb_build_object('A', 0, 'B', 0),
+      'supporters', jsonb_build_array(),
+      'participantStates', jsonb_build_object(),
+      'boost', jsonb_build_object(
+        'active', FALSE,
+        'multiplier', 1,
+        'started_at', NULL,
+        'ends_at', NULL
+      )
+    );
+  END IF;
+
+  -- Use the new points JSONB column if it exists, otherwise fall back to points_a/points_b
+  v_points := COALESCE(
+    v_row.points,
+    jsonb_build_object('A', v_row.points_a, 'B', v_row.points_b)
+  );
+
+  RETURN jsonb_build_object(
+    'session_id', v_row.session_id,
+    'points', v_points,
+    'supporters', COALESCE(v_row.supporter_stats -> 'supporters', jsonb_build_array()),
+    'participantStates', v_row.participant_states,
+    'boost', jsonb_build_object(
+      'active', v_row.boost_active,
+      'multiplier', v_row.boost_multiplier,
+      'started_at', v_row.boost_started_at,
+      'ends_at', v_row.boost_ends_at
+    )
+  );
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.rpc_battle_score_snapshot(UUID) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.rpc_battle_score_snapshot(UUID) TO anon;
+
 SELECT 'Multi-team battle scoring enabled!' AS status;
