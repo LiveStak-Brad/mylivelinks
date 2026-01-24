@@ -1502,7 +1502,11 @@ export default function BattleGridWrapper({
 
         {/* Bottom Row: Timer/Gifters - at bottom of flex column, above chat */}
         {(isBattleSession || (isCohostSession && canPublish)) && (
-          <div className="w-full flex-shrink-0 flex items-center justify-between px-2 py-1 mb-4">
+          <div className="w-full flex-shrink-0 flex items-center justify-between px-2 py-2 mb-4 relative">
+            {/* Gradient background to hide chat behind */}
+            <div className="absolute inset-0 bg-gradient-to-t from-black via-black/80 to-transparent pointer-events-none" />
+            
+            <div className="relative z-10 w-full flex items-center justify-between">
             {/* Left side: Team A top 3 gifters (bronze -> silver -> gold, closest to timer) */}
             <div className="flex items-center gap-1 flex-1 justify-end">
               {isBattleSession && topGiftersByTeam['A'] && topGiftersByTeam['A'].length > 0 && (
@@ -1567,6 +1571,7 @@ export default function BattleGridWrapper({
                   ))}
                 </>
               )}
+            </div>
             </div>
           </div>
         )}
