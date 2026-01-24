@@ -67,11 +67,13 @@ export default function GiftAnimation({
   }, []);
 
   useEffect(() => {
-    if (isTestGift) return;
-    // Animation duration: 3 seconds
+    // Fallback timeout to ensure animation always completes
+    // Non-test gifts: 3 seconds
+    // Test gifts with video: 5 seconds (video should call onEnded sooner, this is backup)
+    const duration = isTestGift ? 5000 : 3000;
     const timer = setTimeout(() => {
       handleComplete();
-    }, 3000);
+    }, duration);
 
     return () => clearTimeout(timer);
   }, [handleComplete, isTestGift]);
