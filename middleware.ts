@@ -84,6 +84,11 @@ export async function middleware(request: NextRequest) {
 
   const pathname = request.nextUrl.pathname;
 
+  // Skip auth checks for public routes entirely
+  if (isPublicRoute(pathname)) {
+    return response;
+  }
+
   // Refresh session if expired
   try {
     // IMPORTANT:
@@ -91,39 +96,24 @@ export async function middleware(request: NextRequest) {
     // on the response. If we return early, those cookie writes are lost and users get
     // stuck in a login loop (especially on localhost during OAuth flows).
     
-    // First check if we have auth cookies at all - if not, skip getUser() call
-    const hasAuthCookie = request.cookies.has('sb-access-token') || 
-                          request.cookies.has('sb-refresh-token') ||
-                          // Check for Supabase SSR cookie format (domain-specific)
-                          Array.from(request.cookies.getAll()).some(c => 
-                            c.name.includes('auth-token') || c.name.includes('sb-')
-                          );
+    // Check if we have Supabase auth cookies
+    // Supabase SSR uses cookies with format: sb-<project-ref>-auth-token
+    const allCookies = request.cookies.getAll();
+    const hasAuthCookie = allCookies.some(cookie => 
+      cookie.name.startsWith('sb-') && cookie.name.includes('auth-token')
+    );
     
-    // If no auth cookies exist AND it's not a public route, redirect to login
-    // This prevents unnecessary getUser() calls that slow down the middleware
-    if (!hasAuthCookie && !isPublicRoute(pathname)) {
-      const fullPath = request.nextUrl.pathname + request.nextUrl.search;
-      const loginUrl = new URL('/login', request.url);
-      if (isValidNextUrl(fullPath)) {
-        loginUrl.searchParams.set('next', fullPath);
-      }
-      return NextResponse.redirect(loginUrl);
-    }
-    
-    // Only call getUser if we have cookies OR it's a public route
-    // This reduces auth checks and prevents redirect loops
-    if (hasAuthCookie || isPublicRoute(pathname)) {
+    // If we have auth cookies, verify the session
+    if (hasAuthCookie) {
       const { data: { user } } = await supabase.auth.getUser();
       
-      // Redirect logged-in users from / to /watch (Watch is the centerpoint like TikTok)
+      // Redirect logged-in users from / to /watch
       if (user && pathname === '/') {
         return NextResponse.redirect(new URL('/watch', request.url));
       }
-
-      // Auth gate: redirect unauthenticated users to login with next= param
-      // Only redirect if we actually checked auth (had cookies) and found no user
-      if (!user && !isPublicRoute(pathname) && hasAuthCookie) {
-        // Build the full path including query string
+      
+      // If cookies exist but no valid user, redirect to login
+      if (!user) {
         const fullPath = request.nextUrl.pathname + request.nextUrl.search;
         const loginUrl = new URL('/login', request.url);
         if (isValidNextUrl(fullPath)) {
@@ -131,10 +121,18 @@ export async function middleware(request: NextRequest) {
         }
         return NextResponse.redirect(loginUrl);
       }
+    } else {
+      // No auth cookies = definitely not logged in, redirect to login
+      const fullPath = request.nextUrl.pathname + request.nextUrl.search;
+      const loginUrl = new URL('/login', request.url);
+      if (isValidNextUrl(fullPath)) {
+        loginUrl.searchParams.set('next', fullPath);
+      }
+      return NextResponse.redirect(loginUrl);
     }
   } catch (error) {
-    // Never block requests due to transient auth/network issues
-    // Log error for debugging but allow the request through
+    // On error, allow the request through rather than blocking
+    // This prevents users from getting stuck if Supabase has issues
     console.error('[Middleware] Auth check error:', error);
   }
 
@@ -148,8 +146,10 @@ export const config = {
      * - _next/static (static files)
      * - _next/image (image optimization files)
      * - favicon.ico (favicon file)
+     * - manifest.json (PWA manifest)
+     * - images and other static assets
      */
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    '/((?!_next/static|_next/image|favicon.ico|manifest.json|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 };
 
