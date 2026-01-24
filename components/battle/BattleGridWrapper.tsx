@@ -1434,8 +1434,8 @@ export default function BattleGridWrapper({
   }
 
   return (
-    <div className={`flex flex-col relative ${className}`}>
-      {/* Battle Score Bar - absolute positioned at top, overlays grid */}
+    <div className="relative w-full h-full">
+      {/* Battle Score Bar - absolute positioned, respects safe area from parent */}
       {isBattleSession && battleStates.size > 0 && (
         <div className="absolute top-0 left-0 right-0 z-10 bg-black/60">
           <BattleScoreSlider
@@ -1448,8 +1448,8 @@ export default function BattleGridWrapper({
         </div>
       )}
       
-      {/* Grid */}
-      <div className="relative flex-1 w-full h-full">
+      {/* Grid Container - applies safe area padding, grid fills this */}
+      <div className={`w-full h-full relative ${className}`}>
         <MultiHostGrid
           participants={participants}
           mode={gridMode}
@@ -1484,9 +1484,10 @@ export default function BattleGridWrapper({
       </div>
 
       {/* Bottom Row: Top Gifters (center) + Timer/StartBattle (center) - absolute positioned */}
+      {/* Show for: battle sessions (all users), OR cohost ready to start (host only) */}
       {(isBattleSession || (isCohostSession && canPublish)) && !isInCooldown && (
         <div className="absolute bottom-0 left-0 right-0 z-10 flex items-center justify-center px-2 py-1 gap-4">
-          {/* Timer (active battle) / Start Battle (cohost) */}
+          {/* Timer (active battle - show to ALL) / Start Battle (cohost - host only) */}
           <div className="flex-shrink-0">
             {isBattleSession && isBattleActive ? (
               <BattleTimer
@@ -1500,7 +1501,7 @@ export default function BattleGridWrapper({
             ) : null}
           </div>
 
-          {/* Top 3 Gifters (only during active battle) */}
+          {/* Top 3 Gifters (only during active battle - show to ALL) */}
           {isBattleSession && isBattleActive && topGifters.length > 0 && (
             <TopGiftersDisplay
               gifters={topGifters}
