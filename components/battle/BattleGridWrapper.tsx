@@ -88,6 +88,8 @@ interface BattleGridWrapperProps {
   currentUserName: string;
   /** Whether current user should publish (hosts only) */
   canPublish: boolean;
+  /** For viewers: the profile ID of the host they're watching (to show that host first) */
+  targetHostId?: string;
   /** Remaining seconds in current phase */
   remainingSeconds: number;
   /** Additional className for wrapper */
@@ -105,6 +107,7 @@ export default function BattleGridWrapper({
   currentUserId,
   currentUserName,
   canPublish,
+  targetHostId,
   remainingSeconds,
   className = '',
   onRoomConnected,
@@ -536,14 +539,18 @@ export default function BattleGridWrapper({
     
     // Sort participants:
     // - Hosts: current user first (personalized view)
-    // - Viewers: by slot_index (see original host first)
+    // - Viewers: target host first (the host they clicked on)
     gridParticipants.sort((a, b) => {
       if (canPublish) {
         // Host view: current user first, then by slot
         if (a.id === currentUserId) return -1;
         if (b.id === currentUserId) return 1;
+      } else if (targetHostId) {
+        // Viewer view: target host first (the host they clicked on), then by slot
+        if (a.id === targetHostId) return -1;
+        if (b.id === targetHostId) return 1;
       }
-      // Viewer view (or remaining hosts): sort by slot_index
+      // Fallback: sort by slot_index
       const aSlot = hostSnapshot.participants?.find(p => p.id === a.id)?.slot_index || 99;
       const bSlot = hostSnapshot.participants?.find(p => p.id === b.id)?.slot_index || 99;
       return aSlot - bSlot;

@@ -2153,6 +2153,7 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
                     currentUserId={currentUserId}
                     currentUserName={streamer.display_name || streamer.username}
                     canPublish={false}
+                    targetHostId={streamer.profile_id}
                     remainingSeconds={battleRemainingSeconds}
                     className="w-full h-full box-border pt-28 pb-[40vh]"
                     onRefreshSession={refreshBattleSession}
