@@ -276,13 +276,10 @@ export default function BattleGridWrapper({
     }
   }, [participants.length]);
 
-  // Derive top 3 gifters per team from scores.supporters
-  const { teamAGifters, teamBGifters } = useMemo((): { 
-    teamAGifters: TeamTopGifter[]; 
-    teamBGifters: TeamTopGifter[]; 
-  } => {
+  // Derive top 3 gifters from scores.supporters (all teams combined for 3+ battles)
+  const topGifters = useMemo((): TeamTopGifter[] => {
     if (!scores?.supporters || scores.supporters.length === 0) {
-      return { teamAGifters: [], teamBGifters: [] };
+      return [];
     }
 
     const mapToGifter = (s: typeof scores.supporters[0], rank: 1 | 2 | 3): TeamTopGifter => ({
@@ -294,19 +291,11 @@ export default function BattleGridWrapper({
       rank,
     });
 
-    const teamA = scores.supporters
-      .filter(s => s.side === 'A')
+    // Get top 3 gifters across ALL teams
+    return scores.supporters
       .sort((a, b) => b.points_contributed - a.points_contributed)
       .slice(0, 3)
       .map((s, i) => mapToGifter(s, (i + 1) as 1 | 2 | 3));
-
-    const teamB = scores.supporters
-      .filter(s => s.side === 'B')
-      .sort((a, b) => b.points_contributed - a.points_contributed)
-      .slice(0, 3)
-      .map((s, i) => mapToGifter(s, (i + 1) as 1 | 2 | 3));
-
-    return { teamAGifters: teamA, teamBGifters: teamB };
   }, [scores?.supporters]);
 
   // Battle states with real scores and team-relative colors
@@ -1515,24 +1504,11 @@ export default function BattleGridWrapper({
         )}
       </div>
 
-      {/* Bottom Row: Top Gifters (left/right) + Timer/StartBattle/Ready (center) */}
-      {/* Unified layout: always render if battle/cohost active, content varies */}
+      {/* Bottom Row: Top Gifters (center) + Timer/StartBattle (center) */}
       {(isBattleSession || (isCohostSession && canPublish)) && !isInCooldown && (
-        <div className="w-full flex items-center justify-between px-2 py-1">
-          {/* Left: Team A Top 3 Gifters (only during active battle) */}
-          <div className="flex-1 min-w-0">
-            {isBattleSession && isBattleActive && teamAGifters.length > 0 && (
-              <TopGiftersDisplay
-                gifters={teamAGifters}
-                side="A"
-                color={TEAM_COLORS.A}
-              />
-            )}
-          </div>
-
-          {/* Center: Timer (active battle) / Start Battle (cohost) */}
-          {/* Note: Ready UI is now shown in BattleReadyModal popup for hosts */}
-          <div className="flex-shrink-0 px-2">
+        <div className="w-full flex items-center justify-center px-2 py-1 gap-4">
+          {/* Timer (active battle) / Start Battle (cohost) */}
+          <div className="flex-shrink-0">
             {isBattleSession && isBattleActive ? (
               <BattleTimer
                 remainingSeconds={remainingSeconds}
@@ -1545,16 +1521,14 @@ export default function BattleGridWrapper({
             ) : null}
           </div>
 
-          {/* Right: Team B Top 3 Gifters (only during active battle) */}
-          <div className="flex-1 min-w-0 flex justify-end">
-            {isBattleSession && isBattleActive && teamBGifters.length > 0 && (
-              <TopGiftersDisplay
-                gifters={teamBGifters}
-                side="B"
-                color={TEAM_COLORS.B}
-              />
-            )}
-          </div>
+          {/* Top 3 Gifters (only during active battle) */}
+          {isBattleSession && isBattleActive && topGifters.length > 0 && (
+            <TopGiftersDisplay
+              gifters={topGifters}
+              side="A"
+              color={TEAM_COLORS.A}
+            />
+          )}
         </div>
       )}
       
