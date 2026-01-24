@@ -1481,36 +1481,36 @@ export default function BattleGridWrapper({
             />
           </div>
         )}
-      </div>
 
-      {/* Bottom Row: Top Gifters (center) + Timer/StartBattle (center) - absolute positioned */}
-      {/* Show for: battle sessions (all users), OR cohost ready to start (host only) */}
-      {(isBattleSession || (isCohostSession && canPublish)) && !isInCooldown && (
-        <div className="absolute bottom-0 left-0 right-0 z-10 flex items-center justify-center px-2 py-1 gap-4">
-          {/* Timer (active battle - show to ALL) / Start Battle (cohost - host only) */}
-          <div className="flex-shrink-0">
-            {isBattleSession && isBattleActive ? (
-              <BattleTimer
-                remainingSeconds={remainingSeconds}
-                phase="active"
-                mode={session.mode}
-                compact
+        {/* Bottom Row: Top Gifters (center) + Timer/StartBattle (center) - absolute positioned within padded container */}
+        {/* Show for: battle sessions (all users), OR cohost ready to start (host only) */}
+        {(isBattleSession || (isCohostSession && canPublish)) && !isInCooldown && (
+          <div className="absolute bottom-0 left-0 right-0 z-10 flex items-center justify-center px-2 py-1 gap-4">
+            {/* Timer (active battle - show to ALL) / Start Battle (cohost - host only) */}
+            <div className="flex-shrink-0">
+              {isBattleSession && isBattleActive ? (
+                <BattleTimer
+                  remainingSeconds={remainingSeconds}
+                  phase="active"
+                  mode={session.mode}
+                  compact
+                />
+              ) : isCohostSession && canPublish ? (
+                <CohostStartBattleButton onStartBattle={handleStartBattle} />
+              ) : null}
+            </div>
+
+            {/* Top 3 Gifters (only during active battle - show to ALL) */}
+            {isBattleSession && isBattleActive && topGifters.length > 0 && (
+              <TopGiftersDisplay
+                gifters={topGifters}
+                side="A"
+                color={TEAM_COLORS.A}
               />
-            ) : isCohostSession && canPublish ? (
-              <CohostStartBattleButton onStartBattle={handleStartBattle} />
-            ) : null}
+            )}
           </div>
-
-          {/* Top 3 Gifters (only during active battle - show to ALL) */}
-          {isBattleSession && isBattleActive && topGifters.length > 0 && (
-            <TopGiftersDisplay
-              gifters={topGifters}
-              side="A"
-              color={TEAM_COLORS.A}
-            />
-          )}
-        </div>
-      )}
+        )}
+      </div>
       
       {/* Cooldown controls (battle only, host only) */}
       {isBattleSession && isInCooldown && canPublish && (
