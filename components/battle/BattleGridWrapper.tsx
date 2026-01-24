@@ -278,11 +278,11 @@ export default function BattleGridWrapper({
     }
   }, [participants.length]);
 
-  // Derive top 3 gifters from scores.supporters (all teams combined for 3+ battles)
-  const topGifters = useMemo((): TeamTopGifter[] => {
+  // Derive top 3 gifters BY TEAM from scores.supporters
+  const topGiftersByTeam = useMemo((): Record<string, TeamTopGifter[]> => {
     if (!scores?.supporters || scores.supporters.length === 0) {
       console.log('[BattleGrid] No supporters data:', { scores });
-      return [];
+      return {};
     }
 
     const mapToGifter = (s: typeof scores.supporters[0], rank: 1 | 2 | 3): TeamTopGifter => ({
@@ -294,14 +294,24 @@ export default function BattleGridWrapper({
       rank,
     });
 
-    // Get top 3 gifters across ALL teams
-    const result = scores.supporters
-      .sort((a, b) => b.points_contributed - a.points_contributed)
-      .slice(0, 3)
-      .map((s, i) => mapToGifter(s, (i + 1) as 1 | 2 | 3));
+    // Group by team (side), get top 3 per team
+    const byTeam: Record<string, TeamTopGifter[]> = {};
     
-    console.log('[BattleGrid] Top gifters:', result);
-    return result;
+    // Get all unique teams
+    const teams = [...new Set(scores.supporters.map(s => s.side))];
+    
+    teams.forEach(team => {
+      const teamGifters = scores.supporters
+        .filter(s => s.side === team)
+        .sort((a, b) => b.points_contributed - a.points_contributed)
+        .slice(0, 3)
+        .map((s, i) => mapToGifter(s, (i + 1) as 1 | 2 | 3));
+      
+      byTeam[team] = teamGifters;
+    });
+    
+    console.log('[BattleGrid] Top gifters by team:', byTeam);
+    return byTeam;
   }, [scores?.supporters]);
 
   // Battle states with real scores and team-relative colors
@@ -1492,12 +1502,12 @@ export default function BattleGridWrapper({
 
         {/* Bottom Row: Timer/Gifters - at bottom of flex column, above chat */}
         {(isBattleSession || (isCohostSession && canPublish)) && (
-          <div className="w-full flex-shrink-0 flex items-center justify-between px-2 py-1">
-            {/* Left side: Top 3 gifters (bronze -> silver -> gold, closest to timer) */}
+          <div className="w-full flex-shrink-0 flex items-center justify-between px-2 py-1 mb-4">
+            {/* Left side: Team A top 3 gifters (bronze -> silver -> gold, closest to timer) */}
             <div className="flex items-center gap-1 flex-1 justify-end">
-              {isBattleSession && topGifters.length > 0 && (
+              {isBattleSession && topGiftersByTeam['A'] && topGiftersByTeam['A'].length > 0 && (
                 <>
-                  {topGifters.slice(0, 3).reverse().map((gifter) => (
+                  {topGiftersByTeam['A'].slice(0, 3).reverse().map((gifter) => (
                     <div
                       key={gifter.profile_id}
                       className="w-8 h-8 rounded-full overflow-hidden flex-shrink-0"
@@ -1533,11 +1543,11 @@ export default function BattleGridWrapper({
               ) : <div className="w-20" />}
             </div>
 
-            {/* Right side: Same gifters mirrored (gold -> silver -> bronze, closest to timer) */}
+            {/* Right side: Team B top 3 gifters (gold -> silver -> bronze, closest to timer) */}
             <div className="flex items-center gap-1 flex-1 justify-start">
-              {isBattleSession && topGifters.length > 0 && (
+              {isBattleSession && topGiftersByTeam['B'] && topGiftersByTeam['B'].length > 0 && (
                 <>
-                  {topGifters.slice(0, 3).map((gifter) => (
+                  {topGiftersByTeam['B'].slice(0, 3).map((gifter) => (
                     <div
                       key={`r-${gifter.profile_id}`}
                       className="w-8 h-8 rounded-full overflow-hidden flex-shrink-0"
