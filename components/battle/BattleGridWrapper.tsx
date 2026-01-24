@@ -1438,10 +1438,10 @@ export default function BattleGridWrapper({
   }
 
   return (
-    <div className={`relative w-full h-full ${className}`}>
-      {/* Battle Score Bar - absolute positioned at top within safe area */}
-      {isBattleSession && battleStates.size > 0 && (
-        <div className="absolute top-0 left-0 right-0 z-10 bg-black/60">
+    <div className={`flex flex-col ${className}`}>
+      {/* Battle Score Bar - at top of flex column */}
+      {isBattleSession && battleStates.size > 0 ? (
+        <div className="w-full bg-black/60 flex-shrink-0">
           <BattleScoreSlider
             battleStates={battleStates}
             battleMode={battleMode}
@@ -1450,10 +1450,12 @@ export default function BattleGridWrapper({
             rounded={false}
           />
         </div>
+      ) : (
+        isBattleSession && console.log('[BattleGrid] Score bar NOT showing. battleStates.size:', battleStates.size)
       )}
       
-      {/* Grid Container - fills parent, grid content respects padding */}
-      <div className="w-full h-full relative">
+      {/* Grid Container - flex-1 takes remaining space */}
+      <div className="relative flex-1 w-full">
         <MultiHostGrid
           participants={participants}
           mode={gridMode}
@@ -1486,34 +1488,38 @@ export default function BattleGridWrapper({
           </div>
         )}
 
-        {/* Bottom Row: Top Gifters (center) + Timer/StartBattle (center) - absolute positioned within padded container */}
-        {/* Show for: battle sessions (all users), OR cohost ready to start (host only) */}
+        {/* Bottom Row: Timer/Gifters - at bottom of flex column, above chat */}
         {(isBattleSession || (isCohostSession && canPublish)) && (
-          <div className="absolute bottom-0 left-0 right-0 z-10 flex items-center justify-center px-2 py-1 gap-4">
-            {/* Timer (active battle - show to ALL) / Start Battle (cohost - host only) */}
-            {!isInCooldown && (
-              <div className="flex-shrink-0">
-                {isBattleSession && isBattleActive ? (
-                  <BattleTimer
-                    remainingSeconds={remainingSeconds}
-                    phase="active"
-                    mode={session.mode}
-                    compact
-                  />
-                ) : isCohostSession && canPublish ? (
-                  <CohostStartBattleButton onStartBattle={handleStartBattle} />
-                ) : null}
-              </div>
-            )}
+          <div className="w-full flex-shrink-0 flex items-center justify-between px-2 py-1">
+            {/* Left side: Gifters for first team/streamer */}
+            <div className="flex items-center gap-1">
+              {isBattleSession && topGifters.length > 0 && (
+                <TopGiftersDisplay
+                  gifters={topGifters.filter(g => g.rank <= 3)}
+                  side="A"
+                  color={TEAM_COLORS.A}
+                />
+              )}
+            </div>
 
-            {/* Top 3 Gifters - show during battle, after battle, and in cooldown */}
-            {isBattleSession && topGifters.length > 0 && (
-              <TopGiftersDisplay
-                gifters={topGifters}
-                side="A"
-                color={TEAM_COLORS.A}
-              />
-            )}
+            {/* Center: Timer or Start Battle button */}
+            <div className="flex-shrink-0">
+              {!isInCooldown && isBattleSession && isBattleActive ? (
+                <BattleTimer
+                  remainingSeconds={remainingSeconds}
+                  phase="active"
+                  mode={session.mode}
+                  compact
+                />
+              ) : !isInCooldown && isCohostSession && canPublish && !isBattleActive ? (
+                <CohostStartBattleButton onStartBattle={handleStartBattle} />
+              ) : null}
+            </div>
+
+            {/* Right side: Reserved for second team/streamer gifters (if needed) */}
+            <div className="flex items-center gap-1">
+              {/* Placeholder for now - will show team B gifters if 1v1 */}
+            </div>
           </div>
         )}
       </div>

@@ -41,7 +41,7 @@ export default function TopGiftersDisplay({
     return null;
   }
 
-  // Rank badge colors (gold, silver, bronze)
+  // Rank badge colors (gold, silver, bronze) - brighter and more saturated
   const RANK_COLORS: Record<1 | 2 | 3, string> = {
     1: '#FFD700', // Gold
     2: '#C0C0C0', // Silver
@@ -49,21 +49,21 @@ export default function TopGiftersDisplay({
   };
 
   return (
-    <div className={`flex items-center gap-2 ${className}`}>
+    <div className={`flex items-center gap-1 ${className}`}>
       {gifters.map((gifter) => (
         <div
           key={gifter.profile_id}
-          className="w-10 h-10 rounded-full overflow-hidden flex-shrink-0 ring-2"
+          className="w-8 h-8 rounded-full overflow-hidden flex-shrink-0"
           style={{ 
-            borderColor: RANK_COLORS[gifter.rank],
-            boxShadow: `0 0 8px ${RANK_COLORS[gifter.rank]}40`
+            border: `2px solid ${RANK_COLORS[gifter.rank]}`,
+            boxShadow: `0 0 6px ${RANK_COLORS[gifter.rank]}`
           }}
         >
           <Image
             src={getAvatarUrl(gifter.avatar_url)}
             alt={gifter.username}
-            width={40}
-            height={40}
+            width={32}
+            height={32}
             className="w-full h-full object-cover"
           />
         </div>
