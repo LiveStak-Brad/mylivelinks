@@ -1442,7 +1442,7 @@ export default function BattleGridWrapper({
             battleStates={battleStates}
             battleMode={battleMode}
             height={20}
-            hostId={currentUserId}
+            hostId={canPublish ? currentUserId : (targetHostId || currentUserId)}
             rounded={false}
           />
         </div>
