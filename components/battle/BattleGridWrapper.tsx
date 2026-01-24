@@ -1438,8 +1438,8 @@ export default function BattleGridWrapper({
   }
 
   return (
-    <div className="relative w-full h-full">
-      {/* Battle Score Bar - absolute positioned, respects safe area from parent */}
+    <div className={`relative w-full h-full ${className}`}>
+      {/* Battle Score Bar - absolute positioned at top within safe area */}
       {isBattleSession && battleStates.size > 0 && (
         <div className="absolute top-0 left-0 right-0 z-10 bg-black/60">
           <BattleScoreSlider
@@ -1452,8 +1452,8 @@ export default function BattleGridWrapper({
         </div>
       )}
       
-      {/* Grid Container - applies safe area padding, grid fills this */}
-      <div className={`w-full h-full relative ${className}`}>
+      {/* Grid Container - fills parent, grid content respects padding */}
+      <div className="w-full h-full relative">
         <MultiHostGrid
           participants={participants}
           mode={gridMode}
