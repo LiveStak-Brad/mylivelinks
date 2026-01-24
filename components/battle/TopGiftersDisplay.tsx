@@ -55,7 +55,7 @@ export default function TopGiftersDisplay({
           key={gifter.profile_id}
           className="w-10 h-10 rounded-full overflow-hidden flex-shrink-0 ring-2"
           style={{ 
-            ringColor: RANK_COLORS[gifter.rank],
+            borderColor: RANK_COLORS[gifter.rank],
             boxShadow: `0 0 8px ${RANK_COLORS[gifter.rank]}40`
           }}
         >
