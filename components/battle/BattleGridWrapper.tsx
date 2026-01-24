@@ -1504,8 +1504,8 @@ export default function BattleGridWrapper({
               ) : null}
             </div>
 
-            {/* Top 3 Gifters (only during active battle - show to ALL) */}
-            {isBattleSession && isBattleActive && topGifters.length > 0 && (
+            {/* Top 3 Gifters - show during AND after battle until next battle starts */}
+            {isBattleSession && topGifters.length > 0 && (
               <TopGiftersDisplay
                 gifters={topGifters}
                 side="A"
