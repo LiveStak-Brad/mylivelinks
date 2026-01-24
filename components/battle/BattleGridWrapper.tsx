@@ -279,6 +279,7 @@ export default function BattleGridWrapper({
   // Derive top 3 gifters from scores.supporters (all teams combined for 3+ battles)
   const topGifters = useMemo((): TeamTopGifter[] => {
     if (!scores?.supporters || scores.supporters.length === 0) {
+      console.log('[BattleGrid] No supporters data:', { scores });
       return [];
     }
 
@@ -292,10 +293,13 @@ export default function BattleGridWrapper({
     });
 
     // Get top 3 gifters across ALL teams
-    return scores.supporters
+    const result = scores.supporters
       .sort((a, b) => b.points_contributed - a.points_contributed)
       .slice(0, 3)
       .map((s, i) => mapToGifter(s, (i + 1) as 1 | 2 | 3));
+    
+    console.log('[BattleGrid] Top gifters:', result);
+    return result;
   }, [scores?.supporters]);
 
   // Battle states with real scores and team-relative colors

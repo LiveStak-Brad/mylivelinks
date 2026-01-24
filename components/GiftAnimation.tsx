@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import ChromaKeyVideoGift from './gifts/ChromaKeyVideoGift';
 import { playGiftSound } from '@/lib/gifts/giftAudio';
 import {
@@ -30,6 +30,12 @@ export default function GiftAnimation({
 }: GiftAnimationProps) {
   const [isVisible, setIsVisible] = useState(true);
   const [scale, setScale] = useState(1);
+  const onCompleteRef = useRef(onComplete);
+
+  // Keep ref up to date
+  useEffect(() => {
+    onCompleteRef.current = onComplete;
+  }, [onComplete]);
 
   const effectiveScale = typeof scaleOverride === 'number' ? scaleOverride : scale;
   const isTestGift = useMemo(
@@ -43,8 +49,8 @@ export default function GiftAnimation({
 
   const handleComplete = useCallback(() => {
     setIsVisible(false);
-    setTimeout(onComplete, 300);
-  }, [onComplete]);
+    setTimeout(() => onCompleteRef.current(), 300);
+  }, []);
 
   useEffect(() => {
     if (typeof scaleOverride === 'number') {
