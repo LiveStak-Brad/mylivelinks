@@ -1434,10 +1434,10 @@ export default function BattleGridWrapper({
   }
 
   return (
-    <div className={`flex flex-col ${className}`}>
-      {/* Battle Score Bar - attached to top of grid, flat edges, full width */}
+    <div className={`flex flex-col relative ${className}`}>
+      {/* Battle Score Bar - absolute positioned at top, overlays grid */}
       {isBattleSession && battleStates.size > 0 && (
-        <div className="w-full bg-black/60">
+        <div className="absolute top-0 left-0 right-0 z-10 bg-black/60">
           <BattleScoreSlider
             battleStates={battleStates}
             battleMode={battleMode}
@@ -1449,7 +1449,7 @@ export default function BattleGridWrapper({
       )}
       
       {/* Grid */}
-      <div className="relative flex-1">
+      <div className="relative flex-1 w-full h-full">
         <MultiHostGrid
           participants={participants}
           mode={gridMode}
@@ -1483,9 +1483,9 @@ export default function BattleGridWrapper({
         )}
       </div>
 
-      {/* Bottom Row: Top Gifters (center) + Timer/StartBattle (center) */}
+      {/* Bottom Row: Top Gifters (center) + Timer/StartBattle (center) - absolute positioned */}
       {(isBattleSession || (isCohostSession && canPublish)) && !isInCooldown && (
-        <div className="w-full flex items-center justify-center px-2 py-1 gap-4">
+        <div className="absolute bottom-0 left-0 right-0 z-10 flex items-center justify-center px-2 py-1 gap-4">
           {/* Timer (active battle) / Start Battle (cohost) */}
           <div className="flex-shrink-0">
             {isBattleSession && isBattleActive ? (
