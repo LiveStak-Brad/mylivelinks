@@ -1488,23 +1488,25 @@ export default function BattleGridWrapper({
 
         {/* Bottom Row: Top Gifters (center) + Timer/StartBattle (center) - absolute positioned within padded container */}
         {/* Show for: battle sessions (all users), OR cohost ready to start (host only) */}
-        {(isBattleSession || (isCohostSession && canPublish)) && !isInCooldown && (
+        {(isBattleSession || (isCohostSession && canPublish)) && (
           <div className="absolute bottom-0 left-0 right-0 z-10 flex items-center justify-center px-2 py-1 gap-4">
             {/* Timer (active battle - show to ALL) / Start Battle (cohost - host only) */}
-            <div className="flex-shrink-0">
-              {isBattleSession && isBattleActive ? (
-                <BattleTimer
-                  remainingSeconds={remainingSeconds}
-                  phase="active"
-                  mode={session.mode}
-                  compact
-                />
-              ) : isCohostSession && canPublish ? (
-                <CohostStartBattleButton onStartBattle={handleStartBattle} />
-              ) : null}
-            </div>
+            {!isInCooldown && (
+              <div className="flex-shrink-0">
+                {isBattleSession && isBattleActive ? (
+                  <BattleTimer
+                    remainingSeconds={remainingSeconds}
+                    phase="active"
+                    mode={session.mode}
+                    compact
+                  />
+                ) : isCohostSession && canPublish ? (
+                  <CohostStartBattleButton onStartBattle={handleStartBattle} />
+                ) : null}
+              </div>
+            )}
 
-            {/* Top 3 Gifters - show during AND after battle until next battle starts */}
+            {/* Top 3 Gifters - show during battle, after battle, and in cooldown */}
             {isBattleSession && topGifters.length > 0 && (
               <TopGiftersDisplay
                 gifters={topGifters}
