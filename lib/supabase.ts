@@ -54,8 +54,20 @@ export function createClient() {
     return clientInstance;
   }
   
-  // Create singleton instance using SSR-compatible client
-  clientInstance = createBrowserClient(url, key);
+  // Create singleton instance using SSR-compatible client with persistent storage
+  clientInstance = createBrowserClient(url, key, {
+    auth: {
+      // Use localStorage for persistence (works in PWAs)
+      // This prevents session loss on page refresh
+      storage: typeof window !== 'undefined' ? window.localStorage : undefined,
+      // Auto-refresh tokens to prevent expiration
+      autoRefreshToken: true,
+      // Persist session across browser tabs
+      persistSession: true,
+      // Detect session from URL (for OAuth callbacks)
+      detectSessionInUrl: true,
+    },
+  });
   
   return clientInstance;
 }
