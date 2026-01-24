@@ -26,6 +26,7 @@
  */
 
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import Image from 'next/image';
 import { 
   Room, 
   RoomEvent, 
@@ -57,6 +58,7 @@ import BattleReadyModal from './BattleReadyModal';
 import useBattleScores from '@/hooks/useBattleScores';
 import TopGiftersDisplay, { TeamTopGifter } from './TopGiftersDisplay';
 import { createClient } from '@/lib/supabase';
+import { getAvatarUrl } from '@/lib/defaultAvatar';
 
 const normalizeParticipantId = (identity: string): string => {
   return identity
@@ -1491,19 +1493,34 @@ export default function BattleGridWrapper({
         {/* Bottom Row: Timer/Gifters - at bottom of flex column, above chat */}
         {(isBattleSession || (isCohostSession && canPublish)) && (
           <div className="w-full flex-shrink-0 flex items-center justify-between px-2 py-1">
-            {/* Left side: Gifters for first team/streamer */}
-            <div className="flex items-center gap-1">
+            {/* Left side: Top 3 gifters (bronze -> silver -> gold, closest to timer) */}
+            <div className="flex items-center gap-1 flex-1 justify-end">
               {isBattleSession && topGifters.length > 0 && (
-                <TopGiftersDisplay
-                  gifters={topGifters.filter(g => g.rank <= 3)}
-                  side="A"
-                  color={TEAM_COLORS.A}
-                />
+                <>
+                  {topGifters.slice(0, 3).reverse().map((gifter) => (
+                    <div
+                      key={gifter.profile_id}
+                      className="w-8 h-8 rounded-full overflow-hidden flex-shrink-0"
+                      style={{ 
+                        border: `2px solid ${gifter.rank === 1 ? '#FFD700' : gifter.rank === 2 ? '#C0C0C0' : '#CD7F32'}`,
+                        boxShadow: `0 0 6px ${gifter.rank === 1 ? '#FFD700' : gifter.rank === 2 ? '#C0C0C0' : '#CD7F32'}`
+                      }}
+                    >
+                      <Image
+                        src={getAvatarUrl(gifter.avatar_url)}
+                        alt={gifter.username}
+                        width={32}
+                        height={32}
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                  ))}
+                </>
               )}
             </div>
 
-            {/* Center: Timer or Start Battle button */}
-            <div className="flex-shrink-0">
+            {/* Center: Timer or Start Battle button - fixed width to prevent movement */}
+            <div className="flex-shrink-0 mx-2">
               {!isInCooldown && isBattleSession && isBattleActive ? (
                 <BattleTimer
                   remainingSeconds={remainingSeconds}
@@ -1513,12 +1530,33 @@ export default function BattleGridWrapper({
                 />
               ) : !isInCooldown && isCohostSession && canPublish && !isBattleActive ? (
                 <CohostStartBattleButton onStartBattle={handleStartBattle} />
-              ) : null}
+              ) : <div className="w-20" />}
             </div>
 
-            {/* Right side: Reserved for second team/streamer gifters (if needed) */}
-            <div className="flex items-center gap-1">
-              {/* Placeholder for now - will show team B gifters if 1v1 */}
+            {/* Right side: Same gifters mirrored (gold -> silver -> bronze, closest to timer) */}
+            <div className="flex items-center gap-1 flex-1 justify-start">
+              {isBattleSession && topGifters.length > 0 && (
+                <>
+                  {topGifters.slice(0, 3).map((gifter) => (
+                    <div
+                      key={`r-${gifter.profile_id}`}
+                      className="w-8 h-8 rounded-full overflow-hidden flex-shrink-0"
+                      style={{ 
+                        border: `2px solid ${gifter.rank === 1 ? '#FFD700' : gifter.rank === 2 ? '#C0C0C0' : '#CD7F32'}`,
+                        boxShadow: `0 0 6px ${gifter.rank === 1 ? '#FFD700' : gifter.rank === 2 ? '#C0C0C0' : '#CD7F32'}`
+                      }}
+                    >
+                      <Image
+                        src={getAvatarUrl(gifter.avatar_url)}
+                        alt={gifter.username}
+                        width={32}
+                        height={32}
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                  ))}
+                </>
+              )}
             </div>
           </div>
         )}
