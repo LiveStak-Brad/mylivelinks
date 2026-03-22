@@ -1463,7 +1463,12 @@ export default function BattleGridWrapper({
           />
         </div>
       ) : (
-        isBattleSession && console.log('[BattleGrid] Score bar NOT showing. battleStates.size:', battleStates.size)
+        (() => {
+          if (isBattleSession) {
+            console.log('[BattleGrid] Score bar NOT showing. battleStates.size:', battleStates.size);
+          }
+          return null;
+        })()
       )}
       
       {/* Grid Container - flex-1 takes remaining space */}
@@ -1499,83 +1504,80 @@ export default function BattleGridWrapper({
             />
           </div>
         )}
-
-        {/* Bottom Row: Timer/Gifters - at bottom of flex column, above chat */}
-        {(isBattleSession || (isCohostSession && canPublish)) && (
-          <>
-            {/* Gradient overlay to hide chat below - positioned absolutely to extend beyond grid */}
-            <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-black via-black to-transparent pointer-events-none z-20" />
-            
-            <div className="w-full flex-shrink-0 flex items-center justify-between px-2 py-2 mb-4 relative z-30">
-            {/* Left side: Team A top 3 gifters (bronze -> silver -> gold, closest to timer) */}
-            <div className="flex items-center gap-1 flex-1 justify-end">
-              {isBattleSession && topGiftersByTeam['A'] && topGiftersByTeam['A'].length > 0 && (
-                <>
-                  {topGiftersByTeam['A'].slice(0, 3).reverse().map((gifter) => (
-                    <div
-                      key={gifter.profile_id}
-                      className="w-8 h-8 rounded-full overflow-hidden flex-shrink-0"
-                      style={{ 
-                        border: `2px solid ${gifter.rank === 1 ? '#FFD700' : gifter.rank === 2 ? '#C0C0C0' : '#CD7F32'}`,
-                        boxShadow: `0 0 6px ${gifter.rank === 1 ? '#FFD700' : gifter.rank === 2 ? '#C0C0C0' : '#CD7F32'}`
-                      }}
-                    >
-                      <Image
-                        src={getAvatarUrl(gifter.avatar_url)}
-                        alt={gifter.username}
-                        width={32}
-                        height={32}
-                        className="w-full h-full object-cover"
-                      />
-                    </div>
-                  ))}
-                </>
-              )}
-            </div>
-
-            {/* Center: Timer or Start Battle button - fixed width to prevent movement */}
-            <div className="flex-shrink-0 mx-2">
-              {!isInCooldown && isBattleSession && isBattleActive ? (
-                <BattleTimer
-                  remainingSeconds={remainingSeconds}
-                  phase="active"
-                  mode={session.mode}
-                  compact
-                />
-              ) : !isInCooldown && isCohostSession && canPublish && !isBattleActive ? (
-                <CohostStartBattleButton onStartBattle={handleStartBattle} />
-              ) : <div className="w-20" />}
-            </div>
-
-            {/* Right side: Team B top 3 gifters (gold -> silver -> bronze, closest to timer) */}
-            <div className="flex items-center gap-1 flex-1 justify-start">
-              {isBattleSession && topGiftersByTeam['B'] && topGiftersByTeam['B'].length > 0 && (
-                <>
-                  {topGiftersByTeam['B'].slice(0, 3).map((gifter) => (
-                    <div
-                      key={`r-${gifter.profile_id}`}
-                      className="w-8 h-8 rounded-full overflow-hidden flex-shrink-0"
-                      style={{ 
-                        border: `2px solid ${gifter.rank === 1 ? '#FFD700' : gifter.rank === 2 ? '#C0C0C0' : '#CD7F32'}`,
-                        boxShadow: `0 0 6px ${gifter.rank === 1 ? '#FFD700' : gifter.rank === 2 ? '#C0C0C0' : '#CD7F32'}`
-                      }}
-                    >
-                      <Image
-                        src={getAvatarUrl(gifter.avatar_url)}
-                        alt={gifter.username}
-                        width={32}
-                        height={32}
-                        className="w-full h-full object-cover"
-                      />
-                    </div>
-                  ))}
-                </>
-              )}
-            </div>
-            </div>
-          </>
-        )}
       </div>
+      
+      {/* Bottom Row: Timer/Gifters - BELOW the grid, above chat */}
+      {(isBattleSession || (isCohostSession && canPublish)) && (
+        <div className="w-full flex-shrink-0 flex items-center justify-between px-2 py-2 mb-4 relative z-30">
+          {/* Gradient extending DOWN from this row to hide chat below */}
+          <div className="absolute top-0 left-0 right-0 h-28 bg-gradient-to-b from-black via-black/80 to-transparent pointer-events-none -z-10" />
+          {/* Left side: Team A top 3 gifters (bronze -> silver -> gold, closest to timer) */}
+          <div className="flex items-center gap-1 flex-1 justify-end">
+            {isBattleSession && topGiftersByTeam['A'] && topGiftersByTeam['A'].length > 0 && (
+              <>
+                {topGiftersByTeam['A'].slice(0, 3).reverse().map((gifter) => (
+                  <div
+                    key={gifter.profile_id}
+                    className="w-8 h-8 rounded-full overflow-hidden flex-shrink-0"
+                    style={{ 
+                      border: `2px solid ${gifter.rank === 1 ? '#FFD700' : gifter.rank === 2 ? '#C0C0C0' : '#CD7F32'}`,
+                      boxShadow: `0 0 6px ${gifter.rank === 1 ? '#FFD700' : gifter.rank === 2 ? '#C0C0C0' : '#CD7F32'}`
+                    }}
+                  >
+                    <Image
+                      src={getAvatarUrl(gifter.avatar_url)}
+                      alt={gifter.username}
+                      width={32}
+                      height={32}
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                ))}
+              </>
+            )}
+          </div>
+
+          {/* Center: Timer or Start Battle button - fixed width to prevent movement */}
+          <div className="flex-shrink-0 mx-2">
+            {!isInCooldown && isBattleSession && isBattleActive ? (
+              <BattleTimer
+                remainingSeconds={remainingSeconds}
+                phase="active"
+                mode={session.mode}
+                compact
+              />
+            ) : !isInCooldown && isCohostSession && canPublish && !isBattleActive ? (
+              <CohostStartBattleButton onStartBattle={handleStartBattle} />
+            ) : <div className="w-20" />}
+          </div>
+
+          {/* Right side: Team B top 3 gifters (gold -> silver -> bronze, closest to timer) */}
+          <div className="flex items-center gap-1 flex-1 justify-start">
+            {isBattleSession && topGiftersByTeam['B'] && topGiftersByTeam['B'].length > 0 && (
+              <>
+                {topGiftersByTeam['B'].slice(0, 3).map((gifter) => (
+                  <div
+                    key={`r-${gifter.profile_id}`}
+                    className="w-8 h-8 rounded-full overflow-hidden flex-shrink-0"
+                    style={{ 
+                      border: `2px solid ${gifter.rank === 1 ? '#FFD700' : gifter.rank === 2 ? '#C0C0C0' : '#CD7F32'}`,
+                      boxShadow: `0 0 6px ${gifter.rank === 1 ? '#FFD700' : gifter.rank === 2 ? '#C0C0C0' : '#CD7F32'}`
+                    }}
+                  >
+                    <Image
+                      src={getAvatarUrl(gifter.avatar_url)}
+                      alt={gifter.username}
+                      width={32}
+                      height={32}
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                ))}
+              </>
+            )}
+          </div>
+        </div>
+      )}
       
       {/* Cooldown controls (battle only, host only) */}
       {isBattleSession && isInCooldown && canPublish && (
