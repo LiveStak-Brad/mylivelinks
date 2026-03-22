@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server';
 import { requireOwner } from '@/lib/rbac';
+import { getOllamaUpstreamHeaders } from '@/lib/ollama-upstream-headers';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -41,10 +42,10 @@ export async function POST(request: NextRequest) {
   try {
     const upstream = await fetch(`${baseUrl}/api/generate`, {
       method: 'POST',
-      headers: {
+      headers: getOllamaUpstreamHeaders({
         'Content-Type': request.headers.get('content-type') ?? 'application/json',
         Accept: request.headers.get('accept') ?? '*/*',
-      },
+      }),
       body: request.body,
       duplex: 'half',
     } as RequestInit & { duplex: 'half' });

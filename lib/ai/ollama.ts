@@ -1,4 +1,5 @@
 import { setTimeout as delayTimeout } from 'timers/promises';
+import { getOllamaUpstreamHeaders } from '@/lib/ollama-upstream-headers';
 
 const DEFAULT_BASE_URL = (process.env.OLLAMA_BASE_URL ?? 'http://127.0.0.1:11434').replace(/\/$/, '');
 const DEFAULT_ASSISTANT_MODEL = process.env.OLLAMA_ASSISTANT_MODEL ?? 'llama3.3:latest';
@@ -51,9 +52,9 @@ async function postChat(payload: OllamaChatPayload): Promise<OllamaJSONResult<an
     try {
       const response = await fetch(`${DEFAULT_BASE_URL}/api/chat`, {
         method: 'POST',
-        headers: {
+        headers: getOllamaUpstreamHeaders({
           'Content-Type': 'application/json',
-        },
+        }),
         body: JSON.stringify({
           model: payload.model,
           stream: false,

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireOwner } from '@/lib/rbac';
+import { getOllamaUpstreamHeaders } from '@/lib/ollama-upstream-headers';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -43,7 +44,10 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const upstream = await fetch(`${baseUrl}/api/tags`, { cache: 'no-store' });
+    const upstream = await fetch(`${baseUrl}/api/tags`, {
+      cache: 'no-store',
+      headers: getOllamaUpstreamHeaders(),
+    });
 
     const headers = new Headers();
     const contentType = upstream.headers.get('content-type');
